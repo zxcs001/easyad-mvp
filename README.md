@@ -2,7 +2,7 @@
 
 Next.js MVP for a multi-tenant out-of-home advertising marketplace.
 
-## Local PostgreSQL
+## Local PostgreSQL Database
 
 The app now uses PostgreSQL through `pg`. It reads `DATABASE_URL` first, then `POSTGRES_URL`, and falls back to:
 
