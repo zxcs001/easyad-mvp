@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(echo \"TSC_DONE_EXIT=$?\")",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__visualize__read_me",
+      "Bash(curl -s \"http://localhost:3000/_next/static/chunks/_1ifbioz._.css\")",
+      "Read(//tmp/**)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(node -e \"const {DatabaseSync}=require\\('node:sqlite'\\); const db=new DatabaseSync\\(':memory:'\\); db.exec\\('CREATE TABLE t\\(x\\)'\\); db.prepare\\('INSERT INTO t VALUES \\(?\\)'\\).run\\(42\\); console.log\\('node:sqlite OK', db.prepare\\('SELECT x FROM t'\\).get\\(\\)\\);\")",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright *)"
+    ]
+  }
+}
