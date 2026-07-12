@@ -1,0 +1,277 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.device-player-preview .weather-panel {
+  gap: 8px;
+  padding: 10px;
+}
+
+.device-player-preview .weather-forecast,
+.device-player-preview .device-widget-source {
+  display: none;
+}
+
+.device-player-preview .device-clock strong {
+  font-size: clamp(1.1rem,2vw,1.8rem);
+}
+
+.device-player-preview .device-clock span,
+.device-player-preview .device-clock small,
+.device-player-preview .weather-now span,
+.device-player-preview .weather-meta,
+.device-player-preview .weather-compact span {
+  font-size: .7rem;
+}
+
+.device-player-preview .weather-now strong,
+.device-player-preview .weather-compact strong {
+  font-size: clamp(1.1rem,2.4vw,1.9rem);
+}
+
+.device-widget-eyebrow {
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #ffffff80;
+  font-size: .7rem;
+  font-weight: 800;
+}
+
+.device-widget-source {
+  color: #fff6;
+  font-size: .72rem;
+}
+
+.device-clock {
+  gap: 2px;
+  display: grid;
+}
+
+.device-clock strong {
+  letter-spacing: -.01em;
+  font-size: clamp(1.8rem,3.4vw,2.8rem);
+  line-height: 1;
+}
+
+.device-clock span {
+  color: #ffffffbd;
+  font-size: .92rem;
+}
+
+.device-clock small {
+  color: #ffffff80;
+  font-size: .78rem;
+}
+
+.weather-panel {
+  background: #ffffff08;
+  border: 1px solid #ffffff14;
+  border-radius: 14px;
+  gap: 14px;
+  padding: 16px;
+  display: grid;
+}
+
+.weather-now {
+  align-items: center;
+  gap: 14px;
+  display: flex;
+}
+
+.weather-now strong {
+  font-size: clamp(2rem,4vw,3rem);
+  line-height: 1;
+  display: block;
+}
+
+.weather-now span {
+  color: #ffffffbd;
+}
+
+.weather-meta {
+  color: #ffffffa8;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: .84rem;
+  display: flex;
+}
+
+.weather-forecast {
+  border-top: 1px solid #ffffff14;
+  grid-template-columns: repeat(4,1fr);
+  gap: 8px;
+  padding-top: 12px;
+  display: grid;
+}
+
+.weather-day {
+  text-align: center;
+  justify-items: center;
+  gap: 4px;
+  display: grid;
+}
+
+.weather-day span {
+  color: #fff9;
+  font-size: .76rem;
+}
+
+.weather-day strong {
+  font-size: .95rem;
+}
+
+.weather-day small {
+  color: #ffffff80;
+  font-size: .76rem;
+}
+
+.weather-compact {
+  align-items: center;
+  gap: 10px;
+  display: inline-flex;
+}
+
+.weather-compact strong {
+  font-size: clamp(1.4rem,2.6vw,2rem);
+}
+
+.weather-compact span {
+  color: #ffffffb3;
+  font-size: .86rem;
+}
+
+.civic-notice-list {
+  gap: 10px;
+  display: grid;
+}
+
+.civic-notice {
+  border-left: 3px solid var(--green);
+  background: #ffffff0a;
+  border-radius: 0 10px 10px 0;
+  gap: 3px;
+  padding: 12px 14px;
+  display: grid;
+}
+
+.civic-notice strong {
+  font-size: .96rem;
+}
+
+.civic-notice span {
+  color: #ffffffad;
+  font-size: .84rem;
+  line-height: 1.4;
+}
+
+.civic-reserved {
+  background: #ffffff05;
+  border: 2px dashed #ffffff38;
+  border-radius: 12px;
+  align-content: center;
+  gap: 6px;
+  min-height: 120px;
+  padding: 16px;
+  display: grid;
+}
+
+.civic-reserved span:last-child {
+  color: #fff9;
+  font-size: .86rem;
+}
+
+.transit-panel {
+  gap: 10px;
+  display: grid;
+}
+
+.transit-stop {
+  color: #ffffffbd;
+  font-size: .9rem;
+}
+
+.transit-list {
+  gap: 8px;
+  display: grid;
+}
+
+.transit-row {
+  background: #ffffff0a;
+  border-radius: 10px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  display: grid;
+}
+
+.transit-route {
+  background: var(--green);
+  color: #fff;
+  border-radius: 8px;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  font-weight: 850;
+  display: inline-grid;
+}
+
+.transit-dest {
+  color: #ffffffdb;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .9rem;
+  overflow: hidden;
+}
+
+.transit-eta {
+  align-items: baseline;
+  gap: 3px;
+  font-size: 1.2rem;
+  font-weight: 850;
+  display: inline-flex;
+}
+
+.transit-eta small {
+  color: #ffffff8c;
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.transit-ticker {
+  align-items: center;
+  gap: 14px;
+  padding: 10px clamp(16px,2vw,30px);
+  display: flex;
+}
+
+.transit-ticker-label {
+  background: var(--green);
+  color: #fff;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  flex: none;
+  padding: 5px 10px;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.transit-ticker-track {
+  color: #ffffffd1;
+  white-space: nowrap;
+  gap: 26px;
+  font-size: .9rem;
+  display: flex;
+  overflow: hidden;
+}
+
+.transit-ticker-item b {
+  color: #fff;
+}
+
+.transit-ticker-item em {
+  color: var(--green);
+  font-style: normal;
+  font-weight: 800;
+}
+

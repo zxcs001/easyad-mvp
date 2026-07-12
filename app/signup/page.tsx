@@ -1,3 +1,4 @@
+import "../component/auth.css";
 import Link from "next/link";
 import { Brand } from "../component/shared-ui";
 import { countUsers } from "../lib/db";

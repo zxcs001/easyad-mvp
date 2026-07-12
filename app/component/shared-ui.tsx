@@ -1,5 +1,6 @@
 "use client";
 
+import "./shared-ui.css";
 import { Booking, InventoryItem } from "../data";
 import { money } from "../utils";
 

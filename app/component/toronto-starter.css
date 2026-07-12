@@ -1,0 +1,233 @@
+.toronto-starter {
+  position: fixed;
+  z-index: 50000;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  color: #111713;
+  background: #c7cec5;
+  opacity: 1;
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+.toronto-starter.is-leaving {
+  opacity: 0;
+  transform: scale(1.015);
+  pointer-events: none;
+}
+
+.toronto-map,
+.toronto-map-canvas,
+.toronto-map-wash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.toronto-map-canvas {
+  background: #b9c5bd;
+}
+
+.toronto-map-wash {
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #f8f6ed2b 0%, transparent 34%, transparent 68%, #dbe0d29e 100%);
+}
+
+.toronto-starter-brand,
+.toronto-starter-meta,
+.toronto-starter-action {
+  position: absolute;
+  z-index: 3;
+}
+
+.toronto-starter-brand {
+  top: 28px;
+  left: 32px;
+  display: grid;
+  gap: 3px;
+  padding-left: 13px;
+  border-left: 4px solid #111713;
+  text-transform: uppercase;
+}
+
+.toronto-starter-brand strong {
+  font-size: .92rem;
+  letter-spacing: .08em;
+}
+
+.toronto-starter-brand span,
+.toronto-starter-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .64rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.toronto-starter-action {
+  top: 50%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(92vw, 620px);
+  transform: translate(-50%, -50%);
+}
+
+.toronto-starter-action > p {
+  color: #111a15c7;
+  background: #f5f4eb42;
+  border: 1px solid #ffffff61;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  margin: 0 0 -6px;
+  padding: 7px 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.toronto-starter-action button {
+  border: 1px solid #ffffff8c;
+  color: #101914e8;
+  background: #f3f2e83d;
+  -webkit-backdrop-filter: blur(18px) saturate(.85);
+  backdrop-filter: blur(18px) saturate(.85);
+  grid-template-columns: auto 42px;
+  align-items: center;
+  gap: 24px;
+  min-height: 88px;
+  padding: 13px 17px 13px 28px;
+  font-family: Iowan Old Style, Baskerville, Times New Roman, Times, serif;
+  font-size: 2.7rem;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: none;
+  box-shadow: inset 0 0 0 1px #14201912, 0 18px 54px #16221b1f;
+  transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease;
+  display: grid;
+}
+
+.toronto-starter-action button:hover,
+.toronto-starter-action button:focus-visible {
+  color: #07100c;
+  background: #f7f6ed9e;
+  border-color: #ffffffd9;
+  transform: translateY(-3px);
+}
+
+.toronto-starter-action button svg {
+  border: 1px solid #17211b3d;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  stroke-width: 1.5px;
+  transition: color .22s ease, background .22s ease, transform .22s ease;
+}
+
+.toronto-starter-action button:hover svg,
+.toronto-starter-action button:focus-visible svg {
+  color: #f7f6ed;
+  background: #101914;
+  transform: rotate(5deg);
+}
+
+.toronto-starter-action label {
+  grid-template-columns: 18px auto;
+  align-items: center;
+  gap: 8px;
+  color: #101914d9;
+  background: #f5f4eb52;
+  border: 1px solid #ffffff70;
+  -webkit-backdrop-filter: blur(12px) saturate(.8);
+  backdrop-filter: blur(12px) saturate(.8);
+  padding: 8px 12px;
+  font-size: .72rem;
+  font-weight: 650;
+  box-shadow: 0 10px 30px #16221b14;
+}
+
+.toronto-starter-action input {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  accent-color: #111713;
+}
+
+.toronto-starter-meta {
+  right: 30px;
+  bottom: 24px;
+  left: 30px;
+  justify-content: space-between;
+  display: flex;
+}
+
+.toronto-map-loader,
+.toronto-map-fallback {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: #17201a;
+  background: #c7cec5;
+  display: grid;
+  transition: opacity .5s ease;
+}
+
+.toronto-map-loader i {
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(90deg, #17201a 40%, #ffffff00 40%);
+  animation: toronto-load 1.2s linear infinite;
+}
+
+.toronto-map-loader span,
+.toronto-map-fallback small {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.toronto-map-fallback span {
+  font-size: 4rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+body.starter-active {
+  overflow: hidden;
+}
+
+body.starter-active .chatbot-launcher,
+body.starter-active .chatbot-panel {
+  display: none;
+}
+
+@keyframes toronto-load {
+  from { transform: translateX(-70px); }
+  to { transform: translateX(70px); }
+}
+
+@media (max-width: 640px) {
+  .toronto-starter-brand { top: 18px; left: 18px; }
+  .toronto-starter-action { gap: 13px; }
+  .toronto-starter-action button { grid-template-columns: minmax(0,auto) 36px; gap: 14px; min-height: 72px; padding: 10px 12px 10px 20px; font-size: 1.75rem; }
+  .toronto-starter-action button svg { width: 36px; height: 36px; padding: 8px; }
+  .toronto-starter-meta { right: 16px; bottom: 14px; left: 16px; }
+  .toronto-starter-meta span:last-child { display: none; }
+  .toronto-map-fallback span { font-size: 2.7rem; }
+  .toronto-starter .maplibregl-ctrl-top-right { top: 70px; right: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toronto-starter { transition: opacity .15s linear; }
+  .toronto-map-loader i { animation: none; }
+}

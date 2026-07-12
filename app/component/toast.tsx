@@ -1,5 +1,6 @@
 "use client";
 
+import "./toast.css";
 import { useEffect, useState } from "react";
 
 export type ToastTone = "success" | "error" | "info";

@@ -1,5 +1,6 @@
 "use client";
 
+import "./chatbot.css";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../types";
 import { toast } from "./toast";

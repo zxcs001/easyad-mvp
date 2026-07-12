@@ -1,5 +1,6 @@
 "use client";
 
+import "./discover-view.css";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, InventoryItem, businesses, formats } from "../data";
 import type { Filters, MapPoint } from "../types";

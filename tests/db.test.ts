@@ -71,13 +71,14 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
     assert.deepEqual((await db.updateInventoryRecord(inventory.id, { tags: ["Urban", "near university", "urban"] }))?.tags, ["urban", "near-university"]);
     assert.equal((await db.getInventory(inventory.id))?.maxLoopSeconds, 180);
 
+    const dateAtOffset = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
     const booking: Booking = {
       id: "BK-DB-1",
       advertiser: "Database Advertiser",
       inventoryId: inventory.id,
       campaign: "Database Campaign",
-      start: "2026-07-10",
-      end: "2026-07-20",
+      start: dateAtOffset(-1),
+      end: dateAtOffset(1),
       adSlots: 2,
       creativeStatus: "pending review",
       status: "pending approval",
@@ -145,6 +146,8 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
 
     assert.equal(uploadedCreative.source, "upload");
     assert.equal((await db.listCreatives(booking.id))[0]?.publicUrl, "/media/CRV-DB-UPLOAD");
+    assert.equal((await db.getPublicMediaResource("CRV-DB-UPLOAD")), null);
+    assert.equal((await db.updatePendingCreativeStatuses(booking.id, "approved"))[0]?.status, "approved");
     assert.equal((await db.getPublicMediaResource("CRV-DB-UPLOAD"))?.originalName, "spot.mp4");
     assert.deepEqual((await db.listInventoryAdvertiserResources(inventory.id)).map((resource) => ({
       id: resource.id,
@@ -157,7 +160,7 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       advertiser: "Database Advertiser",
       publicUrl: "/media/CRV-DB-UPLOAD",
     }]);
-    assert.equal((await db.listInventoryAdvertiserResources(inventory.id, "2026-07-21")).length, 0);
+    assert.equal((await db.listInventoryAdvertiserResources(inventory.id, dateAtOffset(2))).length, 0);
     assert.equal((await db.getPublicMediaResource("CRV-DB-UPLOAD"))?.originalName, "spot.mp4");
 
     await db.deleteInventoryRecord(inventory.id);

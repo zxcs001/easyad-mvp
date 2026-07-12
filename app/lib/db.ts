@@ -655,6 +655,11 @@ export async function listCreatives(bookingId?: string) {
   return result.map(mapCreative);
 }
 
+export async function updatePendingCreativeStatuses(bookingId: string, status: Extract<Creative["status"], "approved" | "needs changes">) {
+  await exec("UPDATE creatives SET status = $1 WHERE booking_id = $2 AND status = 'pending review'", [status, bookingId]);
+  return listCreatives(bookingId);
+}
+
 export async function createCreative(creative: Omit<Creative, "id" | "createdAt"> & { id?: string; storagePath?: string | null }) {
   const id = creative.id ?? `CRV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
   const createdAt = new Date().toISOString();
@@ -667,12 +672,18 @@ export async function createCreative(creative: Omit<Creative, "id" | "createdAt"
 }
 
 export async function getPublicMediaResource(id: string) {
-  const media = await row<PublicMediaRow>("SELECT original_name, mime_type, storage_path FROM media_resources WHERE id = $1", [id]);
+  const media = await row<PublicMediaRow>(`
+    SELECT media_resources.original_name, media_resources.mime_type, media_resources.storage_path
+    FROM media_resources
+    JOIN inventory ON inventory.id = media_resources.inventory_id
+    WHERE media_resources.id = $1
+      AND inventory.approval_status = 'approved'
+  `, [id]);
   if (media) return {
     originalName: media.original_name ?? "media-resource",
     mimeType: media.mime_type ?? "application/octet-stream",
     storagePath: media.storage_path,
-    cacheable: true,
+    cacheable: false,
   };
 
   const creative = await row<PublicMediaRow>(`
@@ -681,8 +692,10 @@ export async function getPublicMediaResource(id: string) {
     JOIN bookings ON bookings.id = creatives.booking_id
     WHERE creatives.id = $1
       AND creatives.source = 'upload'
+      AND creatives.status = 'approved'
       AND creatives.storage_path IS NOT NULL
       AND bookings.status IN ('approved', 'scheduled', 'live')
+      AND bookings.start_date <= CURRENT_DATE::text
       AND bookings.end_date >= CURRENT_DATE::text
   `, [id]);
   return creative ? {
@@ -706,8 +719,10 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
     JOIN bookings ON bookings.id = creatives.booking_id
     WHERE bookings.inventory_id = $1
       AND creatives.source = 'upload'
+      AND creatives.status = 'approved'
       AND creatives.public_url IS NOT NULL
       AND bookings.status IN ('approved', 'scheduled', 'live')
+      AND bookings.start_date <= $2
       AND bookings.end_date >= $2
     ORDER BY creatives.created_at DESC
   `, [inventoryId, asOf]);

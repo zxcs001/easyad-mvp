@@ -1,0 +1,370 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.approvals-grid {
+  grid-template-columns: minmax(0,1fr) minmax(320px,.8fr);
+}
+
+.inventory-grid {
+  grid-template-columns: minmax(0,1fr) 360px;
+}
+
+.media-card a {
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.media-upload {
+  gap: 12px;
+  display: grid;
+}
+
+.approval-actions button,
+.approval-actions a {
+  border: 1px solid #0000;
+  border-radius: 7px;
+  justify-content: center;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  font-weight: 800;
+  display: inline-flex;
+}
+
+.approval-list,
+.automation-list {
+  gap: 10px;
+  margin-top: 14px;
+  display: grid;
+}
+
+.automation-list>div {
+  border: 1px solid var(--line);
+  background: #fbfcfb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.automation-list span {
+  color: var(--muted);
+  font-size: .82rem;
+  display: block;
+}
+
+.inventory-table {
+  gap: 8px;
+  display: grid;
+}
+
+.media-upload {
+  margin-bottom: 14px;
+}
+
+.media-list {
+  gap: 10px;
+  display: grid;
+}
+
+.media-card {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  grid-template-columns: 96px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  display: grid;
+}
+
+.media-card img,
+.media-card video {
+  object-fit: cover;
+  background: #edf1f2;
+  border-radius: 7px;
+  width: 96px;
+  height: 70px;
+}
+
+.media-card div {
+  gap: 3px;
+  min-width: 0;
+  display: grid;
+}
+
+.media-card span,
+.media-card a {
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .78rem;
+  overflow: hidden;
+}
+
+.inventory-management-table .table-head,
+.inventory-management-table .table-row {
+  grid-template-columns: 1.2fr .85fr .85fr .72fr .75fr .9fr .9fr;
+}
+
+.calendar {
+  overflow-x: auto;
+}
+
+.calendar-head,
+.calendar-row {
+  grid-template-columns: 220px repeat(8,minmax(92px,1fr));
+  align-items: center;
+  gap: 8px;
+  min-width: 980px;
+  display: grid;
+}
+
+.calendar-head {
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-size: .76rem;
+  font-weight: 850;
+}
+
+.calendar-row {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.cal-cell {
+  border-radius: 7px;
+  place-items: center;
+  min-height: 34px;
+  font-size: .76rem;
+  font-weight: 850;
+  display: grid;
+}
+
+.cal-cell.available {
+  background: var(--soft-green);
+  color: var(--green-dark);
+}
+
+.cal-cell.booked {
+  background: var(--soft-blue);
+  color: var(--blue);
+}
+
+.approval-list {
+  margin-top: 0;
+}
+
+.approval-history {
+  gap: 8px;
+  display: grid;
+}
+
+.approval-history-row {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  grid-template-columns: .72fr 1.4fr 1fr 1.1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  display: grid;
+}
+
+.approval-history-row strong,
+.approval-history-row small {
+  display: block;
+}
+
+.approval-history-row small {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.approval-card {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  grid-template-columns: minmax(220px,1fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  display: grid;
+}
+
+.approval-card.has-creative-preview {
+  grid-template-columns: minmax(220px,1fr) minmax(132px,174px) auto auto auto;
+}
+
+.approval-creative-preview {
+  color: var(--blue);
+  gap: 5px;
+  font-size: .76rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: grid;
+}
+
+.approval-creative-preview img,
+.approval-creative-preview video {
+  border: 1px solid var(--line);
+  object-fit: cover;
+  background: #eef3f6;
+  border-radius: 4px;
+  width: 100%;
+  height: 84px;
+  display: block;
+}
+
+.approval-creative-preview:hover img,
+.approval-creative-preview:hover video {
+  border-color: var(--blue);
+}
+
+.approval-card strong,
+.approval-card small {
+  display: block;
+}
+
+.approval-card small {
+  color: var(--muted);
+}
+
+.approval-actions {
+  gap: 8px;
+  display: flex;
+}
+
+.inventory-draft-actions {
+  align-items: center;
+  gap: 8px;
+  display: flex;
+}
+
+.tag-editor {
+  grid-column: 1/-1;
+  gap: 8px;
+  display: grid;
+}
+
+.tag-editor>.field-label {
+  margin-bottom: 4px;
+}
+
+.approval-actions button:first-child,
+.approval-actions a:first-child {
+  background: var(--green);
+  color: #fff;
+}
+
+.approval-actions button:last-child,
+.approval-actions a:last-child {
+  color: #8f301f;
+  background: #fff0ec;
+  border-color: #efc2b8;
+}
+
+.decision-banner,
+.empty-state {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  display: grid;
+}
+
+.decision-banner.good {
+  color: #276849;
+  background: #eaf7ef;
+  border-color: #bfddca;
+}
+
+.decision-banner.bad {
+  color: #9d4534;
+  background: #fff0ed;
+  border-color: #f1c5ba;
+}
+
+.empty-state {
+  color: var(--muted);
+  background: #f8faf9;
+}
+
+@media (max-width:900px) {
+
+.inventory-grid,
+.approvals-grid {
+  grid-template-columns: 1fr;
+  grid-template-areas: none;
+}
+
+.approval-card,
+.approval-history-row,
+.media-card {
+  grid-template-columns: 1fr;
+}
+
+.media-card img,
+.media-card video {
+  width: 100%;
+  height: 180px;
+}
+}
+
+@media (max-width:560px) {
+
+.approval-actions {
+  flex-direction: column;
+}
+}
+
+.automation-list>div,
+.approval-card,
+.media-card,
+.decision-banner,
+.empty-state {
+  border-radius: var(--radius-sm);
+  border-color: var(--line);
+}
+
+.approval-actions button,
+.approval-actions a {
+  letter-spacing: 0;
+  border-radius: 6px;
+  min-height: 36px;
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.inventory-table {
+  gap: 4px;
+}
+
+@media (max-width:600px) {
+
+.approval-card,
+.approval-history-row,
+.media-card {
+  gap: 10px;
+  padding: 11px;
+}
+
+.approval-card.has-creative-preview {
+  grid-template-columns: 1fr;
+}
+
+.approval-actions,
+.inventory-draft-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.approval-actions button,
+.approval-actions a,
+.inventory-draft-actions button {
+  width: 100%;
+}
+
+.calendar {
+  margin: 0 -14px;
+  padding: 0 14px 8px;
+}
+}

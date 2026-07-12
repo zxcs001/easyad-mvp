@@ -1,5 +1,6 @@
 "use client";
 
+import "./institution-team-view.css";
 import { useEffect, useState } from "react";
 import type { DbUser } from "../lib/db";
 import { PanelHeading } from "./shared-ui";

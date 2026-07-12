@@ -1,5 +1,6 @@
 "use client";
 
+import "./filters-panel.css";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { Filters } from "../types";
 import { FormatKey, InventoryItem, formats } from "../data";
@@ -127,7 +128,6 @@ export default function FiltersPanel({
         <input type="checkbox" name="showCompetitors" value="true" checked={filters.showCompetitors} onChange={(event) => setFilters((current) => ({ ...current, showCompetitors: event.target.checked }))} />
         Show nearby businesses
       </label>
-      <button className="primary-button wide" type="button">Apply filters</button>
     </form>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import "./place-panel.css";
 import { useEffect, useState } from "react";
 import { formats, type InventoryComment, type InventoryItem } from "../data";
 import { toast } from "./toast";

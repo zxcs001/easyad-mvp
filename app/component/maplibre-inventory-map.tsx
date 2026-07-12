@@ -1,5 +1,6 @@
 "use client";
 
+import "./maplibre-inventory-map.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { Feature, Polygon } from "geojson";

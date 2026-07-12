@@ -1,5 +1,6 @@
 "use client";
 
+import "./account-management-view.css";
 import { useEffect, useMemo, useState } from "react";
 import { Booking, Creative, InventoryItem, MediaResource, Role } from "../data";
 import type { DbUser } from "../lib/db";

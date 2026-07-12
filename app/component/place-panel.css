@@ -1,0 +1,248 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.place-overlay {
+  z-index: 10000;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  background: #101b2480;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  animation: .18s place-fade;
+  display: flex;
+  position: fixed;
+  inset: 0;
+}
+
+@keyframes place-fade{
+
+0% {
+  opacity: 0;
+}
+
+to {
+  opacity: 1;
+}
+}
+
+.place-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  width: min(520px,100%);
+  max-height: min(86vh,720px);
+  box-shadow: var(--shadow-lg);
+  flex-direction: column;
+  animation: .2s cubic-bezier(.16,1,.3,1) place-pop;
+  display: flex;
+  overflow: hidden;
+}
+
+@keyframes place-pop{
+
+0% {
+  opacity: 0;
+  transform: translateY(14px)scale(.98);
+}
+
+to {
+  opacity: 1;
+  transform: none;
+}
+}
+
+.place-header {
+  border-bottom: 1px solid var(--line);
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  display: flex;
+}
+
+.place-header strong {
+  margin-top: 2px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  display: block;
+}
+
+.place-address {
+  color: var(--muted);
+  margin-top: 2px;
+  font-size: .85rem;
+  display: block;
+}
+
+.place-close {
+  border: 1px solid var(--line);
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+  background: #fff;
+  border-radius: 8px;
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.place-close:hover {
+  color: var(--ink);
+  border-color: #c5cdc8;
+}
+
+.place-photo {
+  aspect-ratio: 16/9;
+  color: #ffffffeb;
+  background: radial-gradient(800px 300px at 70% -20%,#35a87c80,#0000 60%),linear-gradient(150deg,#1b2730,#243843);
+  place-items: center;
+  gap: 8px;
+  display: grid;
+  position: relative;
+}
+
+.place-photo svg {
+  fill: none;
+  stroke: #fffc;
+  stroke-width: 1.6px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  width: 48px;
+  height: 48px;
+}
+
+.place-photo span {
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #ffffffb3;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.place-comments {
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 18px 18px;
+  display: flex;
+}
+
+.place-comments h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.place-comment-list {
+  flex-direction: column;
+  flex: 1;
+  gap: 10px;
+  min-height: 60px;
+  max-height: 280px;
+  display: flex;
+  overflow-y: auto;
+}
+
+.place-comment {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 10px 12px;
+}
+
+.place-comment-meta {
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+  display: flex;
+}
+
+.place-comment-meta strong {
+  font-size: .88rem;
+}
+
+.place-comment-meta span {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.place-comment p {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.place-comment-empty {
+  min-height: 60px;
+  color: var(--muted);
+  text-align: center;
+  place-items: center;
+  padding: 14px;
+  font-size: .88rem;
+  display: grid;
+}
+
+.place-comment-form {
+  gap: 8px;
+  margin-top: 12px;
+  display: flex;
+}
+
+.place-comment-form textarea {
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  color: var(--ink);
+  font: inherit;
+  background: #fff;
+  flex: 1;
+  padding: 9px 11px;
+}
+
+.place-comment-form .primary-button {
+  flex: none;
+  align-self: stretch;
+}
+
+.place-comment-signin {
+  color: var(--muted);
+  margin: 12px 0 0;
+  font-size: .86rem;
+}
+
+@media (max-width:560px) {
+
+.place-overlay {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.place-panel {
+  width: 100%;
+  max-height: 92dvh;
+  border-radius: 12px 12px 0 0;
+  border-width: 1px 0 0;
+}
+
+.place-header,
+.place-comments {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.place-photo {
+  max-height: 190px;
+}
+
+.place-comment-form {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.place-comment-form .primary-button {
+  width: 100%;
+}
+}

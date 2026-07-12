@@ -1,0 +1,83 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.auth-page {
+  background: linear-gradient(135deg, #26735b1f, #2f5f9f1a), var(--bg);
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+}
+
+.auth-panel {
+  border: 1px solid var(--line);
+  width: min(520px,100%);
+  box-shadow: var(--shadow);
+  background: #fff;
+  border-radius: 8px;
+  gap: 18px;
+  padding: 24px;
+  display: grid;
+}
+
+.auth-copy {
+  gap: 8px;
+  display: grid;
+}
+
+.auth-copy h1 {
+  margin: 0;
+  font-size: clamp(2rem,6vw,3.6rem);
+  line-height: .96;
+}
+
+.auth-copy p,
+.auth-switch {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.auth-switch a {
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.auth-form {
+  gap: 12px;
+  display: grid;
+}
+
+.auth-error {
+  color: #9d4534;
+  background: #fff0ed;
+  border: 1px solid #f1c5ba;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.demo-accounts {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #f8faf9;
+  border-radius: 8px;
+  gap: 4px;
+  padding: 12px;
+  font-size: .84rem;
+  display: grid;
+}
+
+.demo-accounts strong {
+  color: var(--ink);
+}
+
+.auth-page {
+  background: radial-gradient(900px 520px at 82% -10%, #1f7a5a1f, transparent 60%), radial-gradient(720px 520px at 0% 110%, #2f5f9f1a, transparent 55%), var(--bg);
+}
+
+.auth-panel {
+  border-radius: var(--radius);
+  border-color: var(--line);
+  box-shadow: var(--shadow-lg);
+  padding: 30px;
+}
+

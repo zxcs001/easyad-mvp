@@ -1,5 +1,6 @@
 "use client";
 
+import "./precise-location-picker.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import { mapBounds } from "../utils";

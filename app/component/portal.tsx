@@ -1,5 +1,6 @@
 "use client";
 
+import "./portal.css";
 import { Booking, FormatKey, InventoryItem, Role, View, formats } from "../data";
 import type { DbUser } from "../lib/db";
 import type { Filters } from "../types";

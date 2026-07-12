@@ -19,6 +19,12 @@ npm run dev
 
 `npm run init` installs dependencies, copies `.env.example` to `.env.local` when needed, starts the bundled PostgreSQL service with Docker Compose, and waits until the configured databases are reachable.
 
+Seed the temporary role accounts and operator-owned Thunder Bay devices for local testing:
+
+```bash
+npm run seed:test-data
+```
+
 The local compose setup creates:
 
 - `ooh_market` for the app
@@ -42,6 +48,25 @@ Playwright starts the app on port `3100` so it does not collide with a normal de
 
 On macOS/Linux, use `export TEST_DATABASE_URL=...` instead of `set`.
 
+## Public Device Media API
+
+Published devices expose a read-only, CORS-enabled API for third-party integrations. Only operator media on an approved device and approved advertiser creative whose campaign is currently active are returned.
+
+List the currently visible media and totals for a device:
+
+```text
+GET /api/public/devices/INV-101/media
+```
+
+Access the first currently visible item or use the stable media ID returned by the list endpoint:
+
+```text
+GET /api/public/devices/INV-101/media/1
+GET /api/public/devices/INV-101/media/CRV-123
+```
+
+Image detail responses contain Base64 data. Video detail responses contain a public streaming URL. Append `?encoding=url` to an image detail request when a URL is preferred. Base64 responses default to a 20 MB limit, configurable with `PUBLIC_API_BASE64_MAX_BYTES` up to the platform's 50 MB upload limit.
+
 ## Production Notes
 
 Set these environment variables in your hosting platform:
@@ -51,6 +76,8 @@ DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB_NAME
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
 BOOTSTRAP_ADMIN_TOKEN=<strong-secret>
+APP_ORIGIN=https://your-public-domain.example
+PUBLIC_API_BASE64_MAX_BYTES=20971520
 ```
 
 The schema is created lazily on first database access. Use a managed PostgreSQL database such as Amazon RDS for production.

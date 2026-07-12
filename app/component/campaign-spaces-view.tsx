@@ -1,5 +1,6 @@
 "use client";
 
+import "./campaign-spaces-view.css";
 import type { Booking, InventoryItem } from "../data";
 import type { DbUser } from "../lib/db";
 import { money, reservedLoopSeconds } from "../utils";

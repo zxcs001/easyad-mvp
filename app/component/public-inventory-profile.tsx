@@ -1,3 +1,4 @@
+import "./public-inventory-profile.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InventoryAdvertiserResource, MediaResource, formats } from "../data";
@@ -52,6 +53,7 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
           <Link href="/">Portal</Link>
           <Link href={`/devices/${inventory.id}`}>Device URL</Link>
           <Link href={`/inventory/${inventory.id}`}>Inventory URL</Link>
+          <a href={`/api/public/devices/${inventory.id}/media`}>Device API</a>
         </div>
       </header>
 

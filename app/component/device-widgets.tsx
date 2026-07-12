@@ -1,5 +1,6 @@
 "use client";
 
+import "./device-widgets.css";
 import { useEffect, useState } from "react";
 
 // --- deterministic per-device helpers ------------------------------------------

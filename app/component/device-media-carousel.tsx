@@ -1,5 +1,6 @@
 "use client";
 
+import "./device-media-carousel.css";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Fade from "embla-carousel-fade";

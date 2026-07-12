@@ -1,5 +1,6 @@
 "use client";
 
+import "./device-screen.css";
 import DeviceMediaCarousel, { DeviceMediaSlide } from "./device-media-carousel";
 import { DeviceTemplate } from "./device-templates";
 import { DeviceClock, PublicInfoPanel, TransitPanel, WeatherPanel } from "./device-widgets";
@@ -11,6 +12,7 @@ export default function DeviceScreen({
   slides,
   template,
   preview = false,
+  deviceId,
 }: {
   inventoryName: string;
   city: string;
@@ -18,6 +20,7 @@ export default function DeviceScreen({
   slides: DeviceMediaSlide[];
   template: DeviceTemplate;
   preview?: boolean;
+  deviceId?: string;
 }) {
   const stopName = `${city} - ${inventoryName}`;
   const media = (
@@ -74,6 +77,22 @@ export default function DeviceScreen({
       ) : null}
 
       {template === "fullscreen" ? media : null}
+      {!preview && deviceId ? <DeviceApiGuide deviceId={deviceId} deviceName={inventoryName} mediaCount={slides.length} /> : null}
     </Root>
+  );
+}
+
+function DeviceApiGuide({ deviceId, deviceName, mediaCount }: { deviceId: string; deviceName: string; mediaCount: number }) {
+  const apiPath = `/api/public/devices/${encodeURIComponent(deviceId)}/media`;
+  return (
+    <aside className="device-api-guide" aria-label={`${deviceName} developer API`}>
+      <div className="device-api-heading">
+        <span>Developer API</span>
+        <strong>{deviceName}</strong>
+        <small>{mediaCount} active media item{mediaCount === 1 ? "" : "s"}</small>
+      </div>
+      <a href={apiPath} target="_blank" rel="noreferrer"><code>GET {apiPath}</code></a>
+      <code>GET {apiPath}/{"{position-or-mediaId}"}</code>
+    </aside>
   );
 }

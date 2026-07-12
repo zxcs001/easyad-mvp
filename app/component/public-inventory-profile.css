@@ -1,0 +1,271 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.public-url-box {
+  background: var(--soft-blue);
+  border: 1px solid #cbd8e8;
+  border-radius: 8px;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 12px;
+  display: grid;
+}
+
+.public-url-box a {
+  color: var(--blue);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .85rem;
+  font-weight: 850;
+  overflow: hidden;
+}
+
+.public-device-page {
+  background: #f5f7f6;
+  align-content: start;
+  gap: 22px;
+  min-height: 100vh;
+  padding: clamp(18px,4vw,56px);
+  display: grid;
+}
+
+.public-device-hero {
+  border-bottom: 1px solid var(--line);
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding-bottom: 20px;
+  display: flex;
+}
+
+.public-device-hero h1 {
+  letter-spacing: 0;
+  max-width: 920px;
+  margin: 6px 0 8px;
+  font-size: clamp(2.4rem,6vw,5.8rem);
+  line-height: .92;
+}
+
+.public-device-hero p {
+  color: var(--muted);
+  margin: 0;
+  font-size: 1rem;
+}
+
+.public-device-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  display: flex;
+}
+
+.public-device-actions a,
+.public-media-body a {
+  border: 1px solid var(--line);
+  min-height: 38px;
+  color: var(--ink);
+  background: #fff;
+  border-radius: 7px;
+  justify-content: center;
+  align-items: center;
+  padding: 0 14px;
+  font-weight: 850;
+  display: inline-flex;
+}
+
+.public-device-summary {
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+  display: grid;
+}
+
+.public-metric,
+.public-empty,
+.public-media-card {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px #17202a14;
+}
+
+.public-metric {
+  gap: 5px;
+  padding: 14px;
+  display: grid;
+}
+
+.public-metric span,
+.public-media-body small {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.public-metric strong {
+  font-size: 1.15rem;
+}
+
+.public-device-section {
+  gap: 14px;
+  display: grid;
+}
+
+.public-device-preview {
+  aspect-ratio: 16/9;
+  border-radius: var(--radius-sm);
+  background: #050708;
+  border: 1px solid #1c2c35;
+  width: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  box-shadow: 0 16px 36px #18293029;
+}
+
+.public-device-preview .device-player-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.public-section-heading h2 {
+  letter-spacing: 0;
+  margin: 4px 0 0;
+  font-size: clamp(1.8rem,3vw,3rem);
+}
+
+.public-media-grid {
+  grid-template-columns: repeat(auto-fit,minmax(280px,1fr));
+  gap: 14px;
+  display: grid;
+}
+
+.public-media-card {
+  overflow: hidden;
+}
+
+.public-media-preview {
+  aspect-ratio: 16/9;
+  background: #17202a;
+  place-items: center;
+  display: grid;
+}
+
+.public-media-preview img,
+.public-media-preview video {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+.public-media-body {
+  gap: 8px;
+  padding: 14px;
+  display: grid;
+}
+
+.public-media-body h3,
+.public-media-body p {
+  margin: 0;
+}
+
+.public-media-body p {
+  color: #394650;
+  line-height: 1.45;
+}
+
+.public-media-body a {
+  justify-self: start;
+}
+
+.public-empty {
+  gap: 5px;
+  padding: 18px;
+  display: grid;
+}
+
+.public-empty span {
+  color: var(--muted);
+}
+
+.public-device-tags {
+  padding-top: 0;
+}
+
+.public-device-tags .device-tag-list {
+  flex-wrap: wrap;
+  gap: 6px;
+  display: flex;
+}
+
+.public-device-tags .device-tag-list span {
+  color: var(--green-dark);
+  background: var(--soft-green);
+  border: 1px solid #98c8b7;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.public-section-heading .eyebrow {
+  color: var(--green);
+}
+
+@media (max-width:700px) {
+
+.public-device-page {
+  gap: 16px;
+  padding: 18px 14px 28px;
+  overflow-x: clip;
+}
+
+.public-device-page > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.public-device-hero {
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 16px;
+}
+
+.public-device-hero h1 {
+  margin-top: 4px;
+  font-size: 2.15rem;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.public-device-actions {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  width: 100%;
+}
+
+.public-device-summary {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+}
+
+.public-metric {
+  padding: 12px;
+}
+
+.public-device-preview {
+  min-height: 0;
+}
+
+.public-media-grid {
+  grid-template-columns: minmax(0,1fr);
+}
+
+.public-section-heading h2 {
+  font-size: 1.65rem;
+}
+}
+
+@media (max-width:380px) {
+
+.public-device-actions {
+  grid-template-columns: 1fr;
+}
+}

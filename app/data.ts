@@ -7,6 +7,7 @@ export type View =
   | "booking"
   | "campaigns"
   | "creative"
+  | "resources"
   | "inventory"
   | "calendar"
   | "approvals"

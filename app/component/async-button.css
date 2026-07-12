@@ -1,0 +1,84 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.async-button {
+  position: relative;
+}
+
+.async-button-label {
+  align-items: center;
+  gap: 8px;
+  transition: opacity .14s;
+  display: inline-flex;
+}
+
+.async-button.is-pending .async-button-label,
+.async-button.is-success .async-button-label,
+.async-button.is-error .async-button-label {
+  opacity: 0;
+}
+
+.async-button-feedback {
+  pointer-events: none;
+  place-items: center;
+  display: grid;
+  position: absolute;
+  inset: 0;
+}
+
+.async-button.is-error {
+  animation: .4s feedback-shake;
+}
+
+.async-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  width: 20px;
+  height: 20px;
+}
+
+.async-button.is-success .async-icon {
+  animation: .32s feedback-pop;
+}
+
+.async-spinner {
+  opacity: .9;
+  border: 2.5px solid;
+  border-top-color: #0000;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: .7s linear infinite feedback-spin;
+}
+
+.inline-pending {
+  align-items: center;
+  gap: 8px;
+  display: inline-flex;
+}
+
+.inline-pending .async-spinner {
+  border-width: 2px;
+  width: 15px;
+  height: 15px;
+}
+
+.is-success-pulse {
+  animation: 1.2s feedback-success-pulse;
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.async-button.is-error,
+.async-button.is-success .async-icon,
+.is-success-pulse {
+  animation: none;
+}
+
+.async-spinner {
+  animation-duration: 1.4s;
+}
+}
+

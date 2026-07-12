@@ -1,5 +1,6 @@
 "use client";
 
+import "./reports-billing-views.css";
 import { Booking, InventoryItem, Transaction } from "../data";
 import { deliveredImpressions, money, number, splitRevenue } from "../utils";
 import { BookingsTable, Metric, PanelHeading } from "./shared-ui";

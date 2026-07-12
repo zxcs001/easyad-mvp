@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import type { Booking, InventoryItem } from "../app/data";
@@ -100,11 +100,12 @@ describe("dashboard shell", () => {
 
     render(<Sidebar role="admin" view="reports" setRole={setRole} setView={setView} currentUser={adminUser} />);
 
-    const workspace = screen.getByLabelText("Workspace");
-    expect(within(workspace).getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
+    const workspace = screen.getByRole("button", { name: "Workspace" });
     expect(screen.getByText("admin@example.test - super admin")).toBeInTheDocument();
 
-    await user.selectOptions(workspace, "operator");
+    await user.click(workspace);
+    expect(screen.getByRole("option", { name: "Super Admin" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("option", { name: "Operator" }));
 
     expect(setRole).toHaveBeenCalledWith("operator");
     expect(setView).toHaveBeenCalledWith("inventory");

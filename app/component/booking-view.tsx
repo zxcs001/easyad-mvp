@@ -1,5 +1,6 @@
 "use client";
 
+import "./booking-view.css";
 import type { Dispatch, SetStateAction } from "react";
 import { Booking, InventoryItem } from "../data";
 import type { BookingDraft } from "../types";

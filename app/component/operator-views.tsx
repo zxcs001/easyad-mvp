@@ -1,5 +1,6 @@
 "use client";
 
+import "./operator-views.css";
 import { useEffect, useState } from "react";
 import { ApprovalEvent, Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { MediaResource } from "../data";
@@ -37,7 +38,7 @@ export function InventoryView({
   saveInventory: (item: InventoryItem) => Promise<boolean>;
   updateInventoryApproval: (id: string, approvalStatus: NonNullable<InventoryItem["approvalStatus"]>) => Promise<boolean>;
   uploadMedia: (file: File, title: string) => Promise<boolean>;
-  deleteMediaResource: (id: string) => Promise<void>;
+  deleteMediaResource: (id: string) => Promise<boolean | void>;
   canManage: boolean;
   canDelete: boolean;
 }) {

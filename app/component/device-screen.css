@@ -1,0 +1,181 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.device-player-preview .device-region.aside {
+  gap: 9px;
+  padding: 12px;
+}
+
+.device-player-preview .device-region.top {
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.device-player {
+  color: #fff;
+  background: #050708;
+  height: 100vh;
+  min-height: 100vh;
+  display: grid;
+  position: relative;
+  overflow: hidden;
+}
+
+.device-player.tpl-fullscreen {
+  grid-template: "media"1fr/1fr;
+}
+
+.device-player.tpl-weather {
+  grid-template: "aside media"1fr/minmax(260px,23vw) 1fr;
+}
+
+.device-player.tpl-public-info,
+.device-player.tpl-transit {
+  grid-template: "media aside"1fr/1fr minmax(280px,24vw);
+}
+
+.device-player.tpl-community {
+  grid-template: "top""media"1fr"ticker"/1fr;
+}
+
+.device-region {
+  min-width: 0;
+  min-height: 0;
+}
+
+.device-region.media {
+  grid-area: media;
+  position: relative;
+  overflow: hidden;
+}
+
+.device-region.aside {
+  background: linear-gradient(#0d141b,#0a0f14);
+  border-left: 1px solid #ffffff14;
+  flex-direction: column;
+  grid-area: aside;
+  gap: 16px;
+  padding: clamp(14px,1.6vw,26px);
+  display: flex;
+  overflow: auto;
+}
+
+.device-player.tpl-weather .device-region.aside {
+  border-left: 0;
+  border-right: 1px solid #ffffff14;
+}
+
+.device-region.top {
+  background: linear-gradient(90deg,#0d141b,#0a0f14);
+  border-bottom: 1px solid #ffffff14;
+  grid-area: top;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 12px clamp(16px,2vw,30px);
+  display: flex;
+}
+
+.device-region.ticker {
+  background: #0a0f14;
+  border-top: 1px solid #ffffff14;
+  grid-area: ticker;
+}
+
+.device-api-guide {
+  z-index: 6;
+  left: clamp(10px,1.5vw,20px);
+  bottom: clamp(10px,1.5vw,20px);
+  width: min(560px,calc(100% - 20px));
+  display: grid;
+  gap: 6px;
+  padding: 11px 13px;
+  border: 1px solid #ffffff38;
+  border-radius: 7px;
+  color: #f5faf7;
+  background: #07100ddb;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 28px #0006;
+  position: absolute;
+}
+
+.device-api-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-api-heading span {
+  color: #6ee0b4;
+  font-size: .64rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.device-api-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-api-heading small {
+  color: #b8c8c1;
+  font-size: .66rem;
+}
+
+.device-api-guide code {
+  display: block;
+  overflow: hidden;
+  color: #dce9e4;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: clamp(.61rem,1vw,.72rem);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-api-guide a {
+  padding: 5px 7px;
+  border: 1px solid #ffffff1f;
+  border-radius: 5px;
+  background: #ffffff0d;
+}
+
+.device-api-guide a:hover,
+.device-api-guide a:focus-visible {
+  border-color: #6ee0b480;
+  background: #6ee0b414;
+  outline: none;
+}
+
+@media (max-width:820px) {
+
+.device-player.tpl-weather,
+.device-player.tpl-public-info,
+.device-player.tpl-transit {
+  grid-template: "media"minmax(42vh,1fr)"aside"/1fr;
+}
+
+.device-region.aside,
+.device-player.tpl-weather .device-region.aside {
+  border-top: 1px solid #ffffff14;
+  border-left: 0;
+  border-right: 0;
+}
+
+.device-api-guide {
+  gap: 5px;
+  padding: 9px 10px;
+}
+
+.device-api-heading {
+  grid-template-columns: auto minmax(0,1fr);
+}
+
+.device-api-heading small {
+  display: none;
+}
+}

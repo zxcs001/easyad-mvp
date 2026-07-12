@@ -1,5 +1,6 @@
 "use client";
 
+import "./creative-view.css";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";

@@ -4,6 +4,9 @@ import { getCurrentUser, getInstitutionScope } from "./lib/auth";
 import { ensureBookingTransactions, listApprovalEvents, listApprovalEventsForInstitution, listBookings, listBookingsCreatedBy, listBookingsForInstitution, listCreatives, listInventory, listInventoryByInstitution, listInstitutionOperators, listMediaResources, listMediaResourcesForInstitution, listNonAdminUsers, listPublishedInventory, listTransactions, listTransactionsCreatedBy, listTransactionsForInstitution } from "./lib/db";
 import type { CreativeDraft, Filters } from "./types";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import TorontoStarter from "./component/toronto-starter";
+import { INTRO_COOKIE_NAME, shouldShowStarter } from "./lib/preferences";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -12,7 +15,7 @@ type PageProps = {
 export const dynamic = "force-dynamic";
 
 const roles: Role[] = ["advertiser", "operator", "institutional", "admin"];
-const views: View[] = ["portal", "discover", "booking", "campaigns", "creative", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+const views: View[] = ["portal", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
 const templates: CreativeDraft["template"][] = ["retail", "finance", "event"];
 const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "pdf", "mp4"];
 const filterFormats: Filters["format"][] = ["all", "digital", "static", "transit"];
@@ -24,9 +27,9 @@ const roleDefaultView: Record<Role, View> = {
   admin: "reports",
 };
 const roleAllowedViews: Record<Role, View[]> = {
-  advertiser: ["portal", "discover", "booking", "campaigns", "creative", "reports", "billing"],
-  operator: ["portal", "inventory", "calendar", "approvals", "reports", "billing"],
-  institutional: ["portal", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
+  advertiser: ["portal", "discover", "booking", "campaigns", "creative", "resources", "reports", "billing"],
+  operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing"],
+  institutional: ["portal", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
   admin: views,
 };
 
@@ -37,6 +40,8 @@ export default async function Page({ searchParams }: PageProps) {
   const view = readOne(params.view);
   const requestedRole = isRole(role) ? role : user?.role;
   const requestedView = isView(view) ? view : "portal";
+  const cookieStore = await cookies();
+  const showStarter = shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
 
   if (!user && requestedView !== "portal") {
     redirect(`/login?returnTo=${encodeURIComponent(queryFromParams(params))}`);
@@ -79,48 +84,50 @@ export default async function Page({ searchParams }: PageProps) {
   const selectedTags = readTags(params.tags, inventory);
 
   return (
-    <OohApp
-      currentUser={user}
-      initialInventoryData={inventory}
-      initialBookingsData={bookings}
-      initialMediaResources={mediaResources}
-      initialTransactions={transactions}
-      initialApprovalHistory={approvalHistory}
-      initialCreatives={creatives}
-      initialManagedUsers={managedUsers}
-      initialInstitutionOperators={institutionOperators}
-      initialRole={effectiveRole}
-      initialView={effectiveView}
-      initialFormat={isFormat(format) ? format : undefined}
-      initialLocationId={isLocation(locationId) ? locationId : undefined}
-      initialArea={areaX !== undefined && areaY !== undefined ? { x: areaX, y: areaY } : undefined}
-      initialMapZoom={mapZoom}
-      initialInventoryId={isInventoryItem(itemId, inventory) ? itemId : undefined}
-      initialFilters={{
-        radius: readNumber(params.radius, 8, 30),
-        format: isFilterFormat(filterFormat) ? filterFormat : undefined,
-        minImpressions: readNumber(params.minImpressions, 0, 180000),
-        minTraffic: readNumber(params.minTraffic, 0, 130000),
-        minIncome: readNumber(params.minIncome, 0, 140000),
-        audience: audience && audience !== "all" ? audience : undefined,
-        competitor: isCompetitor(competitor) ? competitor : undefined,
-        priceMax: readNumber(params.priceMax, 300, 1000),
-        showCompetitors: readBoolean(params.showCompetitors),
-        selectedTags: selectedTags.length ? selectedTags : undefined,
-      }}
-      initialBookingId={bookingId}
-      initialCreativeSubmitted={readOne(params.submitted) === "creative"}
-      initialCreative={{
-        template: isTemplate(template) ? template : undefined,
-        format: isFormat(creativeFormat) ? creativeFormat : undefined,
-        width: readNumber(params.width, 320, 10000),
-        height: readNumber(params.height, 180, 5000),
-        fileType: isFileType(fileType) ? fileType : undefined,
-        fileSize: readNumber(params.fileSize, 1, 600),
-        safeZone: readNumber(params.safeZone, 0, 18),
-        distortion: readNumber(params.distortion, 0, 12),
-      }}
-    />
+    <TorontoStarter show={showStarter}>
+      <OohApp
+        currentUser={user}
+        initialInventoryData={inventory}
+        initialBookingsData={bookings}
+        initialMediaResources={mediaResources}
+        initialTransactions={transactions}
+        initialApprovalHistory={approvalHistory}
+        initialCreatives={creatives}
+        initialManagedUsers={managedUsers}
+        initialInstitutionOperators={institutionOperators}
+        initialRole={effectiveRole}
+        initialView={effectiveView}
+        initialFormat={isFormat(format) ? format : undefined}
+        initialLocationId={isLocation(locationId) ? locationId : undefined}
+        initialArea={areaX !== undefined && areaY !== undefined ? { x: areaX, y: areaY } : undefined}
+        initialMapZoom={mapZoom}
+        initialInventoryId={isInventoryItem(itemId, inventory) ? itemId : undefined}
+        initialFilters={{
+          radius: readNumber(params.radius, 8, 30),
+          format: isFilterFormat(filterFormat) ? filterFormat : undefined,
+          minImpressions: readNumber(params.minImpressions, 0, 180000),
+          minTraffic: readNumber(params.minTraffic, 0, 130000),
+          minIncome: readNumber(params.minIncome, 0, 140000),
+          audience: audience && audience !== "all" ? audience : undefined,
+          competitor: isCompetitor(competitor) ? competitor : undefined,
+          priceMax: readNumber(params.priceMax, 300, 1000),
+          showCompetitors: readBoolean(params.showCompetitors),
+          selectedTags: selectedTags.length ? selectedTags : undefined,
+        }}
+        initialBookingId={bookingId}
+        initialCreativeSubmitted={readOne(params.submitted) === "creative"}
+        initialCreative={{
+          template: isTemplate(template) ? template : undefined,
+          format: isFormat(creativeFormat) ? creativeFormat : undefined,
+          width: readNumber(params.width, 320, 10000),
+          height: readNumber(params.height, 180, 5000),
+          fileType: isFileType(fileType) ? fileType : undefined,
+          fileSize: readNumber(params.fileSize, 1, 600),
+          safeZone: readNumber(params.safeZone, 0, 18),
+          distortion: readNumber(params.distortion, 0, 12),
+        }}
+      />
+    </TorontoStarter>
   );
 }
 

@@ -5,6 +5,7 @@ import { ApprovalEvent, Booking, Creative, FormatKey, InventoryItem, MediaResour
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
 import CreativeView from "./component/creative-view";
+import ContentLibraryView from "./component/content-library-view";
 import { Sidebar, Topbar } from "./component/dashboard-shell";
 import DiscoverView from "./component/discover-view";
 import { ApprovalsView, CalendarView, InventoryView } from "./component/operator-views";
@@ -333,10 +334,11 @@ export default function OohApp({
   }
 
   async function deleteMediaResource(id: string) {
-    if (currentUser?.role !== "admin") return;
+    if (!canManageInventory) return false;
     const response = await fetch(`/api/media/${id}`, { method: "DELETE" });
-    if (!response.ok) return;
+    if (!response.ok) return false;
     setMediaResources((current) => current.filter((resource) => resource.id !== id));
+    return true;
   }
 
   async function createManagedUser(account: { name: string; email: string; password: string; role: Exclude<Role, "admin">; institutionId: string | null; operatorLimit: number }) {
@@ -456,6 +458,8 @@ export default function OohApp({
         );
       case "creative":
         return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} />;
+      case "resources":
+        return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
         if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} />;
         return (

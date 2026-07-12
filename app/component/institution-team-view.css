@@ -1,0 +1,15 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.institution-seat-summary {
+  color: var(--muted);
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  display: flex;
+}
+
+.institution-seat-summary strong {
+  color: var(--ink);
+  font-size: 1.35rem;
+}
+

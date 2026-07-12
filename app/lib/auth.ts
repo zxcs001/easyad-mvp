@@ -6,6 +6,32 @@ import { createSessionRecord, deleteSessionRecord, getUserBySession, type DbUser
 
 export const sessionCookie = "ooh_session";
 
+export function requestUrl(request: NextRequest, path: string) {
+  const protocol = firstHeaderValue(request.headers.get("x-forwarded-proto"))
+    ?? request.nextUrl.protocol.replace(/:$/, "");
+  const host = firstHeaderValue(request.headers.get("host"))
+    ?? firstHeaderValue(request.headers.get("x-forwarded-host"));
+  const configuredOrigin = process.env.APP_ORIGIN;
+
+  if (configuredOrigin) {
+    try {
+      return new URL(path, new URL(configuredOrigin).origin);
+    } catch {
+      // Fall through to the validated request host.
+    }
+  }
+
+  if (host) {
+    try {
+      return new URL(path, `${protocol}://${host}`);
+    } catch {
+      // Fall through to Next's normalized request origin.
+    }
+  }
+
+  return new URL(path, request.nextUrl.origin);
+}
+
 export async function getCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(sessionCookie)?.value;
@@ -69,4 +95,9 @@ export function canReadBooking(user: DbUser | null, bookingOwnerId: string | nul
 
 export function isAllowedRole(value: string | null): value is Role {
   return value === "advertiser" || value === "operator" || value === "institutional" || value === "admin";
+}
+
+function firstHeaderValue(value: string | null) {
+  const first = value?.split(",", 1)[0]?.trim();
+  return first || null;
 }

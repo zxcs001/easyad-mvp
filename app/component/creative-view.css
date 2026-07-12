@@ -1,0 +1,245 @@
+/* Component-owned styles. Keep selectors beside the component that renders them. */
+
+.creative-grid {
+  grid-template-columns: minmax(0,1fr) minmax(320px,.8fr);
+}
+
+.template-tabs button {
+  border: 1px solid #0000;
+  border-radius: 7px;
+  justify-content: center;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  font-weight: 800;
+  display: inline-flex;
+}
+
+.validation-list {
+  gap: 10px;
+  margin-top: 14px;
+  display: grid;
+}
+
+.validation-list>div {
+  border: 1px solid var(--line);
+  background: #fbfcfb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.template-tabs {
+  grid-template-columns: repeat(3,1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  display: grid;
+}
+
+.creative-source-tabs {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+  display: grid;
+}
+
+.creative-source-tabs button {
+  color: #394650;
+  border-color: var(--line);
+  background: #f4f6f4;
+  justify-content: center;
+  min-height: 42px;
+}
+
+.creative-source-tabs button.active {
+  color: #fff;
+  background: #17202a;
+  border-color: #17202a;
+}
+
+.template-tabs button,
+.template-tabs a {
+  color: #394650;
+  border-color: var(--line);
+  background: #f4f6f4;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.template-tabs button.active,
+.template-tabs a.active {
+  background: var(--soft-blue);
+  color: var(--blue);
+  border-color: #cbd8e8;
+}
+
+.creative-form {
+  gap: 14px;
+  display: grid;
+}
+
+.field-block {
+  gap: 6px;
+  display: grid;
+}
+
+.creative-canvas {
+  background: #22313b;
+  border-radius: 8px;
+  place-items: center;
+  width: 100%;
+  min-height: 210px;
+  display: grid;
+  position: relative;
+  overflow: hidden;
+}
+
+.creative-canvas.retail {
+  background: linear-gradient(90deg,#17202a1f,#17202a1a),repeating-linear-gradient(45deg,#edcc76 0 22px,#f6e7b4 22px 44px);
+}
+
+.creative-canvas.finance {
+  background: linear-gradient(90deg,#ffffffd1,#e8eef6eb),linear-gradient(135deg,#2f5f9f,#f8fbfb);
+}
+
+.creative-canvas.event {
+  background: radial-gradient(circle at 18% 34%,#d65f46b8,#0000 26%),linear-gradient(120deg,#17202a,#3a4c56);
+}
+
+.safe-zone {
+  color: #fff;
+  border: 2px dashed #ffffffd9;
+  align-content: center;
+  padding: 22px;
+  display: grid;
+  position: absolute;
+}
+
+.finance .safe-zone {
+  color: #17202a;
+  border-color: #2f5f9f99;
+}
+
+.safe-zone span,
+.safe-zone small {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: clamp(.74rem,1.1vw,.9rem);
+  font-weight: 800;
+}
+
+.safe-zone strong {
+  letter-spacing: 0;
+  font-size: clamp(1.5rem,5vw,3.8rem);
+  line-height: .95;
+}
+
+.upload-creative-panel {
+  gap: 12px;
+  display: grid;
+}
+
+.upload-dropzone {
+  color: #394650;
+  text-align: center;
+  cursor: pointer;
+  background: #f7faf9;
+  border: 1px dashed #9db2bd;
+  border-radius: 8px;
+  align-content: center;
+  justify-items: center;
+  min-height: 88px;
+  font-weight: 850;
+}
+
+.upload-dropzone input {
+  max-width: 260px;
+  margin-top: 8px;
+}
+
+.upload-preview {
+  border: 1px solid var(--line);
+  color: #fff;
+  background: #17202a;
+  border-radius: 8px;
+  place-items: center;
+  width: 100%;
+  min-height: 210px;
+  display: grid;
+  overflow: hidden;
+}
+
+.upload-preview img,
+.upload-preview video {
+  object-fit: contain;
+  background: #10171c;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-summary {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  gap: 3px;
+  padding: 10px 12px;
+  display: grid;
+}
+
+.upload-summary.bad {
+  background: #fff8f6;
+  border-color: #efc2b8;
+}
+
+.upload-summary span {
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.validation-list>div {
+  border-left-width: 5px;
+  gap: 3px;
+  display: grid;
+}
+
+.validation-list .pass {
+  border-left-color: var(--green);
+}
+
+.validation-list .fail {
+  border-left-color: var(--coral);
+  background: #fff8f6;
+}
+
+.validation-list span {
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+@media (max-width:900px) {
+
+.creative-grid {
+  grid-template-columns: 1fr;
+  grid-template-areas: none;
+}
+}
+
+@media (max-width:560px) {
+
+.template-tabs {
+  grid-template-columns: 1fr;
+}
+}
+
+.validation-list>div {
+  border-radius: var(--radius-sm);
+  border-color: var(--line);
+}
+
+.template-tabs button {
+  letter-spacing: 0;
+  border-radius: 6px;
+  min-height: 36px;
+  font-size: .78rem;
+  font-weight: 750;
+}
+

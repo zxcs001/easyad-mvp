@@ -50,6 +50,7 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
 
   return (
     <DeviceScreen
+      deviceId={inventory.id}
       inventoryName={inventory.name}
       city={city}
       imageInterval={inventory.imageInterval}

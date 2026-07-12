@@ -1,5 +1,6 @@
 "use client";
 
+import "./async-button.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "./toast";
 

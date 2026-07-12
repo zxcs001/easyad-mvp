@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "init": "npm install && node scripts/init-project.cjs",
+    "seed:temp-accounts": "node scripts/seed-temp-accounts.cjs",
+    "seed:test-inventory": "node scripts/seed-test-inventory.cjs",
+    "seed:test-data": "npm run seed:temp-accounts && npm run seed:test-inventory",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,6 +19,7 @@
   "dependencies": {
     "embla-carousel-fade": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
+    "lucide-react": "^1.24.0",
     "maplibre-gl": "^5.24.0",
     "next": "^16.2.9",
     "pg": "^8.22.0",
