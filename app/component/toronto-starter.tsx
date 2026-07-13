@@ -30,17 +30,29 @@ export default function TorontoStarter({ show, children }: { show: boolean; chil
 
   if (!visible) return children;
 
-  return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label="Toronto campaign starter">
+  return <main className={`toronto-starter${leaving ? " is-leaving" : ""}`} aria-label="Ad campaign starter">
     <TorontoThreeDimensionalMap />
     <div className="toronto-map-wash" aria-hidden="true" />
     <header className="toronto-starter-brand">
-      <strong>OOH / TORONTO</strong>
+      <strong>OOH / Canada</strong>
       <span>Interactive campaign canvas</span>
     </header>
     <section className="toronto-starter-action" aria-label="Enter campaign portal">
-      <p>Next Gen Marketing Platform</p>
-      <button type="button" onClick={enterPortal}><span>Start My Campaign</span><ArrowUpRight aria-hidden="true" /></button>
-      <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>Don&apos;t show this screen again</span></label>
+      <p className="starter-eyebrow"><i aria-hidden="true" />Next-gen OOH marketing platform</p>
+      <h1>The city is your <em>canvas.</em></h1>
+      <p className="starter-sub">Plan, book, and verify out-of-home campaigns across Canada — from geospatial discovery to proof-of-play, in one workspace.</p>
+      <div className="starter-cta-row">
+        <button type="button" onClick={enterPortal}>
+          <span>Start my campaign</span>
+          <i className="starter-cta-arrow" aria-hidden="true"><ArrowUpRight /></i>
+        </button>
+        <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>Don&apos;t show this screen again</span></label>
+      </div>
+      <ul className="starter-features" aria-label="Platform capabilities">
+        <li>Geospatial discovery</li>
+        <li>Creative validation</li>
+        <li>Proof-of-play</li>
+      </ul>
     </section>
     <footer className="toronto-starter-meta">
       <span>43.6532 N / 79.3832 W</span>

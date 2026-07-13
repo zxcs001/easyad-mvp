@@ -33,7 +33,9 @@
 .toronto-map-wash {
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(180deg, #f8f6ed2b 0%, transparent 34%, transparent 68%, #dbe0d29e 100%);
+  background:
+    radial-gradient(720px 460px at 10% 100%, #eceedfe0 0%, #eceedf00 70%),
+    linear-gradient(180deg, #f8f6ed2b 0%, transparent 30%, transparent 56%, #dfe4d6cc 100%);
 }
 
 .toronto-starter-brand,
@@ -67,104 +69,211 @@
 }
 
 .toronto-starter-action {
-  top: 50%;
-  left: 50%;
+  left: clamp(20px, 4.5vw, 64px);
+  right: clamp(20px, 4.5vw, 64px);
+  bottom: clamp(26px, 7vh, 84px);
   display: grid;
-  justify-items: center;
-  gap: 14px;
-  width: min(92vw, 620px);
-  transform: translate(-50%, -50%);
+  justify-items: start;
+  gap: 18px;
+  max-width: 880px;
 }
 
-.toronto-starter-action > p {
-  color: #111a15c7;
-  background: #f5f4eb42;
-  border: 1px solid #ffffff61;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  margin: 0 0 -6px;
-  padding: 7px 11px;
+.toronto-starter-action > * {
+  opacity: 0;
+  animation: starter-rise .7s cubic-bezier(.16, 1, .3, 1) forwards;
+}
+
+.toronto-starter-action > *:nth-child(1) { animation-delay: .1s; }
+.toronto-starter-action > *:nth-child(2) { animation-delay: .22s; }
+.toronto-starter-action > *:nth-child(3) { animation-delay: .34s; }
+.toronto-starter-action > *:nth-child(4) { animation-delay: .46s; }
+.toronto-starter-action > *:nth-child(5) { animation-delay: .58s; }
+
+@keyframes starter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.starter-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 8px 14px;
+  color: #ecf3ee;
+  background: rgba(13, 21, 16, .8);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: .64rem;
   font-weight: 700;
+  letter-spacing: .14em;
   text-transform: uppercase;
 }
 
-.toronto-starter-action button {
-  border: 1px solid #ffffff8c;
-  color: #101914e8;
-  background: #f3f2e83d;
-  -webkit-backdrop-filter: blur(18px) saturate(.85);
-  backdrop-filter: blur(18px) saturate(.85);
-  grid-template-columns: auto 42px;
+.starter-eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ddc97;
+  animation: starter-pulse 2.2s ease-out infinite;
+}
+
+@keyframes starter-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(61, 220, 151, .45); }
+  70% { box-shadow: 0 0 0 9px rgba(61, 220, 151, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); }
+}
+
+.toronto-starter-action h1 {
+  margin: 0;
+  color: #0d1410;
+  font-size: clamp(2.9rem, 7.2vw, 6.2rem);
+  font-weight: 750;
+  letter-spacing: -.035em;
+  line-height: .94;
+  text-wrap: balance;
+}
+
+.toronto-starter-action h1 em {
+  font-family: Iowan Old Style, Baskerville, Times New Roman, Times, serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -.01em;
+}
+
+.starter-sub {
+  margin: 0;
+  max-width: 54ch;
+  color: #17211bd6;
+  font-size: clamp(.98rem, 1.4vw, 1.12rem);
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.starter-cta-row {
+  display: flex;
   align-items: center;
   gap: 24px;
-  min-height: 88px;
-  padding: 13px 17px 13px 28px;
-  font-family: Iowan Old Style, Baskerville, Times New Roman, Times, serif;
-  font-size: 2.7rem;
-  font-weight: 600;
-  line-height: 1;
-  text-transform: none;
-  box-shadow: inset 0 0 0 1px #14201912, 0 18px 54px #16221b1f;
-  transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease;
-  display: grid;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.toronto-starter-action button {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 64px;
+  padding: 0 10px 0 30px;
+  border: 1px solid #0d1410;
+  border-radius: 999px;
+  color: #f4f6ef;
+  background: #0d1410;
+  font-size: 1.06rem;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  box-shadow: 0 20px 44px rgba(13, 20, 16, .32);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
 }
 
 .toronto-starter-action button:hover,
 .toronto-starter-action button:focus-visible {
-  color: #07100c;
-  background: #f7f6ed9e;
-  border-color: #ffffffd9;
-  transform: translateY(-3px);
+  background: #16241c;
+  transform: translateY(-2px);
+  box-shadow: 0 26px 56px rgba(13, 20, 16, .38);
 }
 
-.toronto-starter-action button svg {
-  border: 1px solid #17211b3d;
+.toronto-starter-action button:active {
+  transform: translateY(0) scale(.985);
+}
+
+.starter-cta-arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  width: 42px;
-  height: 42px;
-  padding: 10px;
-  stroke-width: 1.5px;
-  transition: color .22s ease, background .22s ease, transform .22s ease;
+  background: #f4f6ef;
+  color: #0d1410;
+  transition: transform .22s ease;
 }
 
-.toronto-starter-action button:hover svg,
-.toronto-starter-action button:focus-visible svg {
-  color: #f7f6ed;
-  background: #101914;
-  transform: rotate(5deg);
+.starter-cta-arrow svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2px;
+}
+
+.toronto-starter-action button:hover .starter-cta-arrow,
+.toronto-starter-action button:focus-visible .starter-cta-arrow {
+  transform: rotate(45deg);
 }
 
 .toronto-starter-action label {
-  grid-template-columns: 18px auto;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #101914d9;
-  background: #f5f4eb52;
-  border: 1px solid #ffffff70;
-  -webkit-backdrop-filter: blur(12px) saturate(.8);
-  backdrop-filter: blur(12px) saturate(.8);
-  padding: 8px 12px;
-  font-size: .72rem;
-  font-weight: 650;
-  box-shadow: 0 10px 30px #16221b14;
+  color: #17211bcc;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .toronto-starter-action input {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   min-height: 0;
   margin: 0;
   accent-color: #111713;
 }
 
+.starter-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  width: 100%;
+  max-width: 560px;
+  margin: 8px 0 0;
+  padding: 15px 0 0;
+  list-style: none;
+  border-top: 1px solid #10191426;
+  color: #17211bab;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.starter-features li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.starter-features li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: #1f7a5a;
+}
+
 .toronto-starter-meta {
   right: 30px;
   bottom: 24px;
-  left: 30px;
-  justify-content: space-between;
-  display: flex;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
 }
 
 .toronto-map-loader,
@@ -218,11 +327,13 @@ body.starter-active .chatbot-panel {
 
 @media (max-width: 640px) {
   .toronto-starter-brand { top: 18px; left: 18px; }
-  .toronto-starter-action { gap: 13px; }
-  .toronto-starter-action button { grid-template-columns: minmax(0,auto) 36px; gap: 14px; min-height: 72px; padding: 10px 12px 10px 20px; font-size: 1.75rem; }
-  .toronto-starter-action button svg { width: 36px; height: 36px; padding: 8px; }
-  .toronto-starter-meta { right: 16px; bottom: 14px; left: 16px; }
-  .toronto-starter-meta span:last-child { display: none; }
+  .toronto-starter-action { left: 18px; right: 18px; bottom: 24px; gap: 14px; }
+  .toronto-starter-action button { min-height: 56px; padding: 0 8px 0 22px; gap: 12px; font-size: .95rem; }
+  .starter-cta-arrow { width: 38px; height: 38px; }
+  .starter-cta-arrow svg { width: 17px; height: 17px; }
+  .starter-cta-row { gap: 14px; }
+  .starter-features { display: none; }
+  .toronto-starter-meta { display: none; }
   .toronto-map-fallback span { font-size: 2.7rem; }
   .toronto-starter .maplibregl-ctrl-top-right { top: 70px; right: 8px; }
 }
@@ -230,4 +341,6 @@ body.starter-active .chatbot-panel {
 @media (prefers-reduced-motion: reduce) {
   .toronto-starter { transition: opacity .15s linear; }
   .toronto-map-loader i { animation: none; }
+  .toronto-starter-action > * { animation: none; opacity: 1; }
+  .starter-eyebrow i { animation: none; }
 }
