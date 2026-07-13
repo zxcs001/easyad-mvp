@@ -69,15 +69,29 @@ Image detail responses contain Base64 data. Video detail responses contain a pub
 
 ## Production Notes
 
+The production target is a stateless Next.js container on ECS Fargate, RDS PostgreSQL, and private S3 media storage. See [the AWS deployment runbook](docs/AWS_DEPLOYMENT.md) for the complete build, IAM, migration, health-check, and release procedure.
+
+Run the idempotent schema migration before each ECS service deployment:
+
+```bash
+npm run db:migrate
+```
+
 Set these environment variables in your hosting platform:
 
 ```text
 DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB_NAME
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
+DATABASE_SSL_REJECT_UNAUTHORIZED=true
+DATABASE_SSL_CA_BASE64=<base64-rds-ca-bundle>
 BOOTSTRAP_ADMIN_TOKEN=<strong-secret>
 APP_ORIGIN=https://your-public-domain.example
 PUBLIC_API_BASE64_MAX_BYTES=20971520
+MEDIA_STORAGE_PROVIDER=s3
+MEDIA_BUCKET=<private-s3-bucket>
+MEDIA_KEY_PREFIX=production
+AWS_REGION=ca-central-1
 ```
 
-The schema is created lazily on first database access. Use a managed PostgreSQL database such as Amazon RDS for production.
+The application retains a startup schema check, but production releases should run the explicit migration first. Local development uses `.data/uploads`; S3 is required for durable media across multiple Fargate tasks.

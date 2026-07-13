@@ -1,7 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
 import { NextRequest } from "next/server";
-import { getPublicMediaResource, uploadsDir } from "../../../../../../lib/db";
+import { getPublicMediaResource } from "../../../../../../lib/db";
+import { readStoredMedia, storedMediaSize } from "../../../../../../lib/media-storage";
 import { absoluteRequestUrl, publicApiJson, publicApiOptions } from "../../../../../../lib/public-api";
 import { getActiveDeviceMedia, resolveDeviceMediaItem } from "../../../../../../lib/public-device-media";
 
@@ -60,30 +59,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return publicApiJson({ error: "Image file is unavailable" }, { status: 404, cacheControl: "no-store" });
   }
 
-  const resolved = path.resolve(resource.storagePath);
-  const root = path.resolve(uploadsDir);
-  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-    return publicApiJson({ error: "Invalid media path" }, { status: 403, cacheControl: "no-store" });
-  }
-
   try {
-    const fileStat = await stat(resolved);
+    const fileSize = await storedMediaSize(resource.storagePath);
     const maxBase64Bytes = configuredBase64Limit();
-    if (fileStat.size > maxBase64Bytes) {
+    if (fileSize > maxBase64Bytes) {
       return publicApiJson({
         ...metadata,
         error: "Image exceeds the Base64 response limit",
-        content: { encoding: "url", url: mediaUrl, bytes: fileStat.size },
+        content: { encoding: "url", url: mediaUrl, bytes: fileSize },
       }, { status: 413, cacheControl: "no-store" });
     }
-    const file = await readFile(resolved);
+    const file = await readStoredMedia(resource.storagePath);
     return publicApiJson({
       ...metadata,
       content: {
         encoding: "base64",
         mimeType: resource.mimeType,
-        bytes: file.byteLength,
-        data: file.toString("base64"),
+        bytes: file.size,
+        data: file.bytes.toString("base64"),
       },
     });
   } catch {

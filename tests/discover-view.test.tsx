@@ -76,9 +76,9 @@ function DiscoverHarness() {
       setFilters={setFilters}
       selectedLocationId="manual"
       setSelectedLocationId={vi.fn()}
-      selectedLocation={{ x: 50, y: 50 }}
+      selectedLocation={{ id: "manual", label: "Selected map area", x: 50, y: 50 }}
       onAreaChange={vi.fn()}
-      locationOptions={[{ id: "manual", label: "Selected map area" }]}
+      locationOptions={[{ id: "manual", label: "Selected map area", x: 50, y: 50 }]}
       selectedInventory={selectedInventory}
       selectedInventoryId={selectedInventory.id}
       setSelectedInventoryId={setSelectedInventoryId}

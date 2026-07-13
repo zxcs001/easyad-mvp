@@ -1,8 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { canManageInventory, canManageInventoryRecord, getCurrentUser } from "../../../../lib/auth";
-import { createMediaResource, getInventory, listMediaResources, uploadsDir } from "../../../../lib/db";
+import { createMediaResource, getInventory, listMediaResources } from "../../../../lib/db";
+import { deleteStoredMedia, storeMedia } from "../../../../lib/media-storage";
 import { inspectMediaUpload } from "../../../../lib/uploads";
 import { truncateFileName } from "../../../../utils";
 
@@ -37,24 +36,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const resourceId = `MED-${Date.now().toString(36).toUpperCase()}`;
   const originalName = truncateFileName(file.name || "upload");
   const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const inventoryDir = path.join(uploadsDir, id);
-  mkdirSync(inventoryDir, { recursive: true });
-  const storagePath = path.join(inventoryDir, `${resourceId}-${safeName}`);
-  writeFileSync(storagePath, upload.bytes);
+  const storagePath = await storeMedia(`inventory/${id}/${resourceId}-${safeName}`, upload.bytes, upload.mimeType);
 
-  const resource = await createMediaResource({
-    id: resourceId,
-    inventoryId: id,
-    ownerId: user.id,
-    title: String(form.get("title") ?? originalName),
-    originalName,
-    mimeType: upload.mimeType,
-    mediaType: upload.mediaType,
-    sizeBytes: upload.bytes.byteLength,
-    publicUrl: `/media/${resourceId}`,
-    createdAt: new Date().toISOString(),
-    storagePath,
-  });
+  let resource;
+  try {
+    resource = await createMediaResource({
+      id: resourceId,
+      inventoryId: id,
+      ownerId: user.id,
+      title: String(form.get("title") ?? originalName),
+      originalName,
+      mimeType: upload.mimeType,
+      mediaType: upload.mediaType,
+      sizeBytes: upload.bytes.byteLength,
+      publicUrl: `/media/${resourceId}`,
+      createdAt: new Date().toISOString(),
+      storagePath,
+    });
+  } catch (error) {
+    await deleteStoredMedia(storagePath).catch(() => undefined);
+    throw error;
+  }
 
   return NextResponse.json({ resource }, { status: 201 });
 }

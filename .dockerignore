@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.data
+.env*
+!.env.example
+node_modules
+test-results
+playwright-report
+coverage
+TEMP_ACCOUNTS.txt
+*.log
+Dockerfile*
+README.md

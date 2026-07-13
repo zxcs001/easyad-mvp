@@ -73,6 +73,9 @@ const adminUser: DbUser = {
   name: "Admin User",
   email: "admin@example.test",
   role: "admin",
+  status: "active",
+  institutionId: null,
+  operatorLimit: 0,
   createdAt: "2026-06-19T00:00:00.000Z",
 };
 

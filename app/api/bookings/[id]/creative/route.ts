@@ -1,11 +1,10 @@
-import { mkdirSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { Creative, FormatKey, formats } from "../../../../data";
 import { canSubmitCreative, getCurrentUser } from "../../../../lib/auth";
-import { createCreative, getBooking, getBookingOwnerId, listCreatives, updateBookingRecord, uploadsDir } from "../../../../lib/db";
-import { inspectMediaUpload, UploadedMedia } from "../../../../lib/uploads";
+import { createCreative, getBooking, getBookingOwnerId, listCreatives, updateBookingRecord } from "../../../../lib/db";
+import { deleteStoredMedia, storeMedia } from "../../../../lib/media-storage";
+import { inspectMediaUpload } from "../../../../lib/uploads";
 import { isCreativeSubmissionAllowed, truncateFileName, validateCreative } from "../../../../utils";
 
 type RouteContext = {
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   };
 
   if (upload) {
-    const storagePath = saveCreativeUpload(creativeId, upload);
+    const storagePath = await storeMedia(`creatives/${creativeId}.${upload.extension}`, upload.bytes, upload.mimeType);
     uploadMetadata = {
       source: "upload",
       originalName: truncateFileName(upload.originalName || "uploaded-creative"),
@@ -80,7 +79,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
   }
 
-  const creative = await createCreative({ id: creativeId, bookingId: id, ...draft, ...uploadMetadata, status: "pending review" });
+  let creative;
+  try {
+    creative = await createCreative({ id: creativeId, bookingId: id, ...draft, ...uploadMetadata, status: "pending review" });
+  } catch (error) {
+    if (uploadMetadata.storagePath) await deleteStoredMedia(uploadMetadata.storagePath).catch(() => undefined);
+    throw error;
+  }
   const updated = await updateBookingRecord(id, { creativeStatus: "pending review", status: "creative review" });
   return NextResponse.json({ creative, booking: updated }, { status: 201 });
 }
@@ -118,12 +123,4 @@ async function readUploadSubmission(request: NextRequest) {
       distortion: String(form.get("distortion") ?? ""),
     },
   };
-}
-
-function saveCreativeUpload(creativeId: string, upload: UploadedMedia) {
-  const creativeDir = path.join(uploadsDir, "creatives");
-  mkdirSync(creativeDir, { recursive: true });
-  const storagePath = path.join(creativeDir, `${creativeId}.${upload.extension}`);
-  writeFileSync(storagePath, upload.bytes);
-  return storagePath;
 }

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "init": "npm install && node scripts/init-project.cjs",
+    "db:migrate": "node scripts/migrate.cjs",
     "seed:temp-accounts": "node scripts/seed-temp-accounts.cjs",
     "seed:test-inventory": "node scripts/seed-test-inventory.cjs",
     "seed:test-data": "npm run seed:temp-accounts && npm run seed:test-inventory",
@@ -14,9 +15,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/e2e-preflight.cjs && playwright test",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:all": "npm run test && npm run test:e2e",
+    "verify": "npm run test && npm run build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1085.0",
     "embla-carousel-fade": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^1.24.0",

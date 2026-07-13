@@ -2,7 +2,7 @@
 
 import "./setup";
 import { render, screen } from "@testing-library/react";
-import { test } from "vitest";
+import { expect, test } from "vitest";
 import DeviceScreen from "../app/component/device-screen";
 
 test("full device pages show the device API format and device name", () => {

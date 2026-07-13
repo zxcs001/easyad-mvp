@@ -68,13 +68,20 @@ vi.mock("../app/lib/public-device-media", () => ({
 }));
 
 vi.mock("../app/lib/db", () => ({
-  uploadsDir: process.cwd(),
   getPublicMediaResource: async (id: string) => id === imageItem.id ? {
     originalName: imageItem.originalName,
     mimeType: imageItem.mimeType,
     storagePath: `${process.cwd()}/tests/fixtures/public-api-image.bin`,
     cacheable: false,
   } : null,
+}));
+
+vi.mock("../app/lib/media-storage", () => ({
+  storedMediaSize: async () => Buffer.from("public-api-image\n").byteLength,
+  readStoredMedia: async () => {
+    const bytes = Buffer.from("public-api-image\n");
+    return { bytes, size: bytes.byteLength };
+  },
 }));
 
 import { GET as getCollection } from "../app/api/public/devices/[id]/media/route";

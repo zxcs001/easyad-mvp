@@ -14,6 +14,7 @@ vi.mock("../app/lib/db", () => ({
   getInventory: async () => ({ id: "INV-PRIVATE", institutionId: "INST-1" }),
   deleteMediaResource: async () => { state.deleted = true; return resource; },
 }));
+vi.mock("../app/lib/media-storage", () => ({ deleteStoredMedia: async () => undefined }));
 
 import { DELETE } from "../app/api/media/[id]/route";
 

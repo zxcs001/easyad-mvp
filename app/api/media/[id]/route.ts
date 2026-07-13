@@ -1,7 +1,7 @@
-import { unlinkSync } from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { canManageInventoryRecord, getCurrentUser } from "../../../lib/auth";
 import { deleteMediaResource, getInventory, getMediaResource } from "../../../lib/db";
+import { deleteStoredMedia } from "../../../lib/media-storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -19,7 +19,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   const deleted = await deleteMediaResource(id);
   if (!deleted) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
   try {
-    unlinkSync(deleted.storagePath);
+    await deleteStoredMedia(deleted.storagePath);
   } catch {
     // The database record is the source of truth; missing files should not block cleanup.
   }
