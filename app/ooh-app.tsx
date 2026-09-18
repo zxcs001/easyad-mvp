@@ -693,7 +693,9 @@ function newInventoryTemplate(): InventoryItem {
     format: "digital",
     x: 50,
     y: 50,
-    address: "New market location",
+    // Empty, so the address block asks for a real address instead of shipping
+    // "New market location" onto a public screen page.
+    address: "",
     price: 500,
     impressions: 80000,
     traffic: 50000,

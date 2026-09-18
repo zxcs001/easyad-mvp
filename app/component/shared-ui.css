@@ -192,6 +192,63 @@
   grid-template-columns: 1fr;
 }
 
+/* Address block: street on its own row, then city, province and postal code. */
+.address-fields {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  grid-column: 1/-1;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px 14px;
+  display: grid;
+}
+
+.address-fields legend {
+  color: var(--muted);
+  padding: 0 4px;
+  font-size: .78rem;
+  font-weight: 760;
+}
+
+.address-fields .address-wide {
+  grid-column: 1/-1;
+}
+
+.address-help,
+.address-echo,
+.address-hint {
+  color: var(--muted);
+  margin: 0;
+  font-size: .78rem;
+}
+
+.address-echo {
+  color: var(--ink);
+}
+
+.address-hint {
+  color: var(--state-warning-ink);
+}
+
+.address-optional {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.address-fields [aria-invalid="true"]:focus-visible {
+  border-color: var(--state-warning-ink);
+}
+
+@media (max-width: 560px) {
+
+.address-fields {
+  grid-template-columns: 1fr;
+}
+}
+
 .form-error {
   color: #9d4534;
   background: #fff0ed;

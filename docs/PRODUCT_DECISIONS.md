@@ -1,6 +1,6 @@
 # EasyAD product decision register
 
-Last reviewed: 2026-08-24  
+Last reviewed: 2026-09-17  
 Owner: Product (named owner to be assigned)  
 Rule: engineering must not infer an answer. Unresolved choices block only affected branches.
 
@@ -18,5 +18,6 @@ Rule: engineering must not infer an answer. Unresolved choices block only affect
 | PD-010 | Which content categories require external preclearance or specialist review? | Provisional: operator manual checklist; no legal-clearance claim | ADR 0003 |
 | PD-011 | What is the source and permitted use of audience/circulation data? | Provisional: operator-reported with source/freshness; audited requires evidence | ADR 0003 |
 | PD-012 | Who is merchant of record and who receives payouts? | Deferred with payments | Phase 7 only |
+| PD-013 | Which geocoding provider serves address autocomplete, and who pays for it? | Deferred 2026-09-17: Google Places needs a billed key; an OpenStreetMap geocoder is free but weaker on Canadian civic numbers | Address autocomplete only |
 
 Accepted decisions must be recorded in a superseding ADR or maintained product brief with owner, date, rationale, affected capabilities, migration impact, and rollback/exception policy.
