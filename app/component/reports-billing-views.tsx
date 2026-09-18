@@ -27,9 +27,23 @@ export function ReportsView({
     const item = inventory.find((unit) => unit.id === booking.inventoryId);
     return sum + (item ? deliveredImpressions(item, booking) : 0);
   }, 0);
-  const popRate = Math.round(bookings.reduce((sum, booking) => sum + booking.pop, 0) / Math.max(1, bookings.length));
+  // Proof of play belongs to the flights that have played. A campaign that
+  // starts next month has 0% because it has not run, and averaging that with a
+  // finished campaign's 99% reported half the delivery the screens made.
+  const playedBookings = bookings.filter((booking) => ["completed", "live"].includes(booking.status));
+  const popRate = playedBookings.length
+    ? Math.round(playedBookings.reduce((sum, booking) => sum + booking.pop, 0) / playedBookings.length)
+    : 0;
   const collected = transactions.filter((transaction) => transaction.status === "paid").reduce((sum, transaction) => sum + transaction.amount, 0);
-  const cpm = totalImpressions > 0 ? Math.round((bookings.reduce((sum, booking) => sum + booking.spend, 0) / totalImpressions) * 1000) : 0;
+  // Cost against what was delivered, so both sides of the division cover the
+  // same flights. Counting a future campaign's spend against no impressions
+  // raised the reported CPM above any real rate card.
+  const playedSpend = playedBookings.reduce((sum, booking) => sum + booking.spend, 0);
+  const playedImpressions = playedBookings.reduce((sum, booking) => {
+    const item = inventory.find((unit) => unit.id === booking.inventoryId);
+    return sum + (item ? deliveredImpressions(item, booking) : 0);
+  }, 0);
+  const cpm = playedImpressions > 0 ? Math.round((playedSpend / playedImpressions) * 1000) : 0;
   const chartRows = Object.values(bookings.reduce<Record<string, { id: string; name: string; impressions: number }>>((rows, booking) => {
     const item = inventory.find((unit) => unit.id === booking.inventoryId);
     if (!item) return rows;
