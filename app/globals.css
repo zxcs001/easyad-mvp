@@ -136,7 +136,7 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
   font-weight: 800;
   white-space: nowrap;
   backdrop-filter: blur(12px);
-  transition: border-color .16s, background .16s, transform .16s;
+  transition: border-color .16s, background .16s, transform .16s, scale .11s ease;
 }
 
 .language-trigger:hover,
@@ -275,6 +275,7 @@ a {
 
 button {
   cursor: pointer;
+  transition: scale .11s ease, opacity .14s ease;
 }
 
 button:disabled {
@@ -313,13 +314,17 @@ label {
    the translateY(-50%) that centres the carousel arrows and the fallback map
    markers, so a pressed arrow dropped 23-32px and the click could be lost. */
 button:not(:disabled):active {
-  scale: .97;
+  scale: .96;
 }
 
 @media (prefers-reduced-motion:reduce) {
 
 button:not(:disabled):active {
   scale: none;
+}
+
+button {
+  transition: none !important;
 }
 }
 

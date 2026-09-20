@@ -21,13 +21,14 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   bookings: Booking[];
   setDraft: Dispatch<SetStateAction<BookingDraft>>;
   hasCapacityConflict: (inventoryId: string, start: string, end: string, adSlots?: number, excludeId?: string) => boolean;
-  onSubmit: (file: File) => Promise<boolean>;
+  onSubmit: (file?: File | null) => Promise<boolean>;
   canBuy?: boolean;
 }) {
   const { formatNumber, locale, t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creativeImage, setCreativeImage] = useState<File | null>(null);
   const [creativeError, setCreativeError] = useState("");
+  const [showOptions, setShowOptions] = useState(draft.adSlots > 1);
   const isDigital = isDigitalInventory(item);
   const isStatic = isStaticInventory(item);
   const staticAvailable = !isStatic || isInventoryAvailableForDates(item, draft.start, draft.end);
@@ -37,7 +38,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   const requestedSeconds = reservedLoopSeconds(item, draft.adSlots);
   const remainingSeconds = availableLoopSeconds(item, bookings, draft.start, draft.end);
   const showsLoopCapacity = isDigital;
-  const creativeReady = Boolean(creativeImage) && !creativeError;
+  const bookingDetailsReady = Boolean(draft.campaign.trim() && draft.start && draft.end && draft.start <= draft.end);
 
   // The submit button has three independent blocking conditions. Before this,
   // only one of them changed the label, so the other two left a grey button and
@@ -48,10 +49,10 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
       ? isStatic
         ? "This billboard is already taken for these dates. Pick different dates."
         : "This screen is full for these dates. Pick different dates, or ask for fewer showings."
-      : !creativeReady
-        ? creativeError
-          ? "Choose a different picture to continue."
-          : "Add your ad picture to continue."
+      : creativeError
+        ? "Choose a different picture, or remove it and add artwork later."
+        : !bookingDetailsReady
+          ? "Add a campaign name and a valid date range to continue."
         : "";
 
   function chooseCreative(file: File | null) {
@@ -68,7 +69,12 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   return (
     <section className="grid booking-grid">
       <div className="panel">
-        <PanelHeading eyebrow={isStatic ? "Book this billboard" : "Book time on this screen"} title={item.name} action={<span className={`status ${blocked ? "bad" : "good"}`}>{t(isStatic ? staticAvailable ? "Available" : "Unavailable" : conflict ? "Fully booked" : "Available")}</span>} />
+        <PanelHeading eyebrow={isStatic ? "Request this billboard" : "Request time on this screen"} title={item.name} action={<span className={`status ${blocked ? "bad" : "good"}`}>{t(isStatic ? staticAvailable ? "Available" : "Unavailable" : conflict ? "Fully booked" : "Available")}</span>} />
+        <div className="booking-screen-summary" aria-label={t("Selected screen")}>
+          <span><strong>{t("Selected screen")}</strong><small>{item.address}</small></span>
+          <span><strong>{t("Daily rate")}</strong><small>{money(item.price, locale)}</small></span>
+          <span><strong>{t("Format")}</strong><small>{t(item.deliveryMode === "static" ? "Static" : "Digital")}</small></span>
+        </div>
         <div className="form-grid">
           {((advertiserNameFixed ? ["campaign", "start", "end"] : ["advertiser", "campaign", "start", "end"]) as (keyof BookingDraft)[]).map((key) => (
             <label key={key}>
@@ -76,16 +82,22 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
               <input type={key === "start" || key === "end" ? "date" : "text"} value={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
             </label>
           ))}
-          <label>
-            {t("Showings per cycle")}
-            <input type="number" min={1} max={100} value={draft.adSlots} onChange={(event) => setDraft((current) => ({ ...current, adSlots: Math.max(1, Math.round(Number(event.target.value) || 1)) }))} />
-          </label>
         </div>
+        {isDigital ? <div className="booking-options">
+          <button aria-controls="booking-more-options" aria-expanded={showOptions} className="secondary-button" type="button" onClick={() => setShowOptions((current) => !current)}>{t(showOptions ? "Hide options" : "More options")}</button>
+          {showOptions ? <div id="booking-more-options" className="booking-options-panel">
+            <label>
+              {t("Showings per cycle")}
+              <input type="number" min={1} max={100} value={draft.adSlots} onChange={(event) => setDraft((current) => ({ ...current, adSlots: Math.max(1, Math.round(Number(event.target.value) || 1)) }))} />
+              <small>{t("One showing per cycle works for most campaigns.")}</small>
+            </label>
+          </div> : null}
+        </div> : null}
         <div className="booking-creative-field">
           <label htmlFor="booking-creative-image">
-            <strong>{t("Your ad picture")}</strong>
+            <strong>{t("Add artwork now (optional)")}</strong>
           </label>
-          <small id="booking-creative-requirements">{t(isDigital ? "Needed before you can book. PNG, JPEG, or animated GIF, up to 50 MB." : "Needed before you can book. PNG or JPEG, up to 50 MB.")}</small>
+          <small id="booking-creative-requirements">{t(isDigital ? "PNG, JPEG, or animated GIF, up to 50 MB." : "PNG or JPEG, up to 50 MB.")}</small>
           <input
             ref={fileInputRef}
             id="booking-creative-image"
@@ -95,7 +107,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
             aria-describedby="booking-creative-requirements booking-creative-help booking-creative-error"
             onChange={(event) => chooseCreative(event.target.files?.[0] ?? null)}
           />
-          <small id="booking-creative-help">{t("The screen owner checks your picture before your ad goes live.")}</small>
+          <small id="booking-creative-help">{t("You can send the date request now and add artwork in Make an ad later. The screen owner checks it before it goes live.")}</small>
           {creativeImage ? (
             <div className={`booking-creative-summary${creativeError ? " bad" : ""}`}>
               <span><strong>{creativeImage.name}</strong><small>{formatFileSize(creativeImage.size)}</small></span>
@@ -115,7 +127,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
           </> : null}
         </div>
         {blockedReason ? <p className="booking-blocked-reason" id="booking-submit-reason">{t(blockedReason)}</p> : null}
-        <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button wide" disabled={blocked || !canBuy || !creativeReady} onClick={() => creativeImage ? onSubmit(creativeImage) : Promise.resolve(false)} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Keep the selected picture and try again.">{canBuy ? "Send booking request" : "Sign in to book"}</AsyncButton>
+        <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button wide" disabled={blocked || !canBuy || !bookingDetailsReady || Boolean(creativeError)} onClick={() => onSubmit(creativeImage)} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Your details are still here—please try again.">{canBuy ? "Send date request" : "Sign in to request dates"}</AsyncButton>
       </div>
       <div className="panel">
         <PanelHeading eyebrow={isStatic ? "Placement availability" : "What else is booked"} title="Dates already taken" />

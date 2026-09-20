@@ -105,7 +105,7 @@
   padding: 0 18px;
   font-weight: 800;
   display: inline-flex;
-  transition: background .14s,border-color .14s,box-shadow .14s,transform .14s;
+  transition: background .14s,border-color .14s,box-shadow .14s,transform .14s,scale .11s ease;
 }
 
 .government-signin-button:hover:not(:disabled) { background: var(--green-dark); border-color: var(--green-dark); box-shadow: var(--shadow-sm); transform: translateY(-1px); }

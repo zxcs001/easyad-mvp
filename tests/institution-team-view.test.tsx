@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import InstitutionTeamView from "../app/component/institution-team-view";
 import type { DbUser } from "../app/lib/db";
@@ -34,4 +35,14 @@ test("institution team panel blocks new operators when all seats are used", () =
   expect(screen.getByText("1 of 1")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Seat limit reached" })).toBeDisabled();
   expect(screen.getByText("Belongs to Civic Media Group")).toBeInTheDocument();
+});
+
+test("operator deletion explains its effect before it runs", async () => {
+  const onDeleteOperator = vi.fn().mockResolvedValue(true);
+  const userEventInstance = userEvent.setup();
+  render(<InstitutionTeamView institution={institution} operators={[operator]} onCreateOperator={vi.fn()} onDeleteOperator={onDeleteOperator} />);
+
+  await userEventInstance.click(screen.getByRole("button", { name: "Delete operator" }));
+  expect(onDeleteOperator).not.toHaveBeenCalled();
+  expect(screen.getByRole("dialog", { name: "Delete operator" })).toHaveTextContent("The operator seat becomes available again.");
 });

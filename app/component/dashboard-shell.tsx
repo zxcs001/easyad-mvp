@@ -49,7 +49,7 @@ const roleNav: Record<Role, NavItem[]> = {
   advertiser: [
     { view: "portal", label: "Home", icon: Globe2, group: "Workspace" },
     { view: "discover", label: "Find screens", icon: Search, group: "Workspace" },
-    { view: "booking", label: "Book dates", icon: CalendarDays, group: "Operations" },
+    { view: "booking", label: "Request dates", icon: CalendarDays, group: "Operations" },
     { view: "creative", label: "Make an ad", icon: Sparkles, group: "Operations" },
     { view: "resources", label: "Your pictures", icon: Images, group: "Operations" },
     { view: "campaigns", label: "Your campaigns", icon: Megaphone, group: "Operations" },
@@ -113,7 +113,7 @@ const viewTitles: Record<View, { title: string; eyebrow: string }> = {
 const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: string }>> = {
   portal: { title: "Advertise your business", eyebrow: "Get started" },
   discover: { title: "Find screens near you", eyebrow: "Buy screen time" },
-  booking: { title: "Book your dates", eyebrow: "Buy screen time" },
+  booking: { title: "Request your dates", eyebrow: "Buy screen time" },
   creative: { title: "Add your ad", eyebrow: "Buy screen time" },
   campaigns: { title: "Your campaigns", eyebrow: "Track your ads" },
   resources: { title: "Your pictures and videos", eyebrow: "Ad library" },
@@ -124,11 +124,11 @@ const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: strin
 // The three steps an advertiser actually takes. The eyebrow used to read
 // "Step 1 of 4" through "Step 3 of 4", promising a fourth step that does not
 // exist, and it was static text rather than something a person could use.
-// Booking already takes the ad picture, so step 3 is for a campaign that is
-// already booked, which is why it is gated rather than sequential.
+// The date request creates the campaign shell. Artwork can be attached during
+// that request or added in step 3, which remains gated until a request exists.
 const buyingSteps: Array<{ view: View; label: string }> = [
   { view: "discover", label: "Find screens" },
-  { view: "booking", label: "Book dates" },
+  { view: "booking", label: "Request dates" },
   { view: "creative", label: "Make an ad" },
 ];
 

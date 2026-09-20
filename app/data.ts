@@ -144,7 +144,7 @@ export type Booking = {
   start: string;
   end: string;
   adSlots: number;
-  creativeStatus: "approved" | "pending review" | "needs changes";
+  creativeStatus: "not submitted" | "approved" | "pending review" | "needs changes";
   status: "pending approval" | "creative review" | "approved" | "scheduled" | "live" | "completed" | "rejected";
   spend: number;
   paid: boolean;

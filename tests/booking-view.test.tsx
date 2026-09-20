@@ -37,7 +37,7 @@ const draft: BookingDraft = {
   adSlots: 1,
 };
 
-function renderBooking(item: InventoryItem) {
+function renderBooking(item: InventoryItem, onSubmit = vi.fn().mockResolvedValue(true)) {
   render(
     <BookingView
       item={item}
@@ -46,7 +46,7 @@ function renderBooking(item: InventoryItem) {
       bookings={[]}
       setDraft={vi.fn()}
       hasCapacityConflict={() => false}
-      onSubmit={vi.fn().mockResolvedValue(true)}
+      onSubmit={onSubmit}
       canBuy
     />,
   );
@@ -62,55 +62,55 @@ test("physical billboards omit digital loop-time metrics", () => {
   expect(screen.getByText("How long it runs")).toBeInTheDocument();
   expect(screen.getByText("Estimated views")).toBeInTheDocument();
   expect(screen.getByText("Available")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeEnabled();
 
-  fireEvent.change(screen.getByLabelText("Your ad picture"), {
+  fireEvent.change(screen.getByLabelText("Add artwork now (optional)"), {
     target: { files: [new File(["image"], "billboard.png", { type: "image/png" })] },
   });
 
   expect(screen.getByText("billboard.png")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeEnabled();
 });
 
 test("physical billboard requests outside the owner-defined dates are unavailable", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: "static", availableFrom: "2026-08-01", availableTo: "2026-08-31" });
 
   expect(screen.getByText("Unavailable")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeDisabled();
   expect(screen.queryByText("Fully booked")).not.toBeInTheDocument();
 });
 
 test("booking rejects non-image creative files before submission", () => {
   renderBooking(baseItem);
 
-  fireEvent.change(screen.getByLabelText("Your ad picture"), {
+  fireEvent.change(screen.getByLabelText("Add artwork now (optional)"), {
     target: { files: [new File(["not an image"], "creative.pdf", { type: "application/pdf" })] },
   });
 
   expect(screen.getByRole("alert")).toHaveTextContent("Choose a PNG, JPEG, or GIF image.");
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeDisabled();
 });
 
 test("digital bookings accept animated GIF creative", () => {
   renderBooking(baseItem);
 
-  fireEvent.change(screen.getByLabelText("Your ad picture"), {
+  fireEvent.change(screen.getByLabelText("Add artwork now (optional)"), {
     target: { files: [new File(["GIF89a"], "animated.gif", { type: "image/gif" })] },
   });
 
   expect(screen.getByText("animated.gif")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeEnabled();
 });
 
 test("physical billboard bookings do not accept animated GIF creative", () => {
   renderBooking({ ...baseItem, format: "static", deliveryMode: "static" });
 
-  fireEvent.change(screen.getByLabelText("Your ad picture"), {
+  fireEvent.change(screen.getByLabelText("Add artwork now (optional)"), {
     target: { files: [new File(["GIF89a"], "animated.gif", { type: "image/gif" })] },
   });
 
   expect(screen.getByRole("alert")).toHaveTextContent("Choose a PNG or JPEG image.");
-  expect(screen.getByRole("button", { name: "Send booking request" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send date request" })).toBeDisabled();
 });
 
 test("digital screens retain loop-time metrics", () => {
@@ -119,6 +119,18 @@ test("digital screens retain loop-time metrics", () => {
   expect(screen.getByText("Your time each cycle")).toBeInTheDocument();
   expect(screen.getByText("Time still free")).toBeInTheDocument();
   expect(screen.getByText("Time already booked")).toBeInTheDocument();
+});
+
+test("a date request can be sent before artwork and keeps loop settings optional", async () => {
+  const onSubmit = vi.fn().mockResolvedValue(true);
+  renderBooking(baseItem, onSubmit);
+
+  expect(screen.queryByLabelText("Showings per cycle")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Send date request" }));
+
+  expect(onSubmit).toHaveBeenCalledWith(null);
+  fireEvent.click(screen.getByRole("button", { name: "More options" }));
+  expect(screen.getByRole("spinbutton", { name: /Showings per cycle/ })).toHaveValue(1);
 });
 
 test("legacy static-format inventory also omits loop-time metrics", () => {

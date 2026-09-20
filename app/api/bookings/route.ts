@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { Booking, Creative, FormatKey, formats } from "../../data";
 import { canBuyAds, getCurrentUser, getInstitutionScope } from "../../lib/auth";
-import { createBookingWithCreativeRecord, getInventory, listBookings, listBookingsCreatedBy, listBookingsForInstitution } from "../../lib/db";
+import { createBookingRecord, createBookingWithCreativeRecord, getInventory, listBookings, listBookingsCreatedBy, listBookingsForInstitution } from "../../lib/db";
 import { estimateSpend, exceedsLoopCapacity, truncateFileName } from "../../utils";
 import { isInventoryAvailableForDates } from "../../lib/inventory-availability";
 import { isDigitalInventory, isStaticInventory } from "../../lib/inventory-delivery";
@@ -22,9 +22,7 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user || !canBuyAds(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  if (!(request.headers.get("content-type") ?? "").includes("multipart/form-data")) {
-    return NextResponse.json({ error: "A creative image is required with every booking" }, { status: 400 });
-  }
+  if (!(request.headers.get("content-type") ?? "").includes("multipart/form-data")) return NextResponse.json({ error: "Submit booking details as form data" }, { status: 400 });
   const submission = await readBookingSubmission(request);
   if ("error" in submission) return NextResponse.json({ error: submission.error }, { status: submission.status });
   const { body, upload } = submission;
@@ -33,7 +31,7 @@ export async function POST(request: NextRequest) {
   if (!item) return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
   if(item.contentVisibility==="private"||item.advertisingOptIn===false)return NextResponse.json({error:"The owner has not enabled marketplace advertising"},{status:409});
   if((item.restrictedCategories??[]).includes("general"))return NextResponse.json({error:"This screen requires a categorized campaign plan"},{status:409});
-  if (upload.extension === "gif" && !isDigitalInventory(item)) {
+  if (upload?.extension === "gif" && !isDigitalInventory(item)) {
     return NextResponse.json({ error: "Animated GIF creative is available for digital inventory only" }, { status: 422 });
   }
 
@@ -58,12 +56,17 @@ export async function POST(request: NextRequest) {
     start,
     end,
     adSlots,
-    creativeStatus: "pending review",
-    status: "creative review",
+    creativeStatus: upload ? "pending review" : "not submitted",
+    status: upload ? "creative review" : "pending approval",
     spend: estimateSpend(item, start, end, adSlots),
     paid: false,
     pop: 0,
   };
+
+  if (!upload) {
+    const created = await createBookingRecord(booking, user.id);
+    return NextResponse.json({ booking: created, creative: null }, { status: 201 });
+  }
 
   const creativeId = `CRV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
   const storagePath = await storeMedia(`creatives/${creativeId}.${upload.extension}`, upload.bytes, upload.mimeType);
@@ -104,9 +107,8 @@ function cleanAdSlots(value: unknown) {
 async function readBookingSubmission(request: NextRequest) {
   const form = await request.formData();
   const file = form.get("file");
-  if (!(file instanceof File)) return { error: "Choose a PNG, JPEG, or GIF image for approval", status: 400 as const };
-  const inspected = await inspectMediaUpload(file, ["png", "jpg", "gif"]);
-  if (!inspected) return { error: "Booking images must be valid PNG, JPEG, or GIF files up to 50 MB", status: 400 as const };
+  const inspected = file instanceof File && file.size ? await inspectMediaUpload(file, ["png", "jpg", "gif"]) : null;
+  if (file instanceof File && file.size && !inspected) return { error: "Booking images must be valid PNG, JPEG, or GIF files up to 50 MB", status: 400 as const };
   return {
     body: {
       inventoryId: String(form.get("inventoryId") ?? ""),
@@ -116,7 +118,7 @@ async function readBookingSubmission(request: NextRequest) {
       end: String(form.get("end") ?? ""),
       adSlots: String(form.get("adSlots") ?? "1"),
     },
-    upload: { ...inspected, originalName: file.name },
+    upload: inspected && file instanceof File ? { ...inspected, originalName: file.name } : null,
   };
 }
 

@@ -522,7 +522,7 @@ to {
   border-radius: var(--radius-sm);
   letter-spacing: -.01em;
   font-weight: 700;
-  transition: transform .14s,box-shadow .14s,background .14s,border-color .14s,filter .14s;
+  transition: transform .14s,box-shadow .14s,background .14s,border-color .14s,filter .14s,scale .11s ease;
 }
 
 .primary-button {

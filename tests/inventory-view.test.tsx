@@ -53,10 +53,15 @@ test("inventory creation waits for explicit form confirmation", async () => {
 
   await user.click(screen.getByRole("button", { name: "Add device" }));
   expect(addInventory).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Create device" })).toBeInTheDocument();
+  expect(screen.getByText("Identify the device")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
 
   await user.clear(screen.getByLabelText("Name"));
   await user.type(screen.getByLabelText("Name"), "Confirmed Device");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("Set price and availability")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("Review the device")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Create device" }));
 
   expect(addInventory).toHaveBeenCalledWith(expect.objectContaining({ name: "Confirmed Device", id: "" }));
@@ -121,7 +126,64 @@ test("empty inventory hides record and media forms until a device draft is start
 
   await user.click(screen.getByRole("button", { name: "Add device" }));
   expect(screen.getByLabelText("Name")).toBeInTheDocument();
-  expect(screen.getByText("Images and videos")).toBeInTheDocument();
+  expect(screen.queryByText("Images and videos")).not.toBeInTheDocument();
+});
+
+test("device creation validates each stage before moving forward", async () => {
+  const user = userEvent.setup();
+  render(
+    <InventoryView
+      inventory={[item]}
+      selectedId={item.id}
+      select={vi.fn()}
+      item={item}
+      newItem={{ ...item, id: "", name: "", address: "" }}
+      mediaResources={[]}
+      addInventory={vi.fn().mockResolvedValue(true)}
+      deleteInventory={vi.fn()}
+      saveInventory={vi.fn().mockResolvedValue(true)}
+      updateInventoryApproval={vi.fn()}
+      uploadMedia={vi.fn().mockResolvedValue(true)}
+      deleteMediaResource={vi.fn().mockResolvedValue(undefined)}
+      canManage
+      canDelete={false}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Add device" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("Give this device a name.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Name")).toHaveFocus();
+  expect(screen.queryByText("Set price and availability")).not.toBeInTheDocument();
+});
+
+test("operator device creation explains and submits the approval outcome", async () => {
+  const user = userEvent.setup();
+  render(
+    <InventoryView
+      inventory={[item]}
+      selectedId={item.id}
+      select={vi.fn()}
+      item={item}
+      newItem={{ ...item, id: "", name: "Operator Device", address: "2 Approval Way" }}
+      mediaResources={[]}
+      addInventory={vi.fn().mockResolvedValue(true)}
+      deleteInventory={vi.fn()}
+      saveInventory={vi.fn().mockResolvedValue(true)}
+      updateInventoryApproval={vi.fn()}
+      uploadMedia={vi.fn().mockResolvedValue(true)}
+      deleteMediaResource={vi.fn().mockResolvedValue(undefined)}
+      canManage
+      canDelete={false}
+      approvalRequired
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Add device" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("Submitting sends this device to an administrator for approval.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Submit device for approval" })).toBeInTheDocument();
 });
 
 test("public device links are available only for digital inventory", () => {
