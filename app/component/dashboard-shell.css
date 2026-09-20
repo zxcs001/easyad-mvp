@@ -1522,14 +1522,60 @@
 }
 
 /* In a short window the column nav scrolls with no sign that it does:
-   "Performance" and "Billing" were simply gone at 600px tall. Shadows appear at
-   an edge only while there is more to scroll past it. */
+   "Performance" and "Billing" were simply gone at 600px tall.
+
+   The first attempt used the scroll-shadow trick, which needs two cover layers
+   painted in the container's own background colour. Both sidebars are painted
+   with gradients, so a flat cover could not match: on the civic sidebar it read
+   as a dark block under the icons. A visible scrollbar says the same thing and
+   cannot mismatch a background. */
 @media (min-width: 901px) {
   .sidebar .nav {
-    background:
-      linear-gradient(var(--workspace-nav, #111b22) 30%, #0000) center top / 100% 28px no-repeat local,
-      linear-gradient(#0000, var(--workspace-nav, #111b22) 70%) center bottom / 100% 28px no-repeat local,
-      radial-gradient(farthest-side at 50% 0, #0000008c, #0000) center top / 100% 12px no-repeat scroll,
-      radial-gradient(farthest-side at 50% 100%, #0000008c, #0000) center bottom / 100% 12px no-repeat scroll;
+    scrollbar-color: #5c7280 #0000;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
   }
+}
+
+/* ---- The civic sidebar in the collapsed rail ------------------------------
+   The rail rules were written for the marketplace sidebar: .brand, the
+   workspace switcher and the tenant card. Civic Screen Operations renders its
+   own brand, a scope card and a marketplace link, and none of them fitted the
+   44px column: the brand sat 63px wide and off-centre, the scope card kept its
+   34x60 bordered panel, and the account card was 55px. */
+@media (min-width: 901px) {
+
+.sidebar.is-rail .government-brand,
+.sidebar.is-rail .government-scope-card {
+  grid-template-columns: 44px;
+  justify-items: center;
+  gap: 0;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.sidebar.is-rail .government-brand-mark {
+  width: 44px;
+  height: 44px;
+}
+
+/* In the rail only the selected nav item carries a surface, so the scope card
+   shows its shield alone, like every other icon. */
+.sidebar.is-rail .government-scope-card {
+  background: none;
+  border: 0;
+}
+
+.sidebar.is-rail .government-scope-card > span {
+  color: #8fc2e9;
+  background: none;
+  width: 44px;
+  height: 44px;
+}
+
+.sidebar.is-rail .tenant-card {
+  justify-self: center;
+  width: 44px;
+}
 }
