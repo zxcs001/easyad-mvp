@@ -148,8 +148,16 @@ working on it gets the same routine.
 |---|---|---|
 | `lights-on` | "lights on", "start up", "pick up where we left off" | Fetches what teammates pushed, starts PostgreSQL and the dev server on 3001, checks the app answers, and summarizes the last session |
 | `lights-off` | "lights off", "wrap up", "shut down" | Verifies the work, updates `README.md` and `DESIGN.md`, commits to the feature branch, stops servers this session started, and reports what is left |
+| `git-flow` | "start a branch", "commit this", "open a PR", "handle the review" | Branches from an updated `main`, writes commits that give the reason, syncs the branch while it is open, prepares the push and the pull request, and cleans up after the merge |
 
-The pair is deliberate. `lights-on` opens the day and `lights-off` closes it.
+The first pair is deliberate. `lights-on` opens the day and `lights-off`
+closes it.
+
+`git-flow` holds the facts a person gets wrong here: `origin` is the team
+repository `zxcs001/easyad-mvp` and `fork` is the personal fork, so a push goes
+to `fork` and the pull request goes to `origin`. It also names the files that
+must never be committed, the checks that must pass before review, and the files
+where two people who work at the same time usually conflict.
 
 Neither one pushes, opens a pull request, or merges. Those reach other people,
 so they ask instead. `lights-off` also refuses to commit when `npm test`, `tsc`
