@@ -5,9 +5,8 @@
 | Stable ID | Inventory unit | Delivery mode | Specification |
 |---|---|---|---|
 | `INV-DEMO-STATIC-001` | Memorial Avenue Bulletin Face | Static | `SPEC-INV-DEMO-STATIC-001`, face-specific 3048 × 1524 mm trim |
-| `INV-DEMO-STATIC-002` | Balmoral Campus Poster Face | Static | `SPEC-INV-DEMO-STATIC-002`, face-specific 1219 × 1829 mm trim |
 
-These fixtures intentionally use different production requirements. They must not be consolidated into a universal static-art specification.
+The static face keeps its own production requirements. It must not be consolidated into a universal static-art specification. The Balmoral Campus Poster Face (`INV-DEMO-STATIC-002`) no longer ships: the research found no such face, and the seed removes the record if an older seed created it.
 
 This is the canonical reference for the local demo identities and device ownership graph. The data is intentionally fictional and may be recreated with:
 
@@ -15,7 +14,7 @@ This is the canonical reference for the local demo identities and device ownersh
 npm run seed:demo-data
 ```
 
-Login emails and passwords are stored only in the ignored local file `DEMO_ACCOUNTS.md`. That file must never be committed or uploaded. The seed refuses non-local and production databases unless `ALLOW_REMOTE_DEMO_DATA=1` is explicitly set. Rerunning it is idempotent: it restores the accounts, passwords, active status, memberships, and device fields without deleting bookings, media, or other application data.
+Login emails and passwords are stored only in the ignored local file `DEMO_ACCOUNTS.md`. That file must never be committed or uploaded. The seed refuses non-local and production databases unless `ALLOW_REMOTE_DEMO_DATA=1` is explicitly set. Rerunning it is idempotent: it restores the accounts, passwords, active status, memberships, and device fields. It replaces its own demo campaigns, which all carry a `BK-TB-` identifier, and removes `INV-DEMO-` devices that the current seed no longer ships. It does not touch media or any other application data, and it never touches a booking you made by hand.
 
 ## Role model
 
@@ -58,23 +57,36 @@ Ad buyers sign in at `/login`.
 
 ## Government-owned devices
 
-All three devices have `institution_id = USR-DEMO-GOV-TB` and are manageable by the governmental owner and both of its delegated operators.
+All nine devices have `institution_id = USR-DEMO-GOV-TB` and are manageable by the governmental owner and both of its delegated operators. Every address, latitude and longitude is real, and every audience figure has its basis in `docs/DEMO_DATA_RESEARCH.md`.
 
-| Stable device ID | Device | Format / template | Initial manager | State |
-|---|---|---|---|---|
-| `INV-DEMO-GOV-001` | Thunder Bay City Hall Civic Screen | digital / public-info | `USR-DEMO-GOV-OP-01` | approved, published inventory |
-| `INV-DEMO-GOV-002` | Marina Park Community Display | digital / community | `USR-DEMO-GOV-OP-01` | approved, published inventory |
-| `INV-DEMO-GOV-003` | Water Street Transit Terminal Display | transit / transit | `USR-DEMO-GOV-OP-02` | approved, published inventory |
+| Stable device ID | Device | Format | Daily impressions | Spots in loop | Rate, one spot a day | Whole face a day | Initial manager | State |
+|---|---|---|---|---|---|---|---|---|
+| `INV-DEMO-GOV-001` | Thunder Bay City Hall Civic Screen | digital | 1,800 | 9 | $3 | $14 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+| `INV-DEMO-GOV-002` | Waterfront Transit Terminal Screen | transit | 1,900 | 9 | $3 | $21 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+| `INV-DEMO-GOV-003` | Prince Arthur's Landing Waterfront Screen | digital | 1,050 | 9 | $3 | $18 | `USR-DEMO-GOV-OP-02` | approved, published inventory |
+| `INV-DEMO-GOV-004` | Canada Games Complex Entrance Screen | digital | 1,050 | 9 | $3 | $14 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+| `INV-DEMO-GOV-005` | Community Auditorium Lobby Screen | digital | 390 | 9 | $3 | $12 | `USR-DEMO-GOV-OP-02` | approved, published inventory |
+| `INV-DEMO-GOV-006` | Fort William Gardens Concourse Screen | digital | 310 | 9 | $3 | $12 | `USR-DEMO-GOV-OP-02` | approved, published inventory |
+| `INV-DEMO-GOV-007` | Waverley Resource Library Entrance Screen | digital | 260 | 9 | $3 | $12 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+| `INV-DEMO-GOV-008` | Memorial Avenue at Harbour Expressway Digital | digital | 10,000 | 6 | $15 | $90 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+| `INV-DEMO-STATIC-001` | Memorial Avenue Bulletin Face | static | 8,470 | 1 | $50 | $50 | `USR-DEMO-GOV-OP-01` | approved, published inventory |
+
+`INV-DEMO-STATIC-001` is the only face with no loop. An advertiser who books it earns all of its impressions; on every other screen an advertiser earns its share of the loop. The application bills `price x days x slots`, so the stored price is always the rate for one spot. The whole-face column is the researched rate the spots add up to, and $3 is the floor for the smallest faces.
 
 ## Institution-owned devices
 
-All three devices have `institution_id = USR-DEMO-INST-LU` and are manageable by the university owner and its delegated operator.
+All four devices have `institution_id = USR-DEMO-INST-LU` and are manageable by the university owner and its delegated operator.
 
-| Stable device ID | Device | Format / template | Initial manager | State |
-|---|---|---|---|---|
-| `INV-DEMO-INST-001` | Lakehead University Agora Screen | digital / community | `USR-DEMO-INST-OP-01` | approved, published inventory |
-| `INV-DEMO-INST-002` | Lakehead Athletics Centre Entrance Display | digital / weather | `USR-DEMO-INST-OP-01` | approved, published inventory |
-| `INV-DEMO-INST-003` | Lakehead University Transit Shelter | transit / transit | `USR-DEMO-INST-LU` | approved, published inventory |
+| Stable device ID | Device | Format | Daily impressions | Spots in loop | Rate, one spot a day | Whole face a day | Initial manager | State |
+|---|---|---|---|---|---|---|---|---|
+| `INV-DEMO-INST-001` | Lakehead University Agora Screen | digital | 3,300 | 9 | $3 | $24 | `USR-DEMO-INST-OP-01` | approved, published inventory |
+| `INV-DEMO-INST-002` | Lakehead Athletics Centre Entrance Screen | digital | 980 | 9 | $3 | $14 | `USR-DEMO-INST-OP-01` | approved, published inventory |
+| `INV-DEMO-INST-003` | Bora Laskin Faculty of Law Screen | digital | 620 | 9 | $3 | $12 | `USR-DEMO-INST-OP-01` | approved, published inventory |
+| `INV-DEMO-INST-004` | Lakehead University Transit Shelter Screen | transit | 4,100 | 6 | $4 | $21 | `USR-DEMO-INST-OP-01` | approved, published inventory |
+
+## Demo campaigns
+
+`npm run seed:demo-data` also writes 420 bookings across 172 campaigns, from 2025-09-01 to 2027-01-10, with their creatives, invoices, proof-of-play rows and approval events. Every advertiser is fictional. The rules that shape the mix are in `docs/DEMO_DATA_RESEARCH.md` section 7.
 
 ## AI generation contract
 

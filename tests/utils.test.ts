@@ -19,6 +19,7 @@ import {
   geoToMapPoint,
   isCreativeSubmissionAllowed,
   isKnownLocationId,
+  loopShare,
   mapDistanceKm,
   overlaps,
   portalHref,
@@ -94,8 +95,23 @@ test("loop capacity allows overlapping campaigns until reserved seconds are exha
 test("analytics helpers calculate plays, impressions, and revenue split", () => {
   assert.deepEqual(splitRevenue(1000), { gross: 1000, platformFee: 150, operatorPayout: 850 });
   assert.equal(expectedPlays("2026-07-01", "2026-07-02"), PLAYS_PER_DAY * 2);
-  assert.equal(expectedImpressions(inventoryItem, "2026-07-01", "2026-07-02"), 2000);
-  assert.equal(deliveredImpressions(inventoryItem, { start: "2026-07-01", end: "2026-07-02", pop: 50 }), 1000);
+  // impressions is the screen's figure for one day, and one advertiser earns
+  // its share of the loop: a 6s spot in a 30s loop is one fifth of the screen.
+  assert.equal(expectedImpressions(inventoryItem, "2026-07-01", "2026-07-02"), 14000 * 2 * 0.2);
+  assert.equal(expectedImpressions(inventoryItem, "2026-07-01", "2026-07-02", 2), 14000 * 2 * 0.4);
+  assert.equal(deliveredImpressions(inventoryItem, { start: "2026-07-01", end: "2026-07-02", pop: 50 }), 2800);
+  assert.equal(deliveredImpressions(inventoryItem, { start: "2026-07-01", end: "2026-07-02", pop: 50, adSlots: 2 }), 5600);
+});
+
+test("loop share gives an advertiser its slots, never more than the screen", () => {
+  assert.equal(loopShare(inventoryItem, 1), 0.2);
+  assert.equal(loopShare(inventoryItem, 3), 0.6);
+  // Booking the whole loop, or more, is still one screen.
+  assert.equal(loopShare(inventoryItem, 5), 1);
+  assert.equal(loopShare(inventoryItem, 9), 1);
+  // A static face has no loop: its advertiser has the whole face.
+  assert.equal(loopShare({ ...inventoryItem, deliveryMode: "static" }, 1), 1);
+  assert.equal(loopShare({ ...inventoryItem, maxLoopSeconds: 0 }, 1), 1);
 });
 
 test("map and location helpers normalize known spatial values", () => {

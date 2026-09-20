@@ -189,22 +189,31 @@ export function splitRevenue(gross: number) {
 // would derive this from the screen's loop length and operating hours.
 export const PLAYS_PER_DAY = 180;
 
-// Reference flight length used to prorate an inventory unit's headline
-// impressions figure down to a single campaign.
-const REFERENCE_FLIGHT_DAYS = 14;
-
 export function expectedPlays(start: string, end: string) {
   return daysBetween(start, end) * PLAYS_PER_DAY;
 }
 
-export function expectedImpressions(item: InventoryItem, start: string, end: string) {
-  return Math.round((item.impressions * daysBetween(start, end)) / REFERENCE_FLIGHT_DAYS);
+// A screen's impressions figure belongs to the screen, for one day. An
+// advertiser on a digital screen earns only its share of the loop: a 10-second
+// spot in a 60-second loop is one sixth of the screen. Counting the whole
+// screen against one advertiser is the mistake a media buyer spots first.
+// A static face has no loop, so its advertiser earns the whole face.
+export function loopShare(item: Pick<InventoryItem, "deliveryMode" | "imageInterval" | "maxLoopSeconds">, adSlots = 1) {
+  if (item.deliveryMode === "static") return 1;
+  const spotSeconds = item.imageInterval || 10;
+  const loopSeconds = item.maxLoopSeconds || 0;
+  if (!loopSeconds) return 1;
+  return Math.min(1, (Math.max(1, adSlots) * spotSeconds) / loopSeconds);
 }
 
-// Legacy impression estimates scale inventory assumptions by operator-declared
-// completion. They are not measured views or authenticated player evidence.
-export function deliveredImpressions(item: InventoryItem, booking: { start: string; end: string; pop: number }) {
-  return Math.round(expectedImpressions(item, booking.start, booking.end) * (booking.pop / 100));
+export function expectedImpressions(item: InventoryItem, start: string, end: string, adSlots = 1) {
+  return Math.round(item.impressions * daysBetween(start, end) * loopShare(item, adSlots));
+}
+
+// Delivered impressions scale the booked figure by operator-declared completion.
+// They are not measured views or authenticated player evidence.
+export function deliveredImpressions(item: InventoryItem, booking: { start: string; end: string; pop: number; adSlots?: number }) {
+  return Math.round(expectedImpressions(item, booking.start, booking.end, booking.adSlots ?? 1) * (booking.pop / 100));
 }
 
 export function formatRatio(value: number) {

@@ -53,6 +53,10 @@ Seed the documented governmental, institutional, advertiser, and device fixtures
 npm run seed:demo-data
 ```
 
+The seed writes eight users, thirteen Thunder Bay screens and sixteen months of trading: 420 bookings across 172 campaigns, with their creatives, invoices, proof-of-play rows and approval events. Find screens, Performance and Invoices therefore open with data instead of an empty state.
+
+Every screen sits at a real civic or campus address and carries a real latitude and longitude. Every audience figure is published or is an estimate with its arithmetic shown. Every advertiser is fictional, because no real business may appear to have bought advertising it did not buy. [Demo data research](docs/DEMO_DATA_RESEARCH.md) gives the source of each number; read it before you change one.
+
 The stable identities, demo credentials, ownership graph, and AI fixture rules are documented in [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md). The older `seed:test-data` command remains available for the temporary test-account workflow.
 
 ### Local demo credentials file

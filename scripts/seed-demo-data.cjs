@@ -4,6 +4,8 @@ const { pbkdf2Sync, randomBytes } = require("node:crypto");
 const { existsSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 const { Client } = require("pg");
+const { AREA_INCOME, SPOT_SECONDS, mapPosition, screens } = require("./demo-data/thunder-bay.cjs");
+const { buildDemoCampaigns } = require("./demo-data/bookings.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envPath = path.join(root, ".env.local");
@@ -67,158 +69,25 @@ const accounts = [
   },
 ];
 
-const devices = [
-  {
-    id: "INV-DEMO-STATIC-001", institutionKey: "government-owner", managerKey: "government-operator-primary",
-    name: "Memorial Avenue Bulletin Face", format: "static", deliveryMode: "static", productType: "poster-face",
-    x: 67.305, y: 40.93, address: "Memorial Avenue at Central Avenue, Thunder Bay, ON", price: 540,
-    impressions: 126000, traffic: 91000, income: 72000, audience: "Drivers, retail visitors, and commuters",
-    competitor: "Medium", occupancy: 18, imageInterval: 6, maxLoopSeconds: 120, approvalStatus: "approved",
-    productionLeadDays: 8, installationLeadDays: 4, tags: ["large", "physical", "static", "retail", "high-traffic"], displayTemplate: "fullscreen",
-    specification: { trimWidthMm: 3048, trimHeightMm: 1524, visibleWidthMm: 2946, visibleHeightMm: 1422, bleedMm: 25, safeAreaMm: 76, scaleRatio: "1:10", minimumDpi: 300, colourSpace: "CMYK", acceptedFileTypes: ["application/pdf", "image/jpeg"], maximumFileBytes: 524288000, substrate: "13 oz vinyl", finishing: "hemmed and grommeted", notes: "Face-specific operator specification; verify current template before production." },
-  },
-  {
-    id: "INV-DEMO-STATIC-002", institutionKey: "institution-owner", managerKey: "institution-operator",
-    name: "Balmoral Campus Poster Face", format: "static", deliveryMode: "static", productType: "campus-poster",
-    x: 67.274, y: 40.908, address: "Balmoral Street campus entrance, Thunder Bay, ON", price: 320,
-    impressions: 61000, traffic: 44000, income: 63000, audience: "Students, staff, and campus visitors",
-    competitor: "Low", occupancy: 12, imageInterval: 6, maxLoopSeconds: 120, approvalStatus: "approved",
-    productionLeadDays: 6, installationLeadDays: 3, tags: ["medium", "physical", "static", "campus", "students"], displayTemplate: "fullscreen",
-    specification: { trimWidthMm: 1219, trimHeightMm: 1829, visibleWidthMm: 1168, visibleHeightMm: 1778, bleedMm: 13, safeAreaMm: 38, scaleRatio: "1:4", minimumDpi: 200, colourSpace: "CMYK", acceptedFileTypes: ["application/pdf"], maximumFileBytes: 262144000, substrate: "weatherproof poster stock", finishing: "operator supplied frame", notes: "Campus face specification; dimensions differ from Memorial Avenue." },
-  },
-  {
-    id: "INV-DEMO-GOV-001",
-    institutionKey: "government-owner",
-    managerKey: "government-operator-primary",
-    name: "Thunder Bay City Hall Civic Screen",
-    format: "digital",
-    x: 67.29117,
-    y: 40.95185,
-    address: "500 Donald Street East, Thunder Bay, ON",
-    price: 470,
-    impressions: 88000,
-    traffic: 57000,
-    income: 69000,
-    audience: "Civic visitors, residents, and downtown workers",
-    competitor: "Low",
-    occupancy: 28,
-    imageInterval: 10,
-    maxLoopSeconds: 100,
-    approvalStatus: "approved",
-    tags: ["medium", "digital", "government", "civic", "downtown", "public-space", "accessible"],
-    displayTemplate: "public-info",
-  },
-  {
-    id: "INV-DEMO-GOV-002",
-    institutionKey: "government-owner",
-    managerKey: "government-operator-primary",
-    name: "Marina Park Community Display",
-    format: "digital",
-    x: 67.32117,
-    y: 40.86431,
-    address: "Marina Park Drive, Thunder Bay, ON",
-    price: 620,
-    impressions: 114000,
-    traffic: 68000,
-    income: 87000,
-    audience: "Residents, tourists, families, and event visitors",
-    competitor: "Medium",
-    occupancy: 34,
-    imageInterval: 9,
-    maxLoopSeconds: 120,
-    approvalStatus: "approved",
-    tags: ["medium", "digital", "government", "waterfront", "tourism", "events", "public-space"],
-    displayTemplate: "community",
-  },
-  {
-    id: "INV-DEMO-GOV-003",
-    institutionKey: "government-owner",
-    managerKey: "government-operator-backup",
-    name: "Water Street Transit Terminal Display",
-    format: "transit",
-    x: 67.3005,
-    y: 40.887,
-    address: "Water Street Transit Terminal, Thunder Bay, ON",
-    price: 410,
-    impressions: 102000,
-    traffic: 83000,
-    income: 64000,
-    audience: "Transit riders, students, and downtown commuters",
-    competitor: "Low",
-    occupancy: 42,
-    imageInterval: 8,
-    maxLoopSeconds: 120,
-    approvalStatus: "approved",
-    tags: ["small", "digital", "government", "transit", "commuters", "students", "high-traffic"],
-    displayTemplate: "transit",
-  },
-  {
-    id: "INV-DEMO-INST-001",
-    institutionKey: "institution-owner",
-    managerKey: "institution-operator",
-    name: "Lakehead University Agora Screen",
-    format: "digital",
-    x: 67.28175,
-    y: 40.89,
-    address: "955 Oliver Road, Thunder Bay, ON",
-    price: 430,
-    impressions: 96000,
-    traffic: 74000,
-    income: 61000,
-    audience: "Students, faculty, staff, and campus visitors",
-    competitor: "Low",
-    occupancy: 46,
-    imageInterval: 8,
-    maxLoopSeconds: 120,
-    approvalStatus: "approved",
-    tags: ["medium", "digital", "institutional", "campus", "students", "18-34", "indoor"],
-    displayTemplate: "community",
-  },
-  {
-    id: "INV-DEMO-INST-002",
-    institutionKey: "institution-owner",
-    managerKey: "institution-operator",
-    name: "Lakehead Athletics Centre Entrance Display",
-    format: "digital",
-    x: 67.2875,
-    y: 40.902,
-    address: "Lakehead University Athletics Centre, Thunder Bay, ON",
-    price: 390,
-    impressions: 72000,
-    traffic: 51000,
-    income: 59000,
-    audience: "Students, athletes, families, and event attendees",
-    competitor: "Medium",
-    occupancy: 38,
-    imageInterval: 10,
-    maxLoopSeconds: 120,
-    approvalStatus: "approved",
-    tags: ["small", "digital", "institutional", "campus", "sports", "events", "indoor"],
-    displayTemplate: "weather",
-  },
-  {
-    id: "INV-DEMO-INST-003",
-    institutionKey: "institution-owner",
-    managerKey: "institution-owner",
-    name: "Lakehead University Transit Shelter",
-    format: "transit",
-    x: 67.278,
-    y: 40.895,
-    address: "Lakehead University Main Campus Transit Stop, Thunder Bay, ON",
-    price: 360,
-    impressions: 84000,
-    traffic: 67000,
-    income: 57000,
-    audience: "Students, faculty, and transit riders",
-    competitor: "Low",
-    occupancy: 31,
-    imageInterval: 8,
-    maxLoopSeconds: 120,
-    approvalStatus: "approved",
-    tags: ["small", "digital", "institutional", "campus", "transit", "students", "outdoor"],
-    displayTemplate: "transit",
-  },
-];
+// The twelve Thunder Bay screens live in scripts/demo-data/thunder-bay.cjs, with
+// the sources for every number in docs/DEMO_DATA_RESEARCH.md. The map stores
+// percentages, so each position is derived from the real coordinates.
+const devices = screens.map((screen) => ({
+  ...screen,
+  ...mapPosition(screen.latitude, screen.longitude),
+  income: AREA_INCOME,
+  // A static face has no loop. It holds one poster, so one slot fills it and a
+  // second overlapping booking is refused. Giving it a loop invented capacity
+  // that the face does not have.
+  imageInterval: screen.deliveryMode === "static" ? 1 : SPOT_SECONDS,
+  maxLoopSeconds: screen.deliveryMode === "static" ? 1 : screen.loopSeconds,
+  approvalStatus: "approved",
+  productionLeadDays: screen.productionLeadDays ?? 0,
+  installationLeadDays: screen.installationLeadDays ?? 0,
+  specification: screen.deliveryMode === "static"
+    ? { trimWidthMm: 3048, trimHeightMm: 1524, visibleWidthMm: 2946, visibleHeightMm: 1422, bleedMm: 25, safeAreaMm: 76, scaleRatio: "1:10", minimumDpi: 150, colourSpace: "CMYK", acceptedFileTypes: ["pdf", "jpg"], maxFileMb: 250, bleedNotes: "Keep critical copy inside the safe area.", mountingNotes: "Bulletin face, illuminated.", finishingNotes: "Hemmed and grommeted vinyl.", proofingNotes: "Dated posting photograph within five business days.", colourProfile: "GRACoL 2013", version: 1 }
+    : undefined,
+}));
 
 function parseEnv(filePath) {
   if (!existsSync(filePath)) return {};
@@ -311,10 +180,13 @@ async function upsertDevice(client, device, savedByKey, now) {
     INSERT INTO inventory
       (id, name, operator, format, x, y, address, price, impressions, traffic, income, audience, competitor, occupancy,
        image_interval, max_loop_seconds, available_from, available_to, approval_status, tags, display_template,
-       comments_enabled, institution_id, created_by, created_at, updated_at, owner_organization_id, delivery_mode, product_type, production_lead_days, installation_lead_days)
+       comments_enabled, institution_id, created_by, created_at, updated_at, owner_organization_id, delivery_mode, product_type, production_lead_days, installation_lead_days,
+       latitude, longitude, measurement_source, measurement_updated_at,
+       content_visibility, advertising_opt_in)
     VALUES
       ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
-       TRUE, $22, $23, $24, $24, $25, $26, $27, $28, $29)
+       TRUE, $22, $23, $24, $24, $25, $26, $27, $28, $29, $30, $31, $32, $24,
+       'public', TRUE)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       operator = EXCLUDED.operator,
@@ -345,6 +217,15 @@ async function upsertDevice(client, device, savedByKey, now) {
       ,product_type = EXCLUDED.product_type
       ,production_lead_days = EXCLUDED.production_lead_days
       ,installation_lead_days = EXCLUDED.installation_lead_days
+      ,latitude = EXCLUDED.latitude
+      ,longitude = EXCLUDED.longitude
+      ,measurement_source = EXCLUDED.measurement_source
+      ,measurement_updated_at = EXCLUDED.measurement_updated_at
+      -- The marketplace lists a screen only when its owner made it public and
+      -- opted in. A demo screen that stays out of the list makes Find screens
+      -- read as a broken product.
+      ,content_visibility = EXCLUDED.content_visibility
+      ,advertising_opt_in = EXCLUDED.advertising_opt_in
   `, [
     device.id,
     device.name,
@@ -375,6 +256,11 @@ async function upsertDevice(client, device, savedByKey, now) {
     device.productType ?? device.format,
     device.productionLeadDays ?? 0,
     device.installationLeadDays ?? 0,
+    device.latitude ?? null,
+    device.longitude ?? null,
+    // Says plainly whether a figure is published or estimated, so nobody quotes
+    // an estimate as a measurement.
+    device.measurementSource ?? null,
   ]);
 
   if (device.specification) {
@@ -386,6 +272,70 @@ async function upsertDevice(client, device, savedByKey, now) {
       ON CONFLICT (inventory_id, version) DO UPDATE SET status='active', trim_width_mm=EXCLUDED.trim_width_mm, trim_height_mm=EXCLUDED.trim_height_mm, visible_width_mm=EXCLUDED.visible_width_mm, visible_height_mm=EXCLUDED.visible_height_mm, bleed_mm=EXCLUDED.bleed_mm, safe_area_mm=EXCLUDED.safe_area_mm, scale_ratio=EXCLUDED.scale_ratio, minimum_dpi=EXCLUDED.minimum_dpi, colour_space=EXCLUDED.colour_space, accepted_file_types=EXCLUDED.accepted_file_types, maximum_file_bytes=EXCLUDED.maximum_file_bytes, substrate=EXCLUDED.substrate, finishing=EXCLUDED.finishing, notes=EXCLUDED.notes`,
       [`SPEC-${device.id}`, device.id, spec.trimWidthMm, spec.trimHeightMm, spec.visibleWidthMm, spec.visibleHeightMm, spec.bleedMm, spec.safeAreaMm, spec.scaleRatio, spec.minimumDpi, spec.colourSpace, JSON.stringify(spec.acceptedFileTypes), spec.maximumFileBytes, spec.substrate, spec.finishing, spec.notes, manager.id, now]);
   }
+}
+
+// A year of campaigns: bookings, creatives, invoices, proof of play and the
+// approval trail. Without these, Find screens, Performance and Invoices all show
+// empty states and the demo never shows the product working.
+async function seedCampaigns(client, savedByKey) {
+  const set = buildDemoCampaigns({ today: new Date(), target: 420 });
+
+  // Only rows this seeder owns. A device or booking somebody made by hand in
+  // the demo keeps its own id and is left alone. Deleting the bookings cascades
+  // to their creatives, invoices, proof-of-play rows and approval events.
+  await client.query("DELETE FROM bookings WHERE id LIKE 'BK-TB-%'");
+
+  for (const booking of set.bookings) {
+    const creator = savedByKey.get(booking.accountKey);
+    if (!creator) throw new Error(`Unknown booking account ${booking.accountKey}`);
+    await client.query(`
+      INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots,
+        creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14)
+    `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end,
+      booking.adSlots, booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop,
+      creator.id, booking.createdAt]);
+  }
+
+  for (const creative of set.creatives) {
+    await client.query(`
+      INSERT INTO creatives (id, booking_id, source, template, format, width, height, file_type, file_size,
+        safe_zone, distortion, original_name, mime_type, public_url, storage_path, status, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+    `, [creative.id, creative.bookingId, creative.source, creative.template, creative.format, creative.width,
+      creative.height, creative.fileType, creative.fileSize, creative.safeZone, creative.distortion,
+      creative.source === "upload" ? `${creative.template}-artwork.${creative.fileType}` : null,
+      creative.source === "upload" ? `image/${creative.fileType === "mp4" ? "mp4" : creative.fileType}` : null,
+      null, null, creative.status, creative.createdAt]);
+  }
+
+  for (const transaction of set.transactions) {
+    await client.query(`
+      INSERT INTO transactions (id, booking_id, advertiser, amount, platform_fee, operator_payout, status,
+        method, gateway_ref, created_at, paid_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `, [transaction.id, transaction.bookingId, transaction.advertiser, transaction.amount, transaction.platformFee,
+      transaction.operatorPayout, transaction.status, transaction.method, transaction.gatewayRef,
+      transaction.createdAt, transaction.paidAt]);
+  }
+
+  for (const log of set.popLogs) {
+    await client.query(`
+      INSERT INTO pop_logs (id, booking_id, inventory_id, plays, impressions, status, source, played_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, [log.id, log.bookingId, log.inventoryId, log.plays, log.impressions, log.status, log.source, log.playedAt]);
+  }
+
+  for (const event of set.approvalEvents) {
+    const actor = savedByKey.get(event.actorKey);
+    if (!actor) continue;
+    await client.query(`
+      INSERT INTO approval_events (id, booking_id, actor_id, action, previous_status, next_status, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `, [event.id, event.bookingId, actor.id, event.action, event.previousStatus, event.nextStatus, event.createdAt]);
+  }
+
+  return set.summary;
 }
 
 async function main() {
@@ -433,6 +383,23 @@ async function main() {
     const now = new Date().toISOString();
     for (const device of devices) await upsertDevice(client, device, savedByKey, now);
 
+    // Demo screens this seeder no longer ships. A device created by hand in the
+    // demo has its own id and is not touched.
+    const removed = await client.query(
+      "DELETE FROM inventory WHERE id LIKE 'INV-DEMO-%' AND NOT (id = ANY($1::text[])) RETURNING id",
+      [devices.map((device) => device.id)],
+    );
+
+    const campaigns = await seedCampaigns(client, savedByKey);
+
+    // Occupancy is reported, not declared. The generator measures the share of
+    // each loop it sold over the past year, and that measured figure replaces
+    // the estimate on the device. A screen that says 65% while its calendar
+    // holds two campaigns is the first thing a buyer catches.
+    for (const [screenId, occupancy] of Object.entries(campaigns.occupancy)) {
+      await client.query("UPDATE inventory SET occupancy = $2 WHERE id = $1", [screenId, occupancy]);
+    }
+
     await client.query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [seededAccounts.map((account) => account.id)]);
 
     const verification = await client.query(`
@@ -444,7 +411,11 @@ async function main() {
 
     await client.query("COMMIT");
     console.log(`Created or updated ${seededAccounts.length} demo users and ${devices.length} demo devices.`);
-    console.log("Reference: docs/DEMO_USERS_AND_DEVICES.md");
+    if (removed.rowCount) console.log(`Removed ${removed.rowCount} demo devices this seed no longer ships.`);
+    console.log(`Seeded ${campaigns.bookings} bookings across ${campaigns.campaigns} campaigns, ${campaigns.windowStart} to ${campaigns.windowEnd}.`);
+    console.log(`  states: ${Object.entries(campaigns.byStatus).map(([state, count]) => `${state} ${count}`).join(", ")}`);
+    console.log(`  revenue: $${campaigns.revenue.toLocaleString("en-CA")} booked; ${campaigns.cityNotices} city notices at no cost.`);
+    console.log("Reference: docs/DEMO_USERS_AND_DEVICES.md and docs/DEMO_DATA_RESEARCH.md");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     throw error;
