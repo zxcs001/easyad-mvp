@@ -50,6 +50,12 @@
   display: block;
 }
 
+.booking-submit-actions {
+  grid-template-columns: auto minmax(180px,1fr);
+  gap: 10px;
+  display: grid;
+}
+
 .booking-creative-field {
   border: 1px solid var(--line);
   background: #f8faf9;
@@ -120,6 +126,14 @@
 
 .booking-screen-summary {
   grid-template-columns: 1fr;
+}
+
+.booking-submit-actions {
+  grid-template-columns: 1fr;
+}
+
+.booking-submit-actions button {
+  width: 100%;
 }
 
 .booking-creative-summary {

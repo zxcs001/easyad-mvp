@@ -11,7 +11,7 @@ import { useI18n } from "../i18n/client";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 import { isInventoryAvailableForDates } from "../lib/inventory-availability";
 
-export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, canBuy, advertiserNameFixed = false }: {
+export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, onCancel, canBuy, advertiserNameFixed = false }: {
   // An advertiser's booking always carries the account name (the server sets
   // it), so an editable "Advertiser" field did nothing for them.
   advertiserNameFixed?: boolean;
@@ -22,6 +22,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   setDraft: Dispatch<SetStateAction<BookingDraft>>;
   hasCapacityConflict: (inventoryId: string, start: string, end: string, adSlots?: number, excludeId?: string) => boolean;
   onSubmit: (file?: File | null) => Promise<boolean>;
+  onCancel: () => void;
   canBuy?: boolean;
 }) {
   const { formatNumber, locale, t } = useI18n();
@@ -29,6 +30,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   const [creativeImage, setCreativeImage] = useState<File | null>(null);
   const [creativeError, setCreativeError] = useState("");
   const [showOptions, setShowOptions] = useState(draft.adSlots > 1);
+  const [submitting, setSubmitting] = useState(false);
   const isDigital = isDigitalInventory(item);
   const isStatic = isStaticInventory(item);
   const staticAvailable = !isStatic || isInventoryAvailableForDates(item, draft.start, draft.end);
@@ -64,6 +66,15 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
     setCreativeImage(null);
     setCreativeError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function createCampaign() {
+    setSubmitting(true);
+    try {
+      return await onSubmit(creativeImage);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -127,7 +138,10 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
           </> : null}
         </div>
         {blockedReason ? <p className="booking-blocked-reason" id="booking-submit-reason">{t(blockedReason)}</p> : null}
-        <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button wide" disabled={blocked || !canBuy || !bookingDetailsReady || Boolean(creativeError)} onClick={() => onSubmit(creativeImage)} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Your details are still here—please try again.">{canBuy ? "Send date request" : "Sign in to request dates"}</AsyncButton>
+        <div className="booking-submit-actions">
+          <button className="secondary-button" type="button" disabled={submitting} onClick={onCancel}>{t("Cancel campaign")}</button>
+          <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button" disabled={submitting || blocked || !canBuy || !bookingDetailsReady || Boolean(creativeError)} onClick={createCampaign} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Your details are still here—please try again.">{canBuy ? "Create campaign" : "Sign in to request dates"}</AsyncButton>
+        </div>
       </div>
       <div className="panel">
         <PanelHeading eyebrow={isStatic ? "Placement availability" : "What else is booked"} title="Dates already taken" />

@@ -98,6 +98,19 @@ export default function OohApp({
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
   const [role, setRole] = useState<Role>(startingRole);
   const [view, setView] = useState<View>(initialView);
+  const [campaignCreationActive, setCampaignCreationActive] = useState(initialView === "booking");
+  const campaignCreationActiveRef = useRef(initialView === "booking");
+
+  function setCampaignCreationState(active: boolean) {
+    campaignCreationActiveRef.current = active;
+    setCampaignCreationActive(active);
+  }
+
+  function navigateToView(nextView: View) {
+    if (campaignCreationActiveRef.current && nextView !== "booking") return;
+    if (nextView === "booking") setCampaignCreationState(true);
+    setView(nextView);
+  }
 
   // The address follows the view. It used to stay on the first page loaded, so
   // reload went back to that page, Back left the app, and a copied link opened
@@ -124,13 +137,31 @@ export default function OohApp({
       const nextView = isViewValue(requestedView) ? requestedView : initialView;
       const canChangeRole = surface !== "government" && (!currentUser || currentUser.role === "admin");
       const nextRole = canChangeRole && isRoleValue(requestedRole) ? requestedRole : startingRole;
+      if (campaignCreationActiveRef.current && nextView !== "booking") {
+        const lockedUrl = new URL(window.location.href);
+        if (surface !== "government") lockedUrl.searchParams.set("role", role);
+        lockedUrl.searchParams.set("view", "booking");
+        window.history.pushState(window.history.state, "", lockedUrl);
+        return;
+      }
       addressState.current = { role: nextRole, view: nextView };
+      if (nextView === "booking") setCampaignCreationState(true);
       setRole(nextRole);
       setView(nextView);
     }
     window.addEventListener("popstate", restoreFromAddress);
     return () => window.removeEventListener("popstate", restoreFromAddress);
-  }, [currentUser, initialView, startingRole, surface]);
+  }, [currentUser, initialView, role, startingRole, surface]);
+
+  useEffect(() => {
+    if (!campaignCreationActive) return;
+    function protectDraft(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [campaignCreationActive]);
   const [selectedLocationId, setSelectedLocationId] = useState(
     initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
   );
@@ -296,8 +327,21 @@ export default function OohApp({
     setBookings((current) => [payload.booking, ...current]);
     if (payload.creative) setCreatives((current) => [payload.creative!, ...current]);
     setSelectedBookingId(payload.booking.id);
+    setCampaignCreationState(false);
     setView("campaigns");
     return true;
+  }
+
+  function cancelCampaignCreation() {
+    setBookingDraft({
+      campaign: "Launch Campaign",
+      start: "2026-07-15",
+      end: "2026-07-28",
+      advertiser: currentUser?.name ?? "New Advertiser",
+      adSlots: 1,
+    });
+    setCampaignCreationState(false);
+    setView("discover");
   }
 
   async function addInventory(draft: InventoryItem) {
@@ -583,6 +627,7 @@ export default function OohApp({
             bookings={bookings}
             onBook={() => {
               setRole("advertiser");
+              setCampaignCreationState(true);
               setView("booking");
             }}
             canComment={Boolean(currentUser)}
@@ -600,6 +645,7 @@ export default function OohApp({
             setDraft={setBookingDraft}
             hasCapacityConflict={hasCapacityConflict}
             onSubmit={submitBooking}
+            onCancel={cancelCampaignCreation}
             canBuy={canBuyAds}
           />
         );
@@ -676,9 +722,9 @@ export default function OohApp({
 
   return (
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} />
+      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} setView={setView} surface={surface} />
+        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
