@@ -75,7 +75,7 @@ export default function Portal({
         <>
         <section className="portal-hero">
           <div className="portal-copy">
-            <p className="eyebrow pill"><span className="pill-dot" />{t("OOH planning, booking, creative, and proof-of-play")}</p>
+            <p className="eyebrow pill"><span className="pill-dot" />{t("EasyAD planning, booking, creative, and proof-of-play")}</p>
             <h1>{t("Outdoor Campaign Buying Portal")}</h1>
             <p>{t("Discover premium digital, static, and transit inventory, target by place and audience, reserve availability, validate creative, and track delivery from the same workspace.")}</p>
             <div className="portal-actions">

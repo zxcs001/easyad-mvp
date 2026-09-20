@@ -615,7 +615,7 @@ export const frAdditional: Record<string, string> = {
   "No review queue": "Aucune file de révision",
   "No screens in this institution": "Aucun écran dans cette institution",
   "OOH / Canada": "Affichage extérieur / Canada",
-  "OOH planning, booking, creative, and proof-of-play": "Planification, réservation, création et preuve de diffusion extérieures",
+  "EasyAD planning, booking, creative, and proof-of-play": "EasyAD : planification, réservation, création et preuve de diffusion",
   "One controlled operating picture": "Une vue d'exploitation contrôlée",
   "One upload surface. Two accountable paths to screen.": "Une interface de téléversement. Deux parcours responsables vers l'écran.",
   "Open the creative suite or inspect the reserved device inventory profile.": "Ouvrez la suite de création ou consultez la fiche d'inventaire de l'appareil réservé.",
