@@ -57,9 +57,56 @@ test("inventory creation waits for explicit form confirmation", async () => {
 
   await user.clear(screen.getByLabelText("Name"));
   await user.type(screen.getByLabelText("Name"), "Confirmed Device");
+
+  // A new device needs a real address: its public page says where the screen
+  // is, and the city label on the screen preview is read from this value.
+  await user.click(screen.getByRole("button", { name: "Create device" }));
+  expect(addInventory).not.toHaveBeenCalled();
+  expect(screen.getByText("Add the city, so the public page can say where the screen is.")).toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText("Street address"));
+  await user.type(screen.getByLabelText("Street address"), "955 Oliver Rd");
+  await user.type(screen.getByLabelText("City"), "Thunder Bay");
+  await user.selectOptions(screen.getByLabelText("Province or territory"), "ON");
   await user.click(screen.getByRole("button", { name: "Create device" }));
 
-  expect(addInventory).toHaveBeenCalledWith(expect.objectContaining({ name: "Confirmed Device", id: "" }));
+  expect(addInventory).toHaveBeenCalledWith(expect.objectContaining({
+    name: "Confirmed Device",
+    id: "",
+    address: "955 Oliver Rd, Thunder Bay, ON",
+  }));
+});
+
+test("an existing device with an old address still saves other edits", async () => {
+  const user = userEvent.setup();
+  const saveInventory = vi.fn().mockResolvedValue(true);
+
+  render(
+    <InventoryView
+      inventory={[item]}
+      selectedId={item.id}
+      select={vi.fn()}
+      item={item}
+      newItem={{ ...item, id: "", name: "New Inventory Unit", address: "" }}
+      mediaResources={[]}
+      addInventory={vi.fn().mockResolvedValue(true)}
+      deleteInventory={vi.fn()}
+      saveInventory={saveInventory}
+      updateInventoryApproval={vi.fn()}
+      uploadMedia={vi.fn().mockResolvedValue(true)}
+      deleteMediaResource={vi.fn().mockResolvedValue(undefined)}
+      canManage
+      canDelete={false}
+    />,
+  );
+
+  // "1 Existing Way" has no city. The person is editing the price, so the old
+  // address must not block the save.
+  await user.clear(screen.getByLabelText("Daily rate"));
+  await user.type(screen.getByLabelText("Daily rate"), "640");
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+  expect(saveInventory).toHaveBeenCalledWith(expect.objectContaining({ id: item.id, price: 640 }));
 });
 
 test("inventory edits wait for Save changes", async () => {
