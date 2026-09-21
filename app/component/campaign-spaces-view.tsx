@@ -59,7 +59,7 @@ export default function CampaignSpacesView({
             <EmptyState
               title={isAdvertiser ? "You have no campaigns yet" : "No campaign spaces yet"}
               copy={isAdvertiser
-                ? "A campaign appears here once you book a screen and send your ad picture for approval."
+                ? "A campaign appears here once you request dates. You can add artwork before or after the request."
                 : "Submit a booking with its creative image to start the approval workflow."}
               action={isAdvertiser ? <a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a> : undefined}
             />

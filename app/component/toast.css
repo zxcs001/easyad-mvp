@@ -28,6 +28,10 @@
   display: grid;
 }
 
+.toast.is-leaving {
+  animation: .18s ease toast-out forwards;
+}
+
 .toast-success {
   border-left-color: var(--green);
 }
@@ -99,6 +103,14 @@
 0% {
   opacity: 0;
   transform: translateY(12px)scale(.98);
+}
+
+@keyframes toast-out{
+
+to {
+  opacity: 0;
+  transform: translateY(8px) scale(.98);
+}
 }
 
 to {

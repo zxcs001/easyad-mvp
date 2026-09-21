@@ -1,6 +1,6 @@
 # EasyAD product decision register
 
-Last reviewed: 2026-09-17  
+Last reviewed: 2026-09-17
 Owner: Product (named owner to be assigned)  
 Rule: engineering must not infer an answer. Unresolved choices block only affected branches.
 

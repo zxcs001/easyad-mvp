@@ -29,6 +29,14 @@
   animation: .4s feedback-shake;
 }
 
+.async-button.is-success {
+  box-shadow: 0 0 0 3px color-mix(in srgb,var(--green) 22%,transparent);
+}
+
+.async-button.is-error {
+  box-shadow: 0 0 0 3px color-mix(in srgb,var(--state-danger) 18%,transparent);
+}
+
 .async-icon {
   fill: none;
   stroke: currentColor;
@@ -75,6 +83,11 @@
 .async-button.is-success .async-icon,
 .is-success-pulse {
   animation: none;
+}
+
+.async-button.is-success,
+.async-button.is-error {
+  box-shadow: none;
 }
 
 .async-spinner {

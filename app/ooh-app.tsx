@@ -98,6 +98,19 @@ export default function OohApp({
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
   const [role, setRole] = useState<Role>(startingRole);
   const [view, setView] = useState<View>(initialView);
+  const [campaignCreationActive, setCampaignCreationActive] = useState(initialView === "booking");
+  const campaignCreationActiveRef = useRef(initialView === "booking");
+
+  function setCampaignCreationState(active: boolean) {
+    campaignCreationActiveRef.current = active;
+    setCampaignCreationActive(active);
+  }
+
+  function navigateToView(nextView: View) {
+    if (campaignCreationActiveRef.current && nextView !== "booking") return;
+    if (nextView === "booking") setCampaignCreationState(true);
+    setView(nextView);
+  }
 
   // The address follows the view. It used to stay on the first page loaded, so
   // reload went back to that page, Back left the app, and a copied link opened
@@ -124,13 +137,31 @@ export default function OohApp({
       const nextView = isViewValue(requestedView) ? requestedView : initialView;
       const canChangeRole = surface !== "government" && (!currentUser || currentUser.role === "admin");
       const nextRole = canChangeRole && isRoleValue(requestedRole) ? requestedRole : startingRole;
+      if (campaignCreationActiveRef.current && nextView !== "booking") {
+        const lockedUrl = new URL(window.location.href);
+        if (surface !== "government") lockedUrl.searchParams.set("role", role);
+        lockedUrl.searchParams.set("view", "booking");
+        window.history.pushState(window.history.state, "", lockedUrl);
+        return;
+      }
       addressState.current = { role: nextRole, view: nextView };
+      if (nextView === "booking") setCampaignCreationState(true);
       setRole(nextRole);
       setView(nextView);
     }
     window.addEventListener("popstate", restoreFromAddress);
     return () => window.removeEventListener("popstate", restoreFromAddress);
-  }, [currentUser, initialView, startingRole, surface]);
+  }, [currentUser, initialView, role, startingRole, surface]);
+
+  useEffect(() => {
+    if (!campaignCreationActive) return;
+    function protectDraft(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [campaignCreationActive]);
   const [selectedLocationId, setSelectedLocationId] = useState(
     initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
   );
@@ -232,7 +263,7 @@ export default function OohApp({
         .sort((a, b) => a.distance - b.distance),
     [filters, inventory, selectedLocation],
   );
-  // Only Find screens and Book dates choose from the filtered list. Inventory
+  // Only Find screens and Request dates choose from the filtered list. Inventory
   // and the other management views list every device, and used to search the
   // radius-filtered list first: clicking a device outside the radius
   // highlighted its row while the form showed another device, and Save failed.
@@ -273,11 +304,11 @@ export default function OohApp({
     return exceedsLoopCapacity(item, bookings, start, end, adSlots, excludeId);
   }
 
-  async function submitBooking(file: File) {
+  async function submitBooking(file?: File | null) {
     if (!canBuyAds || !selectedInventory) return false;
     if (hasCapacityConflict(selectedInventory.id, bookingDraft.start, bookingDraft.end, bookingDraft.adSlots)) return false;
     const body = new FormData();
-    body.set("file", file);
+    if (file) body.set("file", file);
     body.set("inventoryId", selectedInventory.id);
     body.set("advertiser", bookingDraft.advertiser);
     body.set("campaign", bookingDraft.campaign);
@@ -290,14 +321,27 @@ export default function OohApp({
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => null) as { error?: string } | null;
-      throw new Error(payload?.error ?? "Could not submit this booking. Keep the selected image and try again.");
+      throw new Error(payload?.error ?? "Could not submit this date request. Your details are still here—please try again.");
     }
-    const payload = await response.json() as { booking: Booking; creative: Creative };
+    const payload = await response.json() as { booking: Booking; creative: Creative | null };
     setBookings((current) => [payload.booking, ...current]);
-    setCreatives((current) => [payload.creative, ...current]);
+    if (payload.creative) setCreatives((current) => [payload.creative!, ...current]);
     setSelectedBookingId(payload.booking.id);
+    setCampaignCreationState(false);
     setView("campaigns");
     return true;
+  }
+
+  function cancelCampaignCreation() {
+    setBookingDraft({
+      campaign: "Launch Campaign",
+      start: "2026-07-15",
+      end: "2026-07-28",
+      advertiser: currentUser?.name ?? "New Advertiser",
+      adSlots: 1,
+    });
+    setCampaignCreationState(false);
+    setView("discover");
   }
 
   async function addInventory(draft: InventoryItem) {
@@ -583,6 +627,7 @@ export default function OohApp({
             bookings={bookings}
             onBook={() => {
               setRole("advertiser");
+              setCampaignCreationState(true);
               setView("booking");
             }}
             canComment={Boolean(currentUser)}
@@ -600,6 +645,7 @@ export default function OohApp({
             setDraft={setBookingDraft}
             hasCapacityConflict={hasCapacityConflict}
             onSubmit={submitBooking}
+            onCancel={cancelCampaignCreation}
             canBuy={canBuyAds}
           />
         );
@@ -623,7 +669,7 @@ export default function OohApp({
       case "resources":
         return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
-        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} />;
+        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} />;
         return (
           <InventoryView
             inventory={inventory}
@@ -640,6 +686,7 @@ export default function OohApp({
             deleteMediaResource={deleteMediaResource}
             canManage={canManageInventory}
             canDelete={canDeleteInventory}
+            approvalRequired={currentUser?.role === "operator"}
           />
         );
       case "calendar":
@@ -675,9 +722,9 @@ export default function OohApp({
 
   return (
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={setView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} />
+      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} setView={setView} surface={surface} />
+        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
@@ -686,29 +733,32 @@ export default function OohApp({
 }
 
 function newInventoryTemplate(): InventoryItem {
+  const availableFrom = new Date();
+  const availableTo = new Date(availableFrom);
+  availableTo.setUTCDate(availableTo.getUTCDate() + 90);
   return {
     id: "",
-    name: "New Inventory Unit",
-    operator: "New Operator",
+    name: "",
+    operator: "",
     format: "digital",
     x: 50,
     y: 50,
-    // Empty, so the address block asks for a real address instead of shipping
-    // "New market location" onto a public screen page.
+    // Start blank so the linear setup flow collects real device data instead
+    // of carrying placeholder values into the review step or public page.
     address: "",
-    price: 500,
-    impressions: 80000,
-    traffic: 50000,
-    income: 90000,
-    audience: "Commuters",
+    price: 0,
+    impressions: 0,
+    traffic: 0,
+    income: 0,
+    audience: "",
     competitor: "Medium",
     occupancy: 0,
     imageInterval: 6,
     maxLoopSeconds: 120,
-    availableFrom: "2026-07-01",
-    availableTo: "2026-09-01",
+    availableFrom: availableFrom.toISOString().slice(0, 10),
+    availableTo: availableTo.toISOString().slice(0, 10),
     approvalStatus: "pending approval",
-    tags: ["large", "digital", "private", "urban", "commercial", "medium-income", "25-34", "near-major-highway"],
+    tags: [],
     displayTemplate: "fullscreen",
     displayLanguage: "en",
     deliveryMode: "digital",

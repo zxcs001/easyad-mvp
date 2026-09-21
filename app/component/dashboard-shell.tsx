@@ -49,7 +49,7 @@ const roleNav: Record<Role, NavItem[]> = {
   advertiser: [
     { view: "portal", label: "Home", icon: Globe2, group: "Workspace" },
     { view: "discover", label: "Find screens", icon: Search, group: "Workspace" },
-    { view: "booking", label: "Book dates", icon: CalendarDays, group: "Operations" },
+    { view: "booking", label: "Request dates", icon: CalendarDays, group: "Operations" },
     { view: "creative", label: "Make an ad", icon: Sparkles, group: "Operations" },
     { view: "resources", label: "Your pictures", icon: Images, group: "Operations" },
     { view: "campaigns", label: "Your campaigns", icon: Megaphone, group: "Operations" },
@@ -113,7 +113,7 @@ const viewTitles: Record<View, { title: string; eyebrow: string }> = {
 const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: string }>> = {
   portal: { title: "Advertise your business", eyebrow: "Get started" },
   discover: { title: "Find screens near you", eyebrow: "Buy screen time" },
-  booking: { title: "Book your dates", eyebrow: "Buy screen time" },
+  booking: { title: "Request your dates", eyebrow: "Buy screen time" },
   creative: { title: "Add your ad", eyebrow: "Buy screen time" },
   campaigns: { title: "Your campaigns", eyebrow: "Track your ads" },
   resources: { title: "Your pictures and videos", eyebrow: "Ad library" },
@@ -124,15 +124,15 @@ const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: strin
 // The three steps an advertiser actually takes. The eyebrow used to read
 // "Step 1 of 4" through "Step 3 of 4", promising a fourth step that does not
 // exist, and it was static text rather than something a person could use.
-// Booking already takes the ad picture, so step 3 is for a campaign that is
-// already booked, which is why it is gated rather than sequential.
+// The date request creates the campaign shell. Artwork can be attached during
+// that request or added in step 3, which remains gated until a request exists.
 const buyingSteps: Array<{ view: View; label: string }> = [
   { view: "discover", label: "Find screens" },
-  { view: "booking", label: "Book dates" },
+  { view: "booking", label: "Request dates" },
   { view: "creative", label: "Make an ad" },
 ];
 
-function BuyingSteps({ view, hasBookings, onSelect }: { view: View; hasBookings: boolean; onSelect: (view: View) => void }) {
+function BuyingSteps({ view, hasBookings }: { view: View; hasBookings: boolean }) {
   const { t } = useI18n();
   const currentIndex = buyingSteps.findIndex((step) => step.view === view);
   return (
@@ -152,15 +152,7 @@ function BuyingSteps({ view, hasBookings, onSelect }: { view: View; hasBookings:
         );
         return (
           <li className={`buying-step ${state}`} key={step.view}>
-            {locked ? (
-              <span title={t("Book a screen first")}>{body}</span>
-            ) : (
-              <a
-                aria-current={isCurrent ? "step" : undefined}
-                href={portalHref("advertiser", step.view)}
-                onClick={(event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); onSelect(step.view); }}
-              >{body}</a>
-            )}
+            <span aria-current={isCurrent ? "step" : undefined} aria-disabled={!isCurrent ? "true" : undefined} title={locked ? t("Book a screen first") : undefined}>{body}</span>
           </li>
         );
       })}
@@ -182,7 +174,7 @@ const governmentNav: NavItem[] = [
 
 type AppSurface = "marketplace" | "government";
 
-export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void }) {
+export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed, navigationLocked = false }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void; navigationLocked?: boolean }) {
   // At 900px and below the nav is a strip that scrolls sideways and loaded at
   // its start, so "Results" or "Invoices" could be the current page with no
   // visible "you are here". Bring the current item into view. "nearest" does
@@ -218,7 +210,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           <span><ShieldCheck aria-hidden="true" /></span>
           <div><small>{t("Secure workspace")}</small><strong>{t(role === "admin" ? "Cross-institution oversight" : "Institution network")}</strong></div>
         </div>
-      ) : <WorkspaceSwitcher role={role} options={roleOptions} onSelect={(next) => { setRole(next); setView(roleWorkspaceView[next]); }} />}
+      ) : <WorkspaceSwitcher role={role} options={roleOptions} disabled={navigationLocked} onSelect={(next) => { setRole(next); setView(roleWorkspaceView[next]); }} />}
       <nav className="nav" ref={navRef} aria-label={isGovernment ? t("Civic Screen Operations navigation") : t("{role} navigation", { role: t(displayRole) })}>
         {groups.map((group) => {
           const items = navigation.filter((item) => item.group === group);
@@ -226,22 +218,18 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           return (
             <div className="nav-group" key={group}>
               <span className="nav-group-label">{t(isGovernment ? governmentGroupLabel(group) : role === "advertiser" ? advertiserGroupLabel(group) : group)}</span>
-              {items.map(({ view: navView, label, icon: Icon }) => (
-                <a
-                  aria-current={view === navView ? "page" : undefined}
-                  key={navView}
-                  href={isGovernment ? `/government?view=${navView}` : portalHref(role, navView)}
-                  className={view === navView ? "active" : ""}
-                  // The rail shows bare icons; the clipped label still names the
-                  // link for a screen reader, and this names it for the pointer.
-                  title={collapsed ? t(label) : undefined}
-                  onClick={isGovernment ? undefined : (event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); setView(navView); }}
-                >
-                  <Icon aria-hidden="true" />
-                  <span className="nav-label">{t(label)}</span>
-                  {view === navView ? <span className="nav-active-mark" /> : null}
-                </a>
-              ))}
+              {items.map(({ view: navView, label, icon: Icon }) => {
+                const content = <><Icon aria-hidden="true" /><span className="nav-label">{t(label)}</span>{view === navView ? <span className="nav-active-mark" /> : null}</>;
+                if (navigationLocked) return <span aria-current={view === navView ? "page" : undefined} aria-disabled={view !== navView ? "true" : undefined} className={`nav-item-static${view === navView ? " active" : ""}`} key={navView} title={t(view === navView ? label : "Finish or cancel this campaign first.")}>{content}</span>;
+                return <a
+                    aria-current={view === navView ? "page" : undefined}
+                    key={navView}
+                    href={isGovernment ? `/government?view=${navView}` : portalHref(role, navView)}
+                    className={view === navView ? "active" : ""}
+                    title={collapsed ? t(label) : undefined}
+                    onClick={isGovernment ? undefined : (event) => { if (!isPlainLeftClick(event)) return; event.preventDefault(); setView(navView); }}
+                  >{content}</a>;
+              })}
             </div>
           );
         })}
@@ -289,7 +277,7 @@ function advertiserGroupLabel(group: NavItem["group"]) {
   return "See how it did";
 }
 
-function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: Role[]; onSelect: (role: Role) => void }) {
+function WorkspaceSwitcher({ role, options, onSelect, disabled = false }: { role: Role; options: Role[]; onSelect: (role: Role) => void; disabled?: boolean }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -328,6 +316,10 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
     };
   }, [open]);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   return (
     <div className={`workspace-switcher${open ? " is-open" : ""}`} ref={rootRef}>
       <button
@@ -335,6 +327,7 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
         aria-haspopup="listbox"
         aria-label={t("Workspace")}
         className="workspace-switcher-button"
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -382,7 +375,7 @@ function WorkspaceSwitcher({ role, options, onSelect }: { role: Role; options: R
   );
 }
 
-export function Topbar({ view, visibleCount, inventory, bookings, role, setView, surface = "marketplace" }: { view: View; visibleCount: number; inventory: InventoryItem[]; bookings: Booking[]; role?: Role; setView?: (view: View) => void; surface?: AppSurface }) {
+export function Topbar({ view, visibleCount, inventory, bookings, role, surface = "marketplace", campaignCreationLocked = false }: { view: View; visibleCount: number; inventory: InventoryItem[]; bookings: Booking[]; role?: Role; surface?: AppSurface; campaignCreationLocked?: boolean }) {
   const { locale, t } = useI18n();
   const averageOccupancy = inventory.length ? Math.round(inventory.reduce((sum, item) => sum + item.occupancy, 0) / inventory.length) : 0;
   const bookedValue = bookings.reduce((sum, booking) => sum + booking.spend, 0);
@@ -394,7 +387,8 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, setView,
     <div className="topbar-title">
       <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
       <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
-      {showSteps && setView ? <BuyingSteps view={view} hasBookings={bookings.length > 0} onSelect={setView} /> : null}
+      {showSteps ? <BuyingSteps view={view} hasBookings={bookings.length > 0} /> : null}
+      {campaignCreationLocked ? <p className="campaign-flow-lock">{t("Finish creating this campaign, or cancel to return to screen selection.")}</p> : null}
     </div>
   );
   const metrics = view !== "network" ? (
@@ -410,7 +404,7 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, setView,
   // With the buying steps, the title and the stats share one wrapping row, so
   // the stats drop below the steps when space runs out. The language menu sits
   // outside that row and stays top-right beside the title.
-  if (showSteps && setView) {
+  if (showSteps) {
     return (
       <header className="topbar has-buying-steps">
         <div className="topbar-main">
