@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
-import { isDeviceDisplayPath, useI18n } from "../i18n/client";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useI18n } from "../i18n/client";
 import { readCookieConsent, saveCookieConsent, type CookieConsent } from "../lib/cookie-consent";
 import "./cookie-consent.css";
 
 export default function CookieConsentBanner() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
@@ -31,7 +32,9 @@ export default function CookieConsentBanner() {
     requestAnimationFrame(() => settingsRef.current?.focus());
   }
 
-  if (!ready || isDeviceDisplayPath(pathname)) return null;
+  const view = searchParams.get("view");
+  const isPortalSurface = pathname === "/" && (!view || view === "portal");
+  if (!ready || !isPortalSurface) return null;
   return open ? <section className="cookie-consent" aria-labelledby="cookie-consent-title">
     <h2 id="cookie-consent-title" ref={headingRef} tabIndex={-1}>{t("Your cookie choices")}</h2>
     <p>{t("We use necessary cookies for sign-in, security, your selected language, and your cookie choices. With your permission, optional cookies remember whether to skip the welcome screen.")}</p>
