@@ -1094,6 +1094,14 @@ These ideas are intentionally later than the structured operational work:
 - QR-code/short-link tracking as an optional campaign outcome signal, clearly separated from exposure estimates.
 - Weather-aware installation planning using a future provider, with manual confirmation remaining canonical.
 - Secure client approval links for clients without full accounts.
+- Address autocomplete on every address field, so an operator picks a real
+  place instead of typing one. Selecting a suggestion would also move the
+  device's location pin, which the operator now drags by hand. The shared
+  input would carry the behaviour, so each later address field gets it too.
+  The provider is an open cost decision (PD-013): the code already loads
+  Google Maps on the unused `/google-map-test` page, but the working maps use
+  OpenStreetMap data with no geocoder at all. Deferred on 2026-09-17: useful,
+  not yet worth a paid key or a new dependency.
 - CSV inventory import and export for small operators.
 - Accounting export after commercial policies are defined.
 - API/webhooks for agencies and media owners.

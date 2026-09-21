@@ -53,6 +53,10 @@ Seed the documented governmental, institutional, advertiser, and device fixtures
 npm run seed:demo-data
 ```
 
+The seed writes eight users, thirteen Thunder Bay screens and sixteen months of trading: 420 bookings across 172 campaigns, with their creatives, invoices, proof-of-play rows and approval events. Find screens, Performance and Invoices therefore open with data instead of an empty state.
+
+Every screen sits at a real civic or campus address and carries a real latitude and longitude. Every audience figure is published or is an estimate with its arithmetic shown. Every advertiser is fictional, because no real business may appear to have bought advertising it did not buy. [Demo data research](docs/DEMO_DATA_RESEARCH.md) gives the source of each number; read it before you change one.
+
 The stable identities, demo credentials, ownership graph, and AI fixture rules are documented in [Demo Users and Devices](docs/DEMO_USERS_AND_DEVICES.md). The older `seed:test-data` command remains available for the temporary test-account workflow.
 
 ### Local demo credentials file
@@ -148,8 +152,16 @@ working on it gets the same routine.
 |---|---|---|
 | `lights-on` | "lights on", "start up", "pick up where we left off" | Fetches what teammates pushed, starts PostgreSQL and the dev server on 3001, checks the app answers, and summarizes the last session |
 | `lights-off` | "lights off", "wrap up", "shut down" | Verifies the work, updates `README.md` and `DESIGN.md`, commits to the feature branch, stops servers this session started, and reports what is left |
+| `git-flow` | "start a branch", "commit this", "open a PR", "handle the review" | Branches from an updated `main`, writes commits that give the reason, syncs the branch while it is open, prepares the push and the pull request, and cleans up after the merge |
 
-The pair is deliberate. `lights-on` opens the day and `lights-off` closes it.
+The first pair is deliberate. `lights-on` opens the day and `lights-off`
+closes it.
+
+`git-flow` holds the facts a person gets wrong here: `origin` is the team
+repository `zxcs001/easyad-mvp` and `fork` is the personal fork, so a push goes
+to `fork` and the pull request goes to `origin`. It also names the files that
+must never be committed, the checks that must pass before review, and the files
+where two people who work at the same time usually conflict.
 
 Neither one pushes, opens a pull request, or merges. Those reach other people,
 so they ask instead. `lights-off` also refuses to commit when `npm test`, `tsc`

@@ -167,7 +167,7 @@ The shared language control is embedded at the far right of public and authentic
 
 ### Forms and overlays
 
-Fields use shared border, radius, hover, and focus tokens. Native select and date popups are accepted for the current English/French product; their operating-system-owned popup geometry and localized presentation are part of the supported contract. App-owned validation and errors remain in-page. Dialogs use the shared modal primitive, stay within the visual viewport, trap focus, close with Escape when safe, and restore focus. Toasts are acknowledgements only.
+Fields use shared border, radius, hover, and focus tokens. Native select and date popups are accepted for the current English/French product; their operating-system-owned popup geometry and localized presentation are part of the supported contract. App-owned validation and errors remain in-page. An address is four fields — street, city, province or territory, postal code — that carry the browser's own autofill names, and the block shows the composed line it will save before the person saves it. A refused save names the missing field and moves focus into it; it never disables the control without a reason. Dialogs use the shared modal primitive, stay within the visual viewport, trap focus, close with Escape when safe, and restore focus. Toasts are acknowledgements only.
 
 ### Iconography
 

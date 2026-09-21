@@ -10,6 +10,7 @@ import PreciseLocationPicker from "./precise-location-picker";
 import { deviceTemplates } from "./device-templates";
 import AsyncButton from "./async-button";
 import LocalDateTime from "./local-date-time";
+import AddressFields, { addressIssue } from "./address-fields";
 import { toast } from "./toast";
 import { useI18n } from "../i18n/client";
 import { localeNames, locales } from "../i18n/config";
@@ -83,7 +84,10 @@ export function InventoryView({
 
   function validateCreationStep(step: number) {
     if (step === 1 && !formItem.name.trim()) return "Give this device a name.";
-    if (step === 1 && !formItem.address.trim()) return "Add the device address.";
+    if (step === 1) {
+      const addressProblem = addressIssue(formItem.address);
+      if (addressProblem) return addressProblem;
+    }
     if (step === 2 && (!Number.isFinite(formItem.price) || formItem.price < 0)) return "Enter a valid daily rate.";
     if (step === 2 && !isValidAvailabilityWindow(formItem)) return "Choose a valid availability start and end date.";
     return "";
@@ -92,8 +96,17 @@ export function InventoryView({
   function moveCreationStep(nextStep: number) {
     const error = nextStep > creationStep ? validateCreationStep(creationStep) : "";
     if (error) {
-      setSaveError(error);
-      if (creationStep === 1 && !formItem.name.trim()) nameInputRef.current?.focus();
+      if (creationStep === 1 && !formItem.name.trim()) {
+        setSaveError(error);
+        nameInputRef.current?.focus();
+      } else if (creationStep === 1) {
+        // AddressFields already displays the exact correction beside the
+        // invalid control; avoid repeating it below the whole form.
+        setSaveError("");
+        document.querySelector<HTMLElement>('.address-fields [aria-invalid="true"]')?.focus();
+      } else {
+        setSaveError(error);
+      }
       return;
     }
     setSaveError("");
@@ -116,6 +129,22 @@ export function InventoryView({
       const message = "Choose a valid availability start and end date.";
       setSaveError(message);
       toast.error(message);
+      return;
+    }
+    // A new device must carry a real address; its public page says where the
+    // screen is. An existing device keeps whatever it already holds, so an
+    // edit to another field is never blocked by an old address; the block
+    // applies only when this edit touched the address itself.
+    // Say which field is missing, and put the person in it. A grey button with
+    // no reason leaves them guessing what the form wants.
+    const addressProblem = isCreating || formItem.address !== item.address ? addressIssue(formItem.address) : "";
+    if (addressProblem) {
+      // The address block already shows this sentence under the fields. The
+      // form error would repeat it word for word, so the toast carries it
+      // instead and the focus lands in the field that is missing.
+      setSaveError("");
+      toast.error(addressProblem);
+      document.querySelector<HTMLElement>('.address-fields [aria-invalid="true"]')?.focus();
       return;
     }
     setSaving(true);
@@ -210,7 +239,7 @@ export function InventoryView({
                 <div className="device-stage-heading"><span className="eyebrow">{t("Step 1 of 3")}</span><h3>{t("Identify the device")}</h3><p>{t("Add the details buyers need to recognize and locate it.")}</p></div>
                 <div className="form-grid compact">
                   <label>{t("Name")}<input ref={nameInputRef} autoFocus disabled={saving} value={editorItem.name} onChange={(event) => updateField("name", event.target.value)} /></label>
-                  <label>{t("Address")}<input disabled={saving} value={editorItem.address} onChange={(event) => updateField("address", event.target.value)} /></label>
+                  <AddressFields id="new-device-address" value={editorItem.address} disabled={saving} onChange={(value) => updateField("address", value)} />
                   <fieldset className="device-type-choice">
                     <legend>{t("Device type")}</legend>
                     <label><input type="radio" name="delivery-mode" checked={editorItem.deliveryMode === "digital"} disabled={saving} onChange={() => chooseDeliveryMode("digital")} /><span><strong>{t("Digital screen")}</strong><small>{t("Rotates images or video on a timed loop.")}</small></span></label>
@@ -257,7 +286,7 @@ export function InventoryView({
           <div className="form-grid compact">
             <EditorInput label="Name" value={editorItem.name} disabled={!canManage || saving} onChange={(value) => updateField("name", value)} />
             <EditorInput label="Operator" value={editorItem.operator} disabled={!canManage || saving} onChange={(value) => updateField("operator", value)} />
-            <EditorInput label="Address" value={editorItem.address} disabled={!canManage || saving} onChange={(value) => updateField("address", value)} />
+            <AddressFields value={editorItem.address} disabled={!canManage || saving} onChange={(value) => updateField("address", value)} />
             <label>{t("Format")}<select className="select" disabled={!canManage || saving} value={editorItem.format} onChange={(event) => updateField("format", event.target.value)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>
             <label>{t("Delivery mode")}<select className="select" disabled={!canManage || saving} value={editorItem.deliveryMode ?? "unknown"} onChange={(event) => updateField("deliveryMode", event.target.value)}><option value="digital">{t("Digital")}</option><option value="static">{t("Static")}</option><option value="unknown">{t("Needs classification")}</option></select></label>
             <EditorInput label="Product type" value={editorItem.productType ?? editorItem.format} disabled={!canManage || saving} onChange={(value) => updateField("productType", value)} />

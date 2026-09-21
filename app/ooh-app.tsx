@@ -743,6 +743,8 @@ function newInventoryTemplate(): InventoryItem {
     format: "digital",
     x: 50,
     y: 50,
+    // Start blank so the linear setup flow collects real device data instead
+    // of carrying placeholder values into the review step or public page.
     address: "",
     price: 0,
     impressions: 0,
