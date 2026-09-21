@@ -134,6 +134,28 @@ test("a date request can be sent before artwork and keeps loop settings optional
   expect(screen.getByRole("spinbutton", { name: /Showings per cycle/ })).toHaveValue(1);
 });
 
+test("strict campaign creation defers artwork to the third step", async () => {
+  const onSubmit = vi.fn().mockResolvedValue(true);
+  render(
+    <BookingView
+      item={baseItem}
+      inventory={[baseItem]}
+      draft={draft}
+      bookings={[]}
+      setDraft={vi.fn()}
+      hasCapacityConflict={() => false}
+      onSubmit={onSubmit}
+      onCancel={vi.fn()}
+      canBuy
+      allowCreativeUpload={false}
+    />,
+  );
+
+  expect(screen.queryByLabelText("Add artwork now (optional)")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Continue to make your ad" }));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(null));
+});
+
 test("campaign creation can only leave through create or cancel", () => {
   const onCancel = vi.fn();
   renderBooking(baseItem, vi.fn().mockResolvedValue(true), onCancel);

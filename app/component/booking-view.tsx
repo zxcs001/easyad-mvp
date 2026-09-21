@@ -11,10 +11,11 @@ import { useI18n } from "../i18n/client";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 import { isInventoryAvailableForDates } from "../lib/inventory-availability";
 
-export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, onCancel, canBuy, advertiserNameFixed = false }: {
+export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, onCancel, canBuy, advertiserNameFixed = false, allowCreativeUpload = true }: {
   // An advertiser's booking always carries the account name (the server sets
   // it), so an editable "Advertiser" field did nothing for them.
   advertiserNameFixed?: boolean;
+  allowCreativeUpload?: boolean;
   item: InventoryItem;
   inventory: InventoryItem[];
   draft: BookingDraft;
@@ -51,7 +52,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
       ? isStatic
         ? "This billboard is already taken for these dates. Pick different dates."
         : "This screen is full for these dates. Pick different dates, or ask for fewer showings."
-      : creativeError
+      : allowCreativeUpload && creativeError
         ? "Choose a different picture, or remove it and add artwork later."
         : !bookingDetailsReady
           ? "Add a campaign name and a valid date range to continue."
@@ -71,7 +72,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   async function createCampaign() {
     setSubmitting(true);
     try {
-      return await onSubmit(creativeImage);
+      return await onSubmit(allowCreativeUpload ? creativeImage : null);
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +105,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
             </label>
           </div> : null}
         </div> : null}
-        <div className="booking-creative-field">
+        {allowCreativeUpload ? <div className="booking-creative-field">
           <label htmlFor="booking-creative-image">
             <strong>{t("Add artwork now (optional)")}</strong>
           </label>
@@ -126,7 +127,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
             </div>
           ) : null}
           {creativeError ? <span className="form-error" id="booking-creative-error" role="alert">{creativeError}</span> : <span id="booking-creative-error" />}
-        </div>
+        </div> : null}
         <div className="quote">
           <Metric label="Total cost" value={money(estimateSpend(item, draft.start, draft.end, draft.adSlots), locale)} />
           <Metric label="How long it runs" value={t("{count} days", { count: daysBetween(draft.start, draft.end) })} />
@@ -140,7 +141,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
         {blockedReason ? <p className="booking-blocked-reason" id="booking-submit-reason">{t(blockedReason)}</p> : null}
         <div className="booking-submit-actions">
           <button className="secondary-button" type="button" disabled={submitting} onClick={onCancel}>{t("Cancel campaign")}</button>
-          <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button" disabled={submitting || blocked || !canBuy || !bookingDetailsReady || Boolean(creativeError)} onClick={createCampaign} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Your details are still here—please try again.">{canBuy ? "Create campaign" : "Sign in to request dates"}</AsyncButton>
+          <AsyncButton aria-describedby={blockedReason ? "booking-submit-reason" : undefined} className="primary-button" disabled={submitting || blocked || !canBuy || !bookingDetailsReady || Boolean(allowCreativeUpload && creativeError)} onClick={createCampaign} successMessage="Your booking request was sent." errorMessage="Could not send this booking request. Your details are still here—please try again.">{canBuy ? allowCreativeUpload ? "Create campaign" : "Continue to make your ad" : "Sign in to request dates"}</AsyncButton>
         </div>
       </div>
       <div className="panel">
