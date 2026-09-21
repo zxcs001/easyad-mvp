@@ -73,6 +73,7 @@ export default function AsyncButton({
       type={type}
       className={`${className} async-button is-${state}`.trim()}
       aria-busy={state === "pending"}
+      data-action-state={state}
       disabled={disabled || state === "pending"}
       onClick={handleClick}
       {...rest}
@@ -82,6 +83,9 @@ export default function AsyncButton({
         {state === "pending" ? <span className="async-spinner" /> : null}
         {state === "success" ? <svg viewBox="0 0 24 24" className="async-icon"><path d="M5 13l4 4L19 7" /></svg> : null}
         {state === "error" ? <svg viewBox="0 0 24 24" className="async-icon"><path d="M6 6l12 12M18 6L6 18" /></svg> : null}
+      </span>
+      <span className="sr-only" aria-live="polite">
+        {state === "pending" ? t("Action in progress") : state === "success" ? t("Action completed") : state === "error" ? t("Action failed") : ""}
       </span>
     </button>
   );

@@ -190,7 +190,7 @@
   font-size: .78rem;
   font-weight: 750;
   display: inline-flex;
-  transition: transform .14s,box-shadow .14s,background .14s,border-color .14s;
+  transition: transform .14s,box-shadow .14s,background .14s,border-color .14s,scale .11s ease;
 }
 
 .warning-button:hover:not(:disabled) { background: #ffe8aa; border-color: #c89927; box-shadow: var(--shadow-sm); transform: translateY(-1px); }

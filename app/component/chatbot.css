@@ -9,7 +9,7 @@
   place-items: center;
   width: 58px;
   height: 58px;
-  transition: transform .16s,box-shadow .16s,filter .16s;
+  transition: transform .16s,box-shadow .16s,filter .16s,scale .11s ease;
   display: grid;
   position: fixed;
   bottom: 22px;

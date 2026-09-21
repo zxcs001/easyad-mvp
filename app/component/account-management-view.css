@@ -171,6 +171,11 @@
   font-weight: 700;
 }
 
+.account-delete-confirmation {
+  gap: 16px;
+  display: grid;
+}
+
 .account-history-section {
   border-top: 1px solid var(--line);
   margin-top: 16px;

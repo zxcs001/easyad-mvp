@@ -4,6 +4,7 @@ import { beforeEach, test, vi } from "vitest";
 import type { InventoryItem } from "../app/data";
 
 const mocks = vi.hoisted(() => ({
+  createBookingRecord: vi.fn(async (booking: unknown) => booking),
   createBookingWithCreativeRecord: vi.fn(async (booking: unknown, _userId: string, creative: unknown) => ({ booking, creative })),
   getInventory: vi.fn(),
   listBookings: vi.fn(async () => []),
@@ -18,6 +19,7 @@ vi.mock("../app/lib/auth", () => ({
 }));
 
 vi.mock("../app/lib/db", () => ({
+  createBookingRecord: mocks.createBookingRecord,
   createBookingWithCreativeRecord: mocks.createBookingWithCreativeRecord,
   getInventory: mocks.getInventory,
   listBookings: mocks.listBookings,
@@ -86,16 +88,17 @@ test("static booking inside the availability window does not use digital loop ca
   assert.equal(booking.creativeStatus, "pending review");
 });
 
-test("booking submission without an image is rejected before inventory is queried", async () => {
-  const response = await POST(new NextRequest("http://localhost/api/bookings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ inventoryId: staticBillboard.id, start: "2026-08-10", end: "2026-08-20" }),
-  }));
+test("booking submission without an image creates a date request for later creative", async () => {
+  const response = await POST(bookingRequestWithoutCreative("2026-08-10", "2026-08-20"));
+  const body = await response.json();
 
-  assert.equal(response.status, 400);
-  assert.equal(mocks.getInventory.mock.calls.length, 0);
+  assert.equal(response.status, 201);
+  assert.equal(mocks.getInventory.mock.calls.length, 1);
   assert.equal(mocks.createBookingWithCreativeRecord.mock.calls.length, 0);
+  assert.equal(mocks.createBookingRecord.mock.calls.length, 1);
+  assert.equal(body.booking.status, "pending approval");
+  assert.equal(body.booking.creativeStatus, "not submitted");
+  assert.equal(body.creative, null);
 });
 
 test("stored booking image is removed when the atomic database commit fails", async () => {
@@ -142,4 +145,14 @@ function bookingRequest(start: string, end: string, creative?: File) {
     method: "POST",
     body: form,
   });
+}
+
+function bookingRequestWithoutCreative(start: string, end: string) {
+  const form = new FormData();
+  form.set("inventoryId", staticBillboard.id);
+  form.set("campaign", "Static Campaign");
+  form.set("start", start);
+  form.set("end", end);
+  form.set("adSlots", "1");
+  return new NextRequest("http://localhost/api/bookings", { method: "POST", body: form });
 }

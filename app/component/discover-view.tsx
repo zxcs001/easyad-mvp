@@ -131,7 +131,7 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
           />
         </ScaledDevicePreview>
       ) : null}
-      <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Book")}</button>} />
+      <PanelHeading eyebrow={item.operator} title={item.name} action={<button className="primary-button" onClick={onBook}>{t("Request dates")}</button>} />
       <div className="detail-grid stat-tiles">
         <Metric label="Format" value={t(spec.label)} />
         <Metric label="Rate" value={t("{amount}/day", { amount: money(item.price, locale) })} />

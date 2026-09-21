@@ -11,6 +11,9 @@ import { PanelHeading } from "./shared-ui";
 import SecretInput from "./secret-input";
 import { useI18n } from "../i18n/client";
 import LocalDateTime from "./local-date-time";
+import AsyncButton from "./async-button";
+import AppDialog from "./app-dialog";
+import { toast } from "./toast";
 
 type ManagedRole = Exclude<Role, "admin">;
 
@@ -50,9 +53,11 @@ export default function AccountManagementView({
   const [operatorLimit, setOperatorLimit] = useState(5);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const [roleFilter, setRoleFilter] = useState<ManagedRole | "all">("all");
   const [statusFilter, setStatusFilter] = useState<DbUser["status"] | "all">("all");
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [newAccount, setNewAccount] = useState<CreateAccount>({ name: "", email: "", password: "", role: "advertiser", institutionId: null, operatorLimit: 5 });
 
@@ -84,12 +89,11 @@ export default function AccountManagementView({
   }, [selectedId, selectedUser]);
 
   async function saveAccount() {
-    if (!selectedUser) return;
-    setSaving(true);
+    if (!selectedUser) return false;
     setMessage("");
     const saved = await onUpdateAccount(selectedUser.id, { role, status, institutionId, operatorLimit });
-    setSaving(false);
-    setMessage(saved ? "Account saved." : "Unable to save this account.");
+    if (!saved) setMessage("Unable to save this account.");
+    return saved;
   }
 
   async function createAccount(event: React.FormEvent<HTMLFormElement>) {
@@ -100,22 +104,31 @@ export default function AccountManagementView({
     setSaving(false);
     if (result.error) {
       setMessage(result.error);
+      toast.error(result.error);
       return;
     }
     if (result.user) {
       setNewAccount({ name: "", email: "", password: "", role: "advertiser", institutionId: null, operatorLimit: 5 });
       setSelectedId(result.user.id);
-      setMessage("Account created.");
+      toast.success("Account created.");
     }
   }
 
   async function deleteAccount() {
-    if (!selectedUser) return;
+    if (!selectedUser) return false;
     setSaving(true);
-    const deleted = await onDeleteAccount(selectedUser.id);
-    setSaving(false);
-    setMessage(deleted ? "Account deleted." : "Unable to delete this account.");
-    if (deleted) setSelectedId("");
+    try {
+      const deleted = await onDeleteAccount(selectedUser.id);
+      if (deleted) {
+        setSelectedId("");
+        setDeleteDialogOpen(false);
+      } else {
+        setMessage("Unable to delete this account.");
+      }
+      return deleted;
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -152,7 +165,7 @@ export default function AccountManagementView({
           {newAccount.role === "institutional" ? <p className="account-role-help">{t("Institution accounts open the dedicated Civic Screen Operations dashboard at /government. Super Admin retains access to every institution network.")}</p> : null}
           {newAccount.role === "institutional" ? <label>{t("Operator seats")}<input type="number" min="1" max="100" value={newAccount.operatorLimit} onChange={(event) => setNewAccount((current) => ({ ...current, operatorLimit: Number(event.target.value) }))} /></label> : null}
           {newAccount.role === "operator" ? <label>{t("Institution")}<select className="select" required value={newAccount.institutionId ?? ""} onChange={(event) => setNewAccount((current) => ({ ...current, institutionId: event.target.value || null }))}><option value="">{t("Choose institution")}</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
-          <button className="primary-button" type="submit" disabled={saving}>{t(saving ? "Creating..." : "Create account")}</button>
+          <button aria-busy={saving} className="primary-button" type="submit" disabled={saving}><span className="inline-pending">{saving ? <span aria-hidden="true" className="async-spinner" /> : null}{t(saving ? "Creating..." : "Create account")}</span></button>
         </form>
       </div>
 
@@ -165,8 +178,8 @@ export default function AccountManagementView({
             <label>{t("Account access")}<select className="select" value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as DbUser["status"])}><option value="active">{t("Active")}</option><option value="banned">{t("Banned")}</option></select></label>
             {role === "institutional" ? <label>{t("Operator seats")}<input type="number" min="1" max="100" disabled={saving} value={operatorLimit} onChange={(event) => setOperatorLimit(Number(event.target.value))} /></label> : null}
             {role === "operator" ? <label>{t("Institution")}<select className="select" required disabled={saving} value={institutionId ?? ""} onChange={(event) => setInstitutionId(event.target.value || null)}><option value="">{t("Choose institution")}</option>{institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}</select></label> : null}
-            <button className="primary-button" type="button" disabled={saving} onClick={() => void saveAccount()}>{t(saving ? "Saving..." : "Save account")}</button>
-            <button className="danger-button" type="button" disabled={saving} onClick={() => void deleteAccount()}>{t("Delete account")}</button>
+            <AsyncButton className="primary-button" disabled={saving} onClick={saveAccount} successMessage="Account saved." errorMessage="Unable to save this account.">Save account</AsyncButton>
+            <button className="danger-button" type="button" disabled={saving} onClick={() => { setMessage(""); setDeleteDialogOpen(true); }}>{t("Delete account")}</button>
           </div>
           {message ? <p className="account-message">{t(message)}</p> : null}
 
@@ -195,6 +208,22 @@ export default function AccountManagementView({
           </section>
         </> : <div className="empty-state"><strong>{t("Select an account")}</strong><span>{t("Choose an account from the list to manage its access and history.")}</span></div>}
       </div>
+      <AppDialog
+        dismissible={!saving}
+        initialFocusRef={deleteCancelRef}
+        open={deleteDialogOpen && Boolean(selectedUser)}
+        title={t("Delete account")}
+        description={selectedUser ? t("Delete {name} and remove its access to EasyAD. This cannot be undone.", { name: selectedUser.name }) : undefined}
+        onClose={() => { if (!saving) setDeleteDialogOpen(false); }}
+      >
+        <div className="account-delete-confirmation">
+          {message ? <p className="dialog-error" role="alert">{t(message)}</p> : null}
+          <div className="dialog-actions">
+            <button className="secondary-button" disabled={saving} onClick={() => setDeleteDialogOpen(false)} ref={deleteCancelRef} type="button">{t("Keep account")}</button>
+            <AsyncButton className="danger-button" disabled={saving} onClick={deleteAccount} successMessage="Account deleted." errorMessage="Unable to delete this account.">Delete account</AsyncButton>
+          </div>
+        </div>
+      </AppDialog>
     </section>
   );
 }

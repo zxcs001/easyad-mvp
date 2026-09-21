@@ -1,11 +1,14 @@
 "use client";
 
 import "./institution-team-view.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DbUser } from "../lib/db";
 import { PanelHeading } from "./shared-ui";
 import SecretInput from "./secret-input";
 import { useI18n } from "../i18n/client";
+import AsyncButton from "./async-button";
+import AppDialog from "./app-dialog";
+import { toast } from "./toast";
 
 type NewOperator = { name: string; email: string; password: string };
 
@@ -24,7 +27,9 @@ export default function InstitutionTeamView({
   const [selectedId, setSelectedId] = useState(operators[0]?.id ?? "");
   const [draft, setDraft] = useState<NewOperator>({ name: "", email: "", password: "" });
   const [busy, setBusy] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const selectedOperator = operators.find((operator) => operator.id === selectedId) ?? operators[0] ?? null;
   const seatsRemaining = Math.max(0, institution.operatorLimit - operators.length);
 
@@ -40,22 +45,31 @@ export default function InstitutionTeamView({
     setBusy(false);
     if (result.error) {
       setMessage(result.error);
+      toast.error(result.error);
       return;
     }
     if (result.user) {
       setDraft({ name: "", email: "", password: "" });
       setSelectedId(result.user.id);
-      setMessage("Operator account created.");
+      toast.success("Operator account created.");
     }
   }
 
   async function removeSelected() {
-    if (!selectedOperator) return;
+    if (!selectedOperator) return false;
     setBusy(true);
-    const deleted = await onDeleteOperator(selectedOperator.id);
-    setBusy(false);
-    setMessage(deleted ? "Operator account deleted. The seat is available again." : "Unable to delete this operator.");
-    if (deleted) setSelectedId("");
+    try {
+      const deleted = await onDeleteOperator(selectedOperator.id);
+      if (deleted) {
+        setSelectedId("");
+        setDeleteDialogOpen(false);
+      } else {
+        setMessage("Unable to delete this operator.");
+      }
+      return deleted;
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -71,7 +85,7 @@ export default function InstitutionTeamView({
           <label>{t("Name")}<input required value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
           <label>{t("Email")}<input required type="email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} /></label>
           <SecretInput autoComplete="new-password" label="Temporary password" minLength={10} required secretName="temporary password" value={draft.password} onChange={(event) => setDraft((current) => ({ ...current, password: event.target.value }))} />
-          <button className="primary-button" type="submit" disabled={busy || seatsRemaining === 0}>{t(busy ? "Creating..." : seatsRemaining ? "Create operator" : "Seat limit reached")}</button>
+          <button aria-busy={busy} className="primary-button" type="submit" disabled={busy || seatsRemaining === 0}><span className="inline-pending">{busy ? <span aria-hidden="true" className="async-spinner" /> : null}{t(busy ? "Creating..." : seatsRemaining ? "Create operator" : "Seat limit reached")}</span></button>
         </form>
       </div>
 
@@ -80,10 +94,26 @@ export default function InstitutionTeamView({
           <PanelHeading eyebrow="Selected operator" title={selectedOperator.name} action={<span className={`status ${selectedOperator.status === "banned" ? "bad" : "good"}`}>{t(selectedOperator.status)}</span>} />
           <div className="account-identity"><span>{selectedOperator.email}</span><small>{t("Belongs to {name}", { name: institution.name })}</small></div>
           <section className="account-history-section"><div className="automation-list"><div><strong>{t("Institution boundary")}</strong><span>{t("This operator can only create, update, and upload media for devices under {name}.", { name: institution.name })}</span></div><div><strong>{t("Seat usage")}</strong><span>{t("{remaining} of {total} operator seats remain available.", { remaining: seatsRemaining, total: institution.operatorLimit })}</span></div></div></section>
-          <button className="danger-button" type="button" disabled={busy} onClick={() => void removeSelected()}>{t("Delete operator")}</button>
+          <button className="danger-button" type="button" disabled={busy} onClick={() => { setMessage(""); setDeleteDialogOpen(true); }}>{t("Delete operator")}</button>
           {message ? <p className="account-message">{t(message)}</p> : null}
         </> : <div className="empty-state"><strong>{t("Select an operator")}</strong><span>{t("Create or choose an operator account to view its institution access.")}</span>{message ? <p className="account-message">{t(message)}</p> : null}</div>}
       </div>
+      <AppDialog
+        dismissible={!busy}
+        initialFocusRef={deleteCancelRef}
+        open={deleteDialogOpen && Boolean(selectedOperator)}
+        title={t("Delete operator")}
+        description={selectedOperator ? t("Delete {name} and remove access to {institution}. The operator seat becomes available again.", { name: selectedOperator.name, institution: institution.name }) : undefined}
+        onClose={() => { if (!busy) setDeleteDialogOpen(false); }}
+      >
+        <div className="account-delete-confirmation">
+          {message ? <p className="dialog-error" role="alert">{t(message)}</p> : null}
+          <div className="dialog-actions">
+            <button className="secondary-button" disabled={busy} onClick={() => setDeleteDialogOpen(false)} ref={deleteCancelRef} type="button">{t("Keep operator")}</button>
+            <AsyncButton className="danger-button" disabled={busy} onClick={removeSelected} successMessage="Operator account deleted. The seat is available again." errorMessage="Unable to delete this operator.">Delete operator</AsyncButton>
+          </div>
+        </div>
+      </AppDialog>
     </section>
   );
 }

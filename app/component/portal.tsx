@@ -213,7 +213,7 @@ function AdvertiserHome({
   const recent = bookings.slice(0, 3);
   const steps: Array<[string, string, View]> = [
     ["Find screens near you", "Search a map of screens around your shop and compare what they cost.", "discover"],
-    ["Book your dates", "Pick the days you want to run, and see the price before you commit.", "booking"],
+    ["Request your dates", "Pick the days you want to run, and see the price before you commit.", "booking"],
     ["Add your ad", "Upload a picture. The screen owner checks it before it goes live.", "creative"],
   ];
 

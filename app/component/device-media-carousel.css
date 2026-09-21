@@ -68,7 +68,7 @@
   width: clamp(46px,5cqw,64px);
   height: clamp(46px,5cqw,64px);
   padding: 0;
-  transition: opacity .16s,background .16s,border-color .16s,transform .16s;
+  transition: opacity .16s,background .16s,border-color .16s,transform .16s,scale .11s ease;
   display: grid;
   position: absolute;
   top: 50%;

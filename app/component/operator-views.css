@@ -284,6 +284,155 @@
   display: flex;
 }
 
+.device-creation-steps {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.device-creation-steps li {
+  color: var(--muted);
+  border-bottom: 3px solid var(--line);
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 10px;
+  font-size: .82rem;
+  font-weight: 750;
+  display: flex;
+}
+
+.device-creation-steps li > span {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  display: grid;
+}
+
+.device-creation-steps .is-current {
+  color: var(--ink);
+  border-bottom-color: var(--blue);
+}
+
+.device-creation-steps .is-current > span,
+.device-creation-steps .is-complete > span {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.device-creation-stage {
+  min-height: 420px;
+}
+
+.device-stage-heading {
+  margin-bottom: 18px;
+}
+
+.device-stage-heading h3,
+.device-stage-heading p {
+  margin: 0;
+}
+
+.device-stage-heading h3 {
+  margin-top: 3px;
+  font-size: 1.25rem;
+}
+
+.device-stage-heading p {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.device-type-choice {
+  border: 0;
+  grid-column: 1 / -1;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.device-type-choice legend {
+  margin-bottom: 7px;
+  font-size: .82rem;
+  font-weight: 750;
+}
+
+.device-type-choice label {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  display: grid;
+}
+
+.device-type-choice label:has(input:checked) {
+  background: var(--soft-blue);
+  border-color: var(--blue);
+}
+
+.device-type-choice strong,
+.device-type-choice small {
+  display: block;
+}
+
+.device-type-choice small,
+.inventory-location-picker > small {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: .76rem;
+}
+
+.device-review-list {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin: 0 0 14px;
+}
+
+.device-review-list > div {
+  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(120px,.5fr) minmax(0,1.5fr);
+  gap: 14px;
+  padding: 12px 14px;
+  display: grid;
+}
+
+.device-review-list > div:last-child {
+  border-bottom: 0;
+}
+
+.device-review-list dt {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.device-review-list dd {
+  margin: 0;
+}
+
+.device-review-list dd span,
+.device-review-list dd strong {
+  display: block;
+}
+
+.device-creation-actions {
+  border-top: 1px solid var(--line);
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  display: grid;
+}
+
 .tag-editor {
   grid-column: 1/-1;
   gap: 8px;
@@ -427,5 +576,27 @@
 .calendar {
   margin: 0 -14px;
   padding: 0 14px 8px;
+}
+
+.device-creation-steps li {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.device-creation-stage {
+  min-height: 0;
+}
+
+.device-review-list > div,
+.device-creation-actions {
+  grid-template-columns: 1fr;
+}
+
+.device-creation-actions > span {
+  display: none;
+}
+
+.device-creation-actions button {
+  width: 100%;
 }
 }

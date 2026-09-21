@@ -135,6 +135,27 @@ describe("dashboard shell", () => {
     expect(setView).toHaveBeenCalledWith("inventory");
   });
 
+  test("campaign creation locks workspace and sidebar navigation", () => {
+    const advertiserUser = { ...adminUser, role: "advertiser" as const };
+
+    render(<Sidebar role="advertiser" view="booking" setRole={vi.fn()} setView={vi.fn()} currentUser={advertiserUser} navigationLocked />);
+
+    expect(screen.getByRole("button", { name: "Workspace" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
+    expect(screen.getByText("Home").closest(".nav-item-static")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("Request dates").closest(".nav-item-static")).toHaveAttribute("aria-current", "page");
+  });
+
+  test("advertiser buying steps show progress without allowing step jumps", () => {
+    render(<Topbar view="booking" visibleCount={2} inventory={inventory} bookings={bookings} role="advertiser" campaignCreationLocked />);
+
+    expect(screen.getByText("Find screens").closest("a")).toBeNull();
+    expect(screen.getByText("Request dates").closest("a")).toBeNull();
+    expect(screen.getByText("Make an ad").closest("a")).toBeNull();
+    expect(screen.getByText("Request dates").parentElement).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Finish creating this campaign, or cancel to return to screen selection.")).toBeInTheDocument();
+  });
+
   test("government surface uses a dedicated civic shell while preserving shared navigation actions", () => {
     const setView = vi.fn();
     render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={setView} currentUser={institutionUser} surface="government" />);

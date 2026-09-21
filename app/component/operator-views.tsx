@@ -1,7 +1,7 @@
 "use client";
 
 import "./operator-views.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApprovalEvent, Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { MediaResource } from "../data";
 import { capitalize, money, overlaps, toDate } from "../utils";
@@ -32,6 +32,7 @@ export function InventoryView({
   deleteMediaResource,
   canManage,
   canDelete,
+  approvalRequired = false,
 }: {
   inventory: InventoryItem[];
   selectedId: string;
@@ -47,6 +48,7 @@ export function InventoryView({
   deleteMediaResource: (id: string) => Promise<boolean | void>;
   canManage: boolean;
   canDelete: boolean;
+  approvalRequired?: boolean;
 }) {
   const { locale, t } = useI18n();
   const [formItem, setFormItem] = useState<InventoryItem>(item);
@@ -54,6 +56,8 @@ export function InventoryView({
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [creationStep, setCreationStep] = useState(1);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const editorItem = formItem;
   const hasInventory = inventory.length > 0;
   const showDevicePanels = hasInventory || isCreating;
@@ -67,8 +71,60 @@ export function InventoryView({
     setFormItem((current) => ({ ...current, [field]: value }));
   }
 
+  function chooseDeliveryMode(deliveryMode: "digital" | "static") {
+    setFormItem((current) => ({
+      ...current,
+      deliveryMode,
+      format: deliveryMode,
+      productType: deliveryMode === "digital" ? "digital-screen" : "static-billboard",
+      productionLeadDays: deliveryMode === "static" ? Math.max(10, current.productionLeadDays ?? 0) : 0,
+      installationLeadDays: deliveryMode === "static" ? Math.max(5, current.installationLeadDays ?? 0) : 0,
+    }));
+  }
+
+  function validateCreationStep(step: number) {
+    if (step === 1 && !formItem.name.trim()) return "Give this device a name.";
+    if (step === 1) {
+      const addressProblem = addressIssue(formItem.address);
+      if (addressProblem) return addressProblem;
+    }
+    if (step === 2 && (!Number.isFinite(formItem.price) || formItem.price < 0)) return "Enter a valid daily rate.";
+    if (step === 2 && !isValidAvailabilityWindow(formItem)) return "Choose a valid availability start and end date.";
+    return "";
+  }
+
+  function moveCreationStep(nextStep: number) {
+    const error = nextStep > creationStep ? validateCreationStep(creationStep) : "";
+    if (error) {
+      if (creationStep === 1 && !formItem.name.trim()) {
+        setSaveError(error);
+        nameInputRef.current?.focus();
+      } else if (creationStep === 1) {
+        // AddressFields already displays the exact correction beside the
+        // invalid control; avoid repeating it below the whole form.
+        setSaveError("");
+        document.querySelector<HTMLElement>('.address-fields [aria-invalid="true"]')?.focus();
+      } else {
+        setSaveError(error);
+      }
+      return;
+    }
+    setSaveError("");
+    setCreationStep(nextStep);
+  }
+
   async function submitInventory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isCreating && creationStep < 3) {
+      moveCreationStep(creationStep + 1);
+      return;
+    }
+    const creationError = isCreating ? validateCreationStep(1) || validateCreationStep(2) : "";
+    if (creationError) {
+      setSaveError(creationError);
+      setCreationStep(creationError.includes("name") || creationError.includes("address") ? 1 : 2);
+      return;
+    }
     if (!isValidAvailabilityWindow(formItem)) {
       const message = "Choose a valid availability start and end date.";
       setSaveError(message);
@@ -100,10 +156,10 @@ export function InventoryView({
         setSaveError(message);
         toast.error(message);
       } else {
-        toast.success(isCreating ? "Device created." : "Changes saved.");
+        toast.success(isCreating ? approvalRequired ? "Device submitted for approval." : "Device created." : "Changes saved.");
         setJustSaved(true);
         window.setTimeout(() => setJustSaved(false), 1600);
-        if (isCreating) setIsCreating(false);
+        if (isCreating) { setIsCreating(false); setCreationStep(1); }
       }
     } finally {
       setSaving(false);
@@ -116,7 +172,7 @@ export function InventoryView({
         <PanelHeading
           eyebrow="Centralized inventory database"
           title="Devices and inventory"
-          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setSaveError(""); }}>{t("Add device")}</button> : <a className="primary-button" href="/login">{t("Sign in to manage")}</a>}
+          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setCreationStep(1); setSaveError(""); }}>{t("Add device")}</button> : <a className="primary-button" href="/login">{t("Sign in to manage")}</a>}
         />
         {hasInventory ? <div className="inventory-table inventory-management-table">
           <div className="table-head inventory-management-head"><span>{t("Unit")}</span><span>{t("Operator")}</span><span>{t("Format")}</span><span>{t("Rate")}</span><span>{t("Occupancy")}</span><span>{t("Availability")}</span><span>{t("Status")}</span></div>
@@ -124,7 +180,7 @@ export function InventoryView({
             const staticInventory = isStaticInventory(unit);
             const availability = inventoryAvailabilityLabel(unit);
             return (
-              <button className={`table-row ${selectedId === unit.id ? "selected" : ""}`} key={unit.id} onClick={() => { setIsCreating(false); setSaveError(""); select(unit.id); }}>
+              <button className={`table-row ${selectedId === unit.id ? "selected" : ""}`} key={unit.id} onClick={() => { setIsCreating(false); setCreationStep(1); setSaveError(""); select(unit.id); }}>
                 <span><strong>{unit.name}</strong><small>{unit.address}</small>{unit.tags?.length ? <small>{unit.tags.join(", ")}</small> : null}</span>
                 <span>{unit.operator}</span>
                 <span><span className="status">{t(unit.deliveryMode === "static" ? "Static" : unit.deliveryMode === "digital" ? "Digital" : "Delivery mode pending")}</span><small>{t(formats[unit.format].label)}</small></span>
@@ -153,15 +209,15 @@ export function InventoryView({
         </div>
       </div> : null}
       {showDevicePanels ? <>
-      <div className="panel">
+      <div className={`panel${isCreating ? " span-2" : ""}`}>
         <PanelHeading
           eyebrow={canDelete ? "Super admin controls" : "Inventory record"}
           title={isCreating ? "New inventory device" : item.name}
-          action={canManage ? (
+          action={canManage && !isCreating ? (
             <div className="inventory-draft-actions">
-              <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem(isCreating ? { ...newItem } : { ...item }); setIsCreating(false); setSaveError(""); }}>{t("Cancel")}</button>
-              {!isCreating && canDelete ? <button className="danger-button" type="button" onClick={deleteInventory}>{t("Delete")}</button> : null}
-              <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" form="inventory-device-form" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t(isCreating ? "Creating..." : "Saving...")}</span> : t(justSaved ? "Saved" : (isCreating ? "Create device" : "Save changes"))}</button>
+              <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem({ ...item }); setSaveError(""); }}>{t("Cancel")}</button>
+              {canDelete ? <button className="danger-button" type="button" onClick={deleteInventory}>{t("Delete")}</button> : null}
+              <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" form="inventory-device-form" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t("Saving...")}</span> : t(justSaved ? "Saved" : "Save changes")}</button>
             </div>
           ) : undefined}
         />
@@ -171,6 +227,58 @@ export function InventoryView({
           <a href={`/inventory/${item.id}`} target="_blank" rel="noreferrer">/inventory/{item.id}</a>
         </div> : null}
         <form id="inventory-device-form" noValidate onSubmit={submitInventory}>
+          {isCreating ? <>
+            <ol className="device-creation-steps" aria-label={t("Device setup progress")}>
+              {["Basics", "Availability", "Review"].map((label, index) => {
+                const step = index + 1;
+                return <li className={step === creationStep ? "is-current" : step < creationStep ? "is-complete" : ""} key={label} aria-current={step === creationStep ? "step" : undefined}><span>{step}</span>{t(label)}</li>;
+              })}
+            </ol>
+            <div className="device-creation-stage">
+              {creationStep === 1 ? <>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 1 of 3")}</span><h3>{t("Identify the device")}</h3><p>{t("Add the details buyers need to recognize and locate it.")}</p></div>
+                <div className="form-grid compact">
+                  <label>{t("Name")}<input ref={nameInputRef} autoFocus disabled={saving} value={editorItem.name} onChange={(event) => updateField("name", event.target.value)} /></label>
+                  <AddressFields id="new-device-address" value={editorItem.address} disabled={saving} onChange={(value) => updateField("address", value)} />
+                  <fieldset className="device-type-choice">
+                    <legend>{t("Device type")}</legend>
+                    <label><input type="radio" name="delivery-mode" checked={editorItem.deliveryMode === "digital"} disabled={saving} onChange={() => chooseDeliveryMode("digital")} /><span><strong>{t("Digital screen")}</strong><small>{t("Rotates images or video on a timed loop.")}</small></span></label>
+                    <label><input type="radio" name="delivery-mode" checked={editorItem.deliveryMode === "static"} disabled={saving} onChange={() => chooseDeliveryMode("static")} /><span><strong>{t("Physical billboard")}</strong><small>{t("Uses printed artwork and installation lead time.")}</small></span></label>
+                  </fieldset>
+                  <div className="inventory-location-picker">
+                    <span className="field-label">{t("Pin the device on the map")}</span>
+                    <small>{t("Click the map to set the location. Coordinates are saved automatically.")}</small>
+                    <PreciseLocationPicker point={{ x: editorItem.x, y: editorItem.y }} onChange={(point) => { updateField("x", roundCoordinate(point.x)); updateField("y", roundCoordinate(point.y)); }} />
+                  </div>
+                </div>
+              </> : null}
+              {creationStep === 2 ? <>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 2 of 3")}</span><h3>{t("Set price and availability")}</h3><p>{t("Use the first and last date buyers can request this device.")}</p></div>
+                <div className="form-grid compact">
+                  <EditorInput label="Daily rate" type="number" value={editorItem.price} disabled={saving} onChange={(value) => updateField("price", Number(value))} />
+                  <EditorInput label="Availability start" type="date" value={editorItem.availableFrom} disabled={saving} onChange={(value) => updateField("availableFrom", value)} />
+                  <EditorInput label="Availability end" type="date" value={editorItem.availableTo} disabled={saving} onChange={(value) => updateField("availableTo", value)} />
+                  {editorItem.deliveryMode === "digital" ? <>
+                    <EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} />
+                    <EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} />
+                  </> : <>
+                    <EditorInput label="Production lead time (days)" type="number" value={editorItem.productionLeadDays ?? 10} disabled={saving} onChange={(value) => updateField("productionLeadDays", Math.max(0, Number(value)))} />
+                    <EditorInput label="Installation lead time (days)" type="number" value={editorItem.installationLeadDays ?? 5} disabled={saving} onChange={(value) => updateField("installationLeadDays", Math.max(0, Number(value)))} />
+                  </>}
+                </div>
+              </> : null}
+              {creationStep === 3 ? <>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 3 of 3")}</span><h3>{t("Review the device")}</h3><p>{t(approvalRequired ? "Submitting sends this device to an administrator for approval." : "Creating publishes this device to your inventory.")}</p></div>
+                <dl className="device-review-list">
+                  <div><dt>{t("Device")}</dt><dd><strong>{editorItem.name}</strong><span>{editorItem.address}</span></dd></div>
+                  <div><dt>{t("Type")}</dt><dd>{t(editorItem.deliveryMode === "static" ? "Physical billboard" : "Digital screen")}</dd></div>
+                  <div><dt>{t("Daily rate")}</dt><dd>{money(editorItem.price, locale)}</dd></div>
+                  <div><dt>{t("Available")}</dt><dd>{editorItem.availableFrom} {t("to")} {editorItem.availableTo}</dd></div>
+                </dl>
+                <div className="decision-banner"><strong>{t("You can add more details after creation")}</strong><span>{t("Audience data, tags, display settings, and media remain editable from the device record.")}</span></div>
+              </> : null}
+            </div>
+          </> : <>
           {isStaticInventory(editorItem) ? <div className={`decision-banner ${inventoryAvailabilityLabel(editorItem) === "Available" ? "good" : "bad"}`}>
             <strong>{t("Physical billboard status")}: {t(inventoryAvailabilityLabel(editorItem))}</strong>
             <span>{t("This status is calculated from the availability dates below.")}</span>
@@ -188,8 +296,6 @@ export function InventoryView({
             <label>{t("Display template")}<select className="select" disabled={!canManage || saving} value={editorItem.displayTemplate ?? "fullscreen"} onChange={(event) => updateField("displayTemplate", event.target.value)}>{deviceTemplates.map((template) => <option key={template.id} value={template.id}>{t(template.label)}</option>)}</select></label>
             <label>{t("Device display language")}<select aria-describedby="device-display-language-help" aria-label={t("Device display language")} className="select" disabled={!canManage || saving} value={editorItem.displayLanguage ?? "en"} onChange={(event) => updateField("displayLanguage", event.target.value)}>{locales.map((option) => <option key={option} value={option}>{localeNames[option]}</option>)}</select><small id="device-display-language-help">{t("Controls only the public device display. Website language stays unchanged.")}</small></label>
             <label className="check-row"><input type="checkbox" checked={editorItem.commentsEnabled !== false} disabled={!canManage || saving} onChange={(event) => updateField("commentsEnabled", event.target.checked)} />{t("Show visitor comments on the map place panel")}</label>
-            <EditorInput label="Map position X" type="number" value={editorItem.x} disabled={!canManage || saving} onChange={(value) => updateField("x", Number(value))} />
-            <EditorInput label="Map position Y" type="number" value={editorItem.y} disabled={!canManage || saving} onChange={(value) => updateField("y", Number(value))} />
             <div className="inventory-location-picker">
               <span className="field-label">{t("Device location")}</span>
               <PreciseLocationPicker point={{ x: editorItem.x, y: editorItem.y }} onChange={(point) => { updateField("x", roundCoordinate(point.x)); updateField("y", roundCoordinate(point.y)); }} />
@@ -205,10 +311,17 @@ export function InventoryView({
             <EditorInput label="Availability start" type="date" value={editorItem.availableFrom} disabled={!canManage || saving} onChange={(value) => updateField("availableFrom", value)} />
             <EditorInput label="Availability end" type="date" value={editorItem.availableTo} disabled={!canManage || saving} onChange={(value) => updateField("availableTo", value)} />
           </div>
+          </>}
           {saveError ? <span className="form-error">{t(saveError)}</span> : null}
+          {isCreating ? <div className="device-creation-actions">
+            <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem({ ...newItem }); setIsCreating(false); setCreationStep(1); setSaveError(""); }}>{t("Cancel")}</button>
+            <span />
+            {creationStep > 1 ? <button className="secondary-button" type="button" disabled={saving} onClick={() => moveCreationStep(creationStep - 1)}>{t("Back")}</button> : null}
+            <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t(approvalRequired ? "Submitting..." : "Creating...")}</span> : t(creationStep < 3 ? "Continue" : approvalRequired ? "Submit device for approval" : "Create device")}</button>
+          </div> : null}
         </form>
       </div>
-      <div className="panel">
+      {!isCreating ? <div className="panel">
         <PanelHeading eyebrow="Public media resources" title="Images and videos" />
         {canManage ? <MediaUploadForm uploadMedia={uploadMedia} /> : <div className="empty">{t("Sign in as an operator or super admin to upload resources.")}</div>}
         <div className="media-list">
@@ -228,7 +341,7 @@ export function InventoryView({
             </div>
           )) : <div className="empty">{t("No uploaded resources yet.")}</div>}
         </div>
-      </div>
+      </div> : null}
       </> : <div className="panel span-2">
         <div className="empty-state">
           <strong>{t("Add a device first")}</strong>

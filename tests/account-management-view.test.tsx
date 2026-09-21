@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import AccountManagementView from "../app/component/account-management-view";
@@ -123,4 +123,29 @@ test("super admin can provision an Institution account role", async () => {
     institutionId: null,
     operatorLimit: 8,
   });
+});
+
+test("account deletion waits for explicit confirmation", async () => {
+  const onDeleteAccount = vi.fn().mockResolvedValue(true);
+  const userEventInstance = userEvent.setup();
+  render(
+    <AccountManagementView
+      users={[user]}
+      bookings={[]}
+      inventory={inventory}
+      creatives={[]}
+      mediaResources={[]}
+      onCreateAccount={vi.fn()}
+      onUpdateAccount={vi.fn().mockResolvedValue(true)}
+      onDeleteAccount={onDeleteAccount}
+    />,
+  );
+
+  await userEventInstance.click(screen.getByRole("button", { name: "Delete account" }));
+  expect(onDeleteAccount).not.toHaveBeenCalled();
+  const dialog = screen.getByRole("dialog", { name: "Delete account" });
+  expect(dialog).toHaveTextContent("This cannot be undone.");
+
+  await userEventInstance.click(within(dialog).getByRole("button", { name: "Delete account" }));
+  expect(onDeleteAccount).toHaveBeenCalledWith(user.id);
 });

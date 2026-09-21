@@ -310,7 +310,7 @@
 .portal-nav-actions button,
 .portal .primary-button,
 .portal .ghost-button {
-  transition: transform .16s,box-shadow .16s,border-color .16s,background .16s;
+  transition: transform .16s,box-shadow .16s,border-color .16s,background .16s,scale .11s ease;
 }
 
 .portal-nav {
