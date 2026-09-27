@@ -143,7 +143,18 @@ describe("dashboard shell", () => {
     expect(screen.getByRole("button", { name: "Workspace" })).toBeDisabled();
     expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
     expect(screen.getByText("Home").closest(".nav-item-static")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText("Request dates").closest(".nav-item-static")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByText("Request dates")).not.toBeInTheDocument();
+    expect(screen.queryByText("Make an ad")).not.toBeInTheDocument();
+  });
+
+  test("advertiser sidebar hides internal creation steps", () => {
+    const advertiserUser = { ...adminUser, role: "advertiser" as const };
+
+    render(<Sidebar role="advertiser" view="discover" setRole={vi.fn()} setView={vi.fn()} currentUser={advertiserUser} />);
+
+    expect(screen.getByRole("link", { name: "Find screens" })).toBeInTheDocument();
+    expect(screen.queryByText("Request dates")).not.toBeInTheDocument();
+    expect(screen.queryByText("Make an ad")).not.toBeInTheDocument();
   });
 
   test("advertiser buying steps show progress without allowing step jumps", () => {
@@ -154,6 +165,13 @@ describe("dashboard shell", () => {
     expect(screen.getByText("Make an ad").closest("a")).toBeNull();
     expect(screen.getByText("Request dates").parentElement).toHaveAttribute("aria-current", "step");
     expect(screen.getByText("Finish creating this campaign, or cancel to return to screen selection.")).toBeInTheDocument();
+  });
+
+  test("creative step explains that submission completes the locked flow", () => {
+    render(<Topbar view="creative" visibleCount={2} inventory={inventory} bookings={bookings} role="advertiser" campaignCreationLocked />);
+
+    expect(screen.getByText("Make an ad").parentElement).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Submit your ad for review to finish creating this campaign.")).toBeInTheDocument();
   });
 
   test("government surface uses a dedicated civic shell while preserving shared navigation actions", () => {

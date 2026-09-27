@@ -95,9 +95,16 @@ describe("CreativeView", () => {
     expect(screen.getByText("Select a PNG, JPG, GIF, or MP4 file")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit upload for review" })).toBeDisabled();
   });
+
+  test("locks the new campaign selected by the previous step", () => {
+    render(<CreativeHarness onSubmit={vi.fn()} lockBookingSelection />);
+
+    expect(screen.getByRole("combobox", { name: "Campaign" })).toBeDisabled();
+    expect(screen.getByText("This campaign was created in the previous step.")).toBeInTheDocument();
+  });
 });
 
-function CreativeHarness({ onSubmit }: { onSubmit: Parameters<typeof CreativeView>[0]["onSubmit"] }) {
+function CreativeHarness({ onSubmit, lockBookingSelection = false }: { onSubmit: Parameters<typeof CreativeView>[0]["onSubmit"]; lockBookingSelection?: boolean }) {
   const [creativeDraft, setCreativeDraft] = useState(draft);
   const [selectedBookingId, setSelectedBookingId] = useState(bookings[0].id);
 
@@ -112,6 +119,7 @@ function CreativeHarness({ onSubmit }: { onSubmit: Parameters<typeof CreativeVie
       canSubmit
       selectedBookingId={selectedBookingId}
       setSelectedBookingId={setSelectedBookingId}
+      lockBookingSelection={lockBookingSelection}
     />
   );
 }

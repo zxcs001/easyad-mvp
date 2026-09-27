@@ -50,7 +50,7 @@ export default function CampaignSpacesView({
                 <span><span className="status">{t(booking.status)}</span></span>
                 <span>{t(booking.creativeStatus)}<small>{t("Submission state")}</small></span>
                 <div className="campaign-space-actions">
-                  <button className="secondary-button" type="button" onClick={() => onOpenCreative(booking)}>{t("Creative")}</button>
+                  <button className="secondary-button" type="button" onClick={() => onOpenCreative(booking)}>{t("Edit")}</button>
                   {isDigital ? <a className="secondary-button" href={`/inventory/${booking.inventoryId}`}>{t("Inventory")}</a> : null}
                 </div>
               </div>

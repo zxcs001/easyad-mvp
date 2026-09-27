@@ -43,17 +43,17 @@ const booking: Booking = {
   pop: 0,
 };
 
-test("campaign spaces offers separate creative and inventory actions", async () => {
+test("campaign spaces offers an indicative edit action and a separate inventory action", async () => {
   const user = userEvent.setup();
   const onOpenCreative = vi.fn();
 
   render(<CampaignSpacesView bookings={[booking]} inventory={inventory} onOpenCreative={onOpenCreative} />);
 
-  const creative = screen.getByRole("button", { name: "Creative" });
+  const edit = screen.getByRole("button", { name: "Edit" });
   const inventoryLink = screen.getByRole("link", { name: "Inventory" });
   expect(inventoryLink).toHaveAttribute("href", "/inventory/INV-CAMPAIGN-1");
 
-  await user.click(creative);
+  await user.click(edit);
   expect(onOpenCreative).toHaveBeenCalledWith(booking);
 });
 

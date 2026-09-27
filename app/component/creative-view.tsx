@@ -20,6 +20,7 @@ export default function CreativeView({
   canSubmit,
   selectedBookingId,
   setSelectedBookingId,
+  lockBookingSelection = false,
 }: {
   draft: CreativeDraft;
   setDraft: Dispatch<SetStateAction<CreativeDraft>>;
@@ -30,6 +31,7 @@ export default function CreativeView({
   canSubmit: boolean;
   selectedBookingId: string;
   setSelectedBookingId: (id: string) => void;
+  lockBookingSelection?: boolean;
 }) {
   const { formatDate, t } = useI18n();
   const [sourceMode, setSourceMode] = useState<Creative["source"]>("template");
@@ -133,9 +135,10 @@ export default function CreativeView({
         <div className="creative-form">
           <label className="field-block">
             {t("Campaign")}
-            <select className="select" value={selectedBooking.id} onChange={(event) => setSelectedBookingId(event.target.value)}>
+            <select className="select" value={selectedBooking.id} disabled={lockBookingSelection} aria-label={t("Campaign")} aria-describedby={lockBookingSelection ? "creation-campaign-help" : undefined} onChange={(event) => setSelectedBookingId(event.target.value)}>
               {eligibleBookings.map((booking) => <option key={booking.id} value={booking.id}>{booking.campaign} - {booking.advertiser}</option>)}
             </select>
+            {lockBookingSelection ? <small id="creation-campaign-help">{t("This campaign was created in the previous step.")}</small> : null}
           </label>
           <div className="form-grid compact">
             <label>{t("Format")}<select className="select" value={draft.format} onChange={(event) => setCreativeFormat(event.target.value as FormatKey, setDraft)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>

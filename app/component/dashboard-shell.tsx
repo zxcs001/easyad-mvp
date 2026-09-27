@@ -24,7 +24,6 @@ import {
   PanelsTopLeft,
   Search,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { Booking, InventoryItem, Role, View } from "../data";
@@ -49,8 +48,6 @@ const roleNav: Record<Role, NavItem[]> = {
   advertiser: [
     { view: "portal", label: "Home", icon: Globe2, group: "Workspace" },
     { view: "discover", label: "Find screens", icon: Search, group: "Workspace" },
-    { view: "booking", label: "Request dates", icon: CalendarDays, group: "Operations" },
-    { view: "creative", label: "Make an ad", icon: Sparkles, group: "Operations" },
     { view: "resources", label: "Your pictures", icon: Images, group: "Operations" },
     { view: "campaigns", label: "Your campaigns", icon: Megaphone, group: "Operations" },
     { view: "reports", label: "Results", icon: BarChart3, group: "Insights" },
@@ -124,15 +121,15 @@ const advertiserViewTitles: Partial<Record<View, { title: string; eyebrow: strin
 // The three steps an advertiser actually takes. The eyebrow used to read
 // "Step 1 of 4" through "Step 3 of 4", promising a fourth step that does not
 // exist, and it was static text rather than something a person could use.
-// The date request creates the campaign shell. Artwork can be attached during
-// that request or added in step 3, which remains gated until a request exists.
+// The date request creates the campaign shell, then step 3 attaches artwork to
+// that exact campaign. These labels are progress only, never navigation.
 const buyingSteps: Array<{ view: View; label: string }> = [
   { view: "discover", label: "Find screens" },
   { view: "booking", label: "Request dates" },
   { view: "creative", label: "Make an ad" },
 ];
 
-function BuyingSteps({ view, hasBookings }: { view: View; hasBookings: boolean }) {
+function BuyingSteps({ view }: { view: View }) {
   const { t } = useI18n();
   const currentIndex = buyingSteps.findIndex((step) => step.view === view);
   return (
@@ -140,10 +137,7 @@ function BuyingSteps({ view, hasBookings }: { view: View; hasBookings: boolean }
       {buyingSteps.map((step, index) => {
         const isCurrent = step.view === view;
         const isDone = index < currentIndex;
-        // Make an ad needs a booking to attach to. Say so rather than offer a
-        // control that leads to an empty screen.
-        const locked = step.view === "creative" && !hasBookings && !isCurrent;
-        const state = locked ? "is-locked" : isCurrent ? "is-current" : isDone ? "is-done" : "is-ahead";
+        const state = isCurrent ? "is-current" : isDone ? "is-done" : "is-ahead";
         const body = (
           <>
             <span aria-hidden="true" className="buying-step-mark">{isDone ? <Check /> : index + 1}</span>
@@ -152,7 +146,7 @@ function BuyingSteps({ view, hasBookings }: { view: View; hasBookings: boolean }
         );
         return (
           <li className={`buying-step ${state}`} key={step.view}>
-            <span aria-current={isCurrent ? "step" : undefined} aria-disabled={!isCurrent ? "true" : undefined} title={locked ? t("Book a screen first") : undefined}>{body}</span>
+            <span aria-current={isCurrent ? "step" : undefined} aria-disabled={!isCurrent ? "true" : undefined}>{body}</span>
           </li>
         );
       })}
@@ -382,13 +376,13 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, surface 
   const isGovernment = surface === "government";
   const isAdvertiser = role === "advertiser" && !isGovernment;
   const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
-  const showSteps = isAdvertiser && buyingSteps.some((step) => step.view === view);
+  const showSteps = isAdvertiser && (view === "discover" || (campaignCreationLocked && buyingSteps.some((step) => step.view === view)));
   const titleBlock = (
     <div className="topbar-title">
       <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
       <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
-      {showSteps ? <BuyingSteps view={view} hasBookings={bookings.length > 0} /> : null}
-      {campaignCreationLocked ? <p className="campaign-flow-lock">{t("Finish creating this campaign, or cancel to return to screen selection.")}</p> : null}
+      {showSteps ? <BuyingSteps view={view} /> : null}
+      {campaignCreationLocked ? <p className="campaign-flow-lock">{t(view === "booking" ? "Finish creating this campaign, or cancel to return to screen selection." : "Submit your ad for review to finish creating this campaign.")}</p> : null}
     </div>
   );
   const metrics = view !== "network" ? (

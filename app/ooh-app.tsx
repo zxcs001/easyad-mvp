@@ -27,6 +27,7 @@ import { useI18n } from "./i18n/client";
 import type { FeatureFlags } from "./lib/feature-flags";
 import { isInventoryAvailableForDates } from "./lib/inventory-availability";
 import { isStaticInventory } from "./lib/inventory-delivery";
+import { isVerifiedCreativeSubmission, resolveCampaignView, type CampaignCreationStep } from "./lib/campaign-creation-flow";
 
 export default function OohApp({
   currentUser,
@@ -96,20 +97,34 @@ export default function OohApp({
     });
   }
   const startingRole = currentUser && currentUser.role !== "admin" ? currentUser.role : initialRole;
+  const initialAccessibleBookingIds = new Set(initialBookingsData.map((booking) => booking.id));
+  const safeInitialView = startingRole === "advertiser"
+    ? resolveCampaignView({ requestedView: initialView, activeStep: null, bookingId: initialBookingId, accessibleBookingIds: initialAccessibleBookingIds })
+    : initialView;
   const [role, setRole] = useState<Role>(startingRole);
-  const [view, setView] = useState<View>(initialView);
-  const [campaignCreationActive, setCampaignCreationActive] = useState(initialView === "booking");
-  const campaignCreationActiveRef = useRef(initialView === "booking");
+  const [view, setView] = useState<View>(safeInitialView);
+  const [selectedBookingId, setSelectedBookingId] = useState(initialBookingId && initialBookingsData.some((booking) => booking.id === initialBookingId) ? initialBookingId : initialBookingsData.find((booking) => booking.creativeStatus !== "approved")?.id ?? initialBookingsData[0]?.id ?? "");
+  const [campaignCreationStep, setCampaignCreationStep] = useState<CampaignCreationStep>(null);
+  const campaignCreationStepRef = useRef<CampaignCreationStep>(null);
+  const accessibleBookingIdsRef = useRef(initialAccessibleBookingIds);
+  const campaignCreationActive = campaignCreationStep !== null;
 
-  function setCampaignCreationState(active: boolean) {
-    campaignCreationActiveRef.current = active;
-    setCampaignCreationActive(active);
+  function setCampaignCreationState(step: CampaignCreationStep) {
+    campaignCreationStepRef.current = step;
+    setCampaignCreationStep(step);
   }
 
   function navigateToView(nextView: View) {
-    if (campaignCreationActiveRef.current && nextView !== "booking") return;
-    if (nextView === "booking") setCampaignCreationState(true);
-    setView(nextView);
+    const guardedView = role === "advertiser"
+      ? resolveCampaignView({
+          requestedView: nextView,
+          activeStep: campaignCreationStepRef.current,
+          bookingId: nextView === "creative" ? selectedBookingId : null,
+          accessibleBookingIds: accessibleBookingIdsRef.current,
+        })
+      : nextView;
+    if (guardedView !== nextView) return;
+    setView(guardedView);
   }
 
   // The address follows the view. It used to stay on the first page loaded, so
@@ -117,16 +132,19 @@ export default function OohApp({
   // the wrong view. The ref holds what the address already says: the server
   // made it match on load, and Back updates it before changing the view, so
   // neither a double-run effect nor a Back press pushes an extra entry.
-  const addressState = useRef({ role, view });
+  const addressState = useRef({ role, view, bookingId: view === "creative" ? selectedBookingId : "" });
   useEffect(() => {
-    if (addressState.current.role === role && addressState.current.view === view) return;
-    addressState.current = { role, view };
+    const bookingId = view === "creative" ? selectedBookingId : "";
+    if (addressState.current.role === role && addressState.current.view === view && addressState.current.bookingId === bookingId) return;
+    addressState.current = { role, view, bookingId };
     const url = new URL(window.location.href);
     if (surface === "government") url.searchParams.delete("role");
     else url.searchParams.set("role", role);
     url.searchParams.set("view", view);
+    if (bookingId) url.searchParams.set("bookingId", bookingId);
+    else url.searchParams.delete("bookingId");
     if (url.href !== window.location.href) window.history.pushState(window.history.state, "", url);
-  }, [role, surface, view]);
+  }, [role, selectedBookingId, surface, view]);
 
   // Back and Forward restore the view, and the role where it can change.
   useEffect(() => {
@@ -134,24 +152,30 @@ export default function OohApp({
       const params = new URLSearchParams(window.location.search);
       const requestedView = params.get("view");
       const requestedRole = params.get("role");
+      const requestedBookingId = params.get("bookingId");
       const nextView = isViewValue(requestedView) ? requestedView : initialView;
       const canChangeRole = surface !== "government" && (!currentUser || currentUser.role === "admin");
       const nextRole = canChangeRole && isRoleValue(requestedRole) ? requestedRole : startingRole;
-      if (campaignCreationActiveRef.current && nextView !== "booking") {
+      const guardedView = nextRole === "advertiser"
+        ? resolveCampaignView({ requestedView: nextView, activeStep: campaignCreationStepRef.current, bookingId: requestedBookingId, accessibleBookingIds: accessibleBookingIdsRef.current })
+        : nextView;
+      if (guardedView !== nextView) {
         const lockedUrl = new URL(window.location.href);
         if (surface !== "government") lockedUrl.searchParams.set("role", role);
-        lockedUrl.searchParams.set("view", "booking");
+        lockedUrl.searchParams.set("view", guardedView);
+        if (guardedView === "creative" && selectedBookingId) lockedUrl.searchParams.set("bookingId", selectedBookingId);
+        else lockedUrl.searchParams.delete("bookingId");
         window.history.pushState(window.history.state, "", lockedUrl);
         return;
       }
-      addressState.current = { role: nextRole, view: nextView };
-      if (nextView === "booking") setCampaignCreationState(true);
+      addressState.current = { role: nextRole, view: nextView, bookingId: requestedBookingId ?? "" };
+      if (nextView === "creative" && requestedBookingId) setSelectedBookingId(requestedBookingId);
       setRole(nextRole);
       setView(nextView);
     }
     window.addEventListener("popstate", restoreFromAddress);
     return () => window.removeEventListener("popstate", restoreFromAddress);
-  }, [currentUser, initialView, role, startingRole, surface]);
+  }, [currentUser, initialView, role, selectedBookingId, startingRole, surface]);
 
   useEffect(() => {
     if (!campaignCreationActive) return;
@@ -171,7 +195,6 @@ export default function OohApp({
       : null,
   );
   const [selectedInventoryId, setSelectedInventoryId] = useState(initialInventoryId && initialInventoryData.some((item) => item.id === initialInventoryId) ? initialInventoryId : initialInventoryData[0]?.id ?? "");
-  const [selectedBookingId, setSelectedBookingId] = useState(initialBookingId && initialBookingsData.some((booking) => booking.id === initialBookingId) ? initialBookingId : initialBookingsData.find((booking) => booking.creativeStatus !== "approved")?.id ?? initialBookingsData[0]?.id ?? "");
   const [filters, setFilters] = useState<Filters>(() => {
     const loadedFilters = compactFilters(initialFilters);
     return {
@@ -326,9 +349,10 @@ export default function OohApp({
     const payload = await response.json() as { booking: Booking; creative: Creative | null };
     setBookings((current) => [payload.booking, ...current]);
     if (payload.creative) setCreatives((current) => [payload.creative!, ...current]);
+    accessibleBookingIdsRef.current.add(payload.booking.id);
     setSelectedBookingId(payload.booking.id);
-    setCampaignCreationState(false);
-    setView("campaigns");
+    setCampaignCreationState("creative");
+    setView("creative");
     return true;
   }
 
@@ -340,7 +364,7 @@ export default function OohApp({
       advertiser: currentUser?.name ?? "New Advertiser",
       adSlots: 1,
     });
-    setCampaignCreationState(false);
+    setCampaignCreationState(null);
     setView("discover");
   }
 
@@ -426,8 +450,13 @@ export default function OohApp({
     });
     if (!response.ok) return false;
     const payload = await response.json() as { booking: Booking; creative: Creative };
+    if (!isVerifiedCreativeSubmission(payload, bookingId)) return false;
     setBookings((current) => current.map((booking) => (booking.id === bookingId ? payload.booking : booking)));
     setCreatives((current) => [payload.creative, ...current]);
+    if (campaignCreationStepRef.current === "creative" && selectedBookingId === bookingId) {
+      setCampaignCreationState(null);
+      setView("campaigns");
+    }
     return true;
   }
 
@@ -627,7 +656,7 @@ export default function OohApp({
             bookings={bookings}
             onBook={() => {
               setRole("advertiser");
-              setCampaignCreationState(true);
+              setCampaignCreationState("booking");
               setView("booking");
             }}
             canComment={Boolean(currentUser)}
@@ -647,6 +676,7 @@ export default function OohApp({
             onSubmit={submitBooking}
             onCancel={cancelCampaignCreation}
             canBuy={canBuyAds}
+            allowCreativeUpload={false}
           />
         );
       case "campaigns":
@@ -657,6 +687,7 @@ export default function OohApp({
             inventory={inventory}
             currentUser={currentUser}
             onOpenCreative={(booking) => {
+              setCampaignCreationState(null);
               setSelectedBookingId(booking.id);
               setSelectedInventoryId(booking.inventoryId);
               setRole("advertiser");
@@ -665,9 +696,9 @@ export default function OohApp({
           />
         );
       case "creative":
-        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} />;
+        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} lockBookingSelection={campaignCreationStep === "creative"} />;
       case "resources":
-        return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
+        return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
         if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} />;
         return (

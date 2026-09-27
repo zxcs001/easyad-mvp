@@ -13,6 +13,7 @@ import { CONSENT_COOKIE_NAME } from "./lib/cookie-consent";
 import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
 import GovernmentAccessDenied from "./component/government-access-denied";
 import { getFeatureFlags } from "./lib/feature-flags";
+import { resolveCampaignView } from "./lib/campaign-creation-flow";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -40,6 +41,7 @@ export default async function Page({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   const role = readOne(params.role);
   const view = readOne(params.view);
+  const bookingId = readOne(params.bookingId);
   const requestedRole = isGovernmentSurface ? user?.role : isRole(role) ? role : user?.role;
   const requestedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
   const cookieStore = await cookies();
@@ -76,6 +78,10 @@ export default async function Page({ searchParams }: PageProps) {
   const isUnassignedOperator = user?.role === "operator" && !institutionId;
   const inventory = (user?.role === "admin" ? await listInventory() : institutionId ? await listInventoryByInstitution(institutionId) : await listPublishedInventory()).filter(item=>user?.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(item.id));
   const bookings = (!user || isUnassignedOperator ? [] : user.role === "advertiser" ? await listBookingsCreatedBy(user.id) : institutionId ? await listBookingsForInstitution(institutionId) : await listBookings()).filter(b=>user?.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(b.inventoryId));
+  const guardedView = effectiveRole === "advertiser"
+    ? resolveCampaignView({ requestedView: effectiveView, activeStep: null, bookingId, accessibleBookingIds: new Set(bookings.map((booking) => booking.id)) })
+    : effectiveView;
+  if (guardedView !== effectiveView) redirect(`/?role=${effectiveRole}&view=${guardedView}`);
   const mediaResources = (user?.role === "admin" ? await listMediaResources() : institutionId ? await listMediaResourcesForInstitution(institutionId) : []).filter(r=>inventory.some(i=>i.id===r.inventoryId));
   const deviceAlerts = user?.role === "admin" ? await listDeviceAlerts() : user?.role === "institutional" ? await listDeviceAlerts(user.id) : [];
   if (user?.role === "admin" || institutionId) await ensureBookingTransactions();
@@ -90,7 +96,6 @@ export default async function Page({ searchParams }: PageProps) {
   const creativeFormat = readOne(params.creativeFormat);
   const template = readOne(params.template);
   const fileType = readOne(params.fileType);
-  const bookingId = readOne(params.bookingId);
   const locationId = readOne(params.location);
   const itemId = readOne(params.itemId);
   const filterFormat = readOne(params.format);
@@ -115,7 +120,7 @@ export default async function Page({ searchParams }: PageProps) {
         initialManagedUsers={managedUsers}
         initialInstitutionOperators={institutionOperators}
         initialRole={effectiveRole}
-        initialView={effectiveView}
+        initialView={guardedView}
         initialNavCollapsed={cookieStore.get(SIDEBAR_COOKIE_NAME)?.value === "1"}
         initialFormat={isFormat(format) ? format : undefined}
         initialLocationId={isLocation(locationId) ? locationId : undefined}
