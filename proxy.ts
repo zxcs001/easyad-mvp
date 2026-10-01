@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectLocaleFromGeo, isLocale, LOCALE_COOKIE_NAME, LOCALE_REQUEST_HEADER } from "./app/i18n/config";
+import { creativeHtmlResponseCsp } from "./app/creative-templates";
 
 const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -69,7 +70,14 @@ export function proxy(request: NextRequest) {
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   if (process.env.NODE_ENV === "production") {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    response.headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://tile.openstreetmap.org https://tiles.openfreemap.org; worker-src 'self' blob:");
+    const player = request.nextUrl.pathname === "/player";
+    response.headers.set("Content-Security-Policy", `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'${player ? " blob:" : ""} https://tile.openstreetmap.org https://tiles.openfreemap.org; worker-src 'self' blob:${player ? "; frame-src 'self' blob:" : ""}`);
+  }
+  if (request.nextUrl.pathname.startsWith("/creative-html/")) {
+    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("Content-Security-Policy", creativeHtmlResponseCsp);
+    response.headers.set("Cache-Control", "private, no-store");
   }
   if (request.nextUrl.pathname.startsWith("/api/") && !request.nextUrl.pathname.startsWith("/api/public/")) {
     response.headers.set("Cache-Control", "private, no-store");

@@ -10,7 +10,7 @@ export type PlayerSlide = {
   assetVersion: string;
   title: string;
   subtitle: string;
-  mediaType: "image" | "video";
+  mediaType: "image" | "video" | "html";
   publicUrl: string;
   createdAt: string;
   startsOn: string | null;

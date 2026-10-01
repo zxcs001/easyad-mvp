@@ -4,7 +4,8 @@ import "./creative-view.css";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";
-import { capitalize, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, templateHeadline, templateTitle, validateCreative } from "../utils";
+import { creativeTemplateExamples, creativeTemplateTopics, defaultCreativeHtml, type CreativeTemplateTopic } from "../creative-templates";
+import { capitalize, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, validateCreative } from "../utils";
 import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
@@ -37,11 +38,16 @@ export default function CreativeView({
   const [sourceMode, setSourceMode] = useState<Creative["source"]>("template");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const templateHtml = draft.htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template];
+  const previewKey = `${draft.template}\u0000${templateHtml}`;
+  const [htmlPreview, setHtmlPreview] = useState<{ key: string; document: string } | null>(null);
+  const [examplePreviews, setExamplePreviews] = useState<Partial<Record<CreativeTemplateTopic, string>>>({});
+  const [htmlError, setHtmlError] = useState<string | null>(null);
   const spec = formats[draft.format];
-  const validations = validateCreative(draft);
+  const validations = validateCreative(sourceMode === "template" ? { ...draft, fileType: "html", fileSize: 1 } : draft);
   const ready = validations.every((check) => check.ok);
   const uploadFileType = uploadFile ? fileTypeFromUpload(uploadFile) : null;
-  const canSubmitCurrentMode = ready && (sourceMode === "template" || Boolean(uploadFile && uploadFileType));
+  const canSubmitCurrentMode = ready && (sourceMode === "template" ? htmlPreview?.key === previewKey : Boolean(uploadFile && uploadFileType));
   const eligibleBookings = bookings.filter((booking) => isCreativeSubmissionAllowed(booking));
   const creativeBookings = bookings.filter((booking) => booking.creativeStatus !== "approved" || booking.status === "creative review");
   const selectedBooking = eligibleBookings.find((booking) => booking.id === selectedBookingId) ?? eligibleBookings[0];
@@ -56,6 +62,43 @@ export default function CreativeView({
     setUploadPreviewUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);
   }, [uploadFile]);
+
+  useEffect(() => {
+    if (sourceMode !== "template") return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/creative/template-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template: draft.template, html: templateHtml }),
+          signal: controller.signal,
+        });
+        const result = await response.json() as { document?: string; error?: string };
+        if (!response.ok || !result.document) throw new Error(result.error ?? "Preview could not be generated.");
+        setHtmlPreview({ key: previewKey, document: result.document });
+        setHtmlError(null);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setHtmlPreview(null);
+        setHtmlError(error instanceof Error ? error.message : "Preview could not be generated.");
+      }
+    }, 250);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [draft.template, previewKey, sourceMode, templateHtml]);
+
+  useEffect(() => {
+    if (sourceMode !== "template") return;
+    const controller = new AbortController();
+    fetch("/api/creative/template-preview", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const result = await response.json() as { examples?: Partial<Record<CreativeTemplateTopic, string>> };
+        if (!controller.signal.aborted && result.examples) setExamplePreviews(result.examples);
+      })
+      .catch(() => { /* The selected template's preview reports its own error. */ });
+    return () => controller.abort();
+  }, [sourceMode]);
 
   if (!selectedBooking) {
     return (
@@ -80,25 +123,45 @@ export default function CreativeView({
         </div>
         {sourceMode === "template" ? (
           <>
+            <div className="template-gallery-heading">
+              <strong>{t("Choose a ready-made design")}</strong>
+              <span>{t("Each design includes example copy. Select one and replace the details for your campaign.")}</span>
+            </div>
             <div className="template-tabs">
-              {(["retail", "finance", "event"] as CreativeDraft["template"][]).map((template) => (
-                <a key={template} href={creativeHref(draft, { template }, selectedBooking.id)} className={draft.template === template ? "active" : ""} onClick={(event) => {
+              {creativeTemplateTopics.map((template) => (
+                <a key={template} href={creativeHref(draft, { template }, selectedBooking.id)} aria-label={t("{topic} design: {name}", { topic: t(capitalize(template)), name: t(creativeTemplateExamples[template].name) })} aria-current={draft.template === template ? "true" : undefined} className={`template-choice ${draft.template === template ? "active" : ""}`} onClick={(event) => {
                   if (!isPlainLeftClick(event)) return;
                   // Switch in place and keep the address on this template; the
                   // href alone reloaded the whole page after the switch.
                   event.preventDefault();
                   window.history.replaceState(window.history.state, "", event.currentTarget.href);
                   setDraft((current) => ({ ...current, template }));
-                }}>{t(capitalize(template))}</a>
+                }}>
+                  <span className={`template-choice-art ${template}`}>
+                    {examplePreviews[template] ? <iframe title={t("{topic} design example", { topic: t(capitalize(template)) })} sandbox="" referrerPolicy="no-referrer" srcDoc={examplePreviews[template]} tabIndex={-1} /> : null}
+                  </span>
+                  <span className="template-choice-copy">
+                    <span className="template-choice-topic">{t(capitalize(template))}</span>
+                    <strong>{t(creativeTemplateExamples[template].name)}</strong>
+                    <small>{t(creativeTemplateExamples[template].description)}</small>
+                  </span>
+                </a>
               ))}
             </div>
-            <div className={`creative-canvas ${draft.template}`} style={{ aspectRatio: spec.ratio }}>
-              <div className="safe-zone" style={{ inset: `${draft.safeZone}%` }}>
-                <span>{t(templateHeadline(draft.template))}</span>
-                <strong>{t(templateTitle(draft.template))}</strong>
-                <small>{t(spec.label)}</small>
-              </div>
+            <div className="creative-html-preview" style={{ aspectRatio: spec.ratio }}>
+              {htmlPreview?.key === previewKey ? <iframe title={t("Template preview")} sandbox="" referrerPolicy="no-referrer" srcDoc={htmlPreview.document} /> : <span>{t("Preparing safe preview…")}</span>}
             </div>
+            <label className="creative-html-editor">{t("Template HTML")}
+              <textarea className="resize-none" value={templateHtml} maxLength={16384} rows={10} spellCheck={false} onChange={(event) => {
+                const html = event.target.value;
+                setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: html } }));
+              }} />
+            </label>
+            <div className="creative-html-editor-foot">
+              <small>{t("Edit the words and layout tags. Scripts, links, images, and inline styles are removed for safety.")}</small>
+              <button type="button" onClick={() => setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: defaultCreativeHtml[current.template] } }))}>{t("Reset this topic")}</button>
+            </div>
+            {htmlError ? <p className="form-error" role="alert">{t(htmlError)}</p> : null}
           </>
         ) : (
           <div className="upload-creative-panel">
@@ -144,8 +207,8 @@ export default function CreativeView({
             <label>{t("Format")}<select className="select" value={draft.format} onChange={(event) => setCreativeFormat(event.target.value as FormatKey, setDraft)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>
             <label>{t("Width")}<input type="number" value={draft.width} onChange={(event) => setDraft((current) => ({ ...current, width: Number(event.target.value) }))} /></label>
             <label>{t("Height")}<input type="number" value={draft.height} onChange={(event) => setDraft((current) => ({ ...current, height: Number(event.target.value) }))} /></label>
-            <label>{t("File type")}<select className="select" value={draft.fileType} onChange={(event) => setDraft((current) => ({ ...current, fileType: event.target.value as CreativeDraft["fileType"] }))}>{["png", "jpg", "gif", "pdf", "mp4"].map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select></label>
-            <Range label={t("File size: {count} MB", { count: draft.fileSize })} min={1} max={600} value={draft.fileSize} onChange={(fileSize) => setDraft((current) => ({ ...current, fileSize }))} />
+            {sourceMode === "template" ? <label>{t("File type")}<input value="HTML" readOnly /></label> : <label>{t("File type")}<select className="select" value={draft.fileType} onChange={(event) => setDraft((current) => ({ ...current, fileType: event.target.value as CreativeDraft["fileType"] }))}>{["png", "jpg", "gif", "pdf", "mp4"].map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select></label>}
+            {sourceMode === "upload" ? <Range label={t("File size: {count} MB", { count: draft.fileSize })} min={1} max={600} value={draft.fileSize} onChange={(fileSize) => setDraft((current) => ({ ...current, fileSize }))} /> : null}
             <Range label={t("Safe zone: {count}%", { count: draft.safeZone })} min={0} max={18} value={draft.safeZone} onChange={(safeZone) => setDraft((current) => ({ ...current, safeZone }))} />
             <Range label={t("Distortion: {count}%", { count: draft.distortion })} min={0} max={12} value={draft.distortion} onChange={(distortion) => setDraft((current) => ({ ...current, distortion }))} />
           </div>

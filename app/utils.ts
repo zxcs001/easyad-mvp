@@ -92,7 +92,7 @@ export function validateCreative(draft: CreativeDraft) {
   const spec = formats[draft.format];
   const ratio = draft.width / draft.height;
   const ratioDelta = Math.abs(ratio - spec.ratio) / spec.ratio;
-  const allowedTypes = draft.format === "digital" ? ["png", "jpg", "gif", "mp4"] : ["png", "jpg", "pdf"];
+  const allowedTypes = draft.format === "digital" ? ["png", "jpg", "gif", "mp4", "html"] : ["png", "jpg", "pdf"];
   return [
     { label: "Aspect ratio", ok: ratioDelta < 0.025, message: `Expected ${formatRatio(spec.ratio)}, received ${formatRatio(ratio)}.` },
     { label: "Safe zone", ok: draft.safeZone >= spec.safeZone, message: `Requires at least ${spec.safeZone}% margin for this format.` },

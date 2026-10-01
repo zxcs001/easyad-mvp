@@ -21,6 +21,37 @@ test("production CSP permits map data while restricting other external connectio
   }
 });
 
+test("HTML creative documents can be framed only by this site and cannot run scripts", () => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    const response = proxy(new NextRequest("https://easyad.example/creative-html/CRV-1"));
+    assert.equal(response.headers.get("X-Frame-Options"), "SAMEORIGIN");
+    const policy = response.headers.get("Content-Security-Policy") ?? "";
+    assert.ok(policy.includes("sandbox"));
+    assert.ok(policy.includes("default-src 'none'"));
+    assert.ok(policy.includes("frame-ancestors 'self'"));
+    assert.ok(!policy.includes("script-src"));
+    assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+test("only the player can validate and frame cached HTML blob ads", () => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    const player = proxy(new NextRequest("https://easyad.example/player"));
+    const playerPolicy = player.headers.get("Content-Security-Policy") ?? "";
+    assert.ok(playerPolicy.includes("connect-src 'self' blob:"));
+    assert.ok(playerPolicy.includes("frame-src 'self' blob:"));
+    const otherPolicy = proxy(new NextRequest("https://easyad.example/")).headers.get("Content-Security-Policy") ?? "";
+    assert.ok(!otherPolicy.includes("connect-src 'self' blob:"));
+    assert.ok(!otherPolicy.includes("frame-src 'self' blob:"));
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
 test("proxy rejects cross-origin API mutations and permits same-origin requests", () => {
   const blocked = proxy(new NextRequest("http://localhost:3000/api/bookings", {
     method: "POST",

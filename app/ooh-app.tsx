@@ -7,6 +7,7 @@ import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
 import CampaignWorkspace from "./component/campaign-workspace";
 import CreativeView from "./component/creative-view";
+import { defaultCreativeHtml } from "./creative-templates";
 import ContentLibraryView from "./component/content-library-view";
 import { Sidebar, Topbar } from "./component/dashboard-shell";
 import DiscoverView from "./component/discover-view";
@@ -297,7 +298,7 @@ export default function OohApp({
   const canManageInventory = currentUser?.role === "operator" || currentUser?.role === "institutional" || currentUser?.role === "admin";
   const canDeleteInventory = currentUser?.role === "admin";
   const canBuyAds = currentUser?.role === "advertiser" || currentUser?.role === "admin";
-  const institutionNetworkInventory = currentUser?.role === "admin" ? inventory.filter((item) => Boolean(item.institutionId)) : inventory;
+  const institutionNetworkInventory = useMemo(() => currentUser?.role === "admin" ? inventory.filter((item) => Boolean(item.institutionId)) : inventory, [currentUser?.role, inventory]);
   const networkSelectedInventory = institutionNetworkInventory.find((item) => item.id === selectedInventoryId) ?? institutionNetworkInventory[0] ?? null;
   const institutionNetworkIds = new Set(institutionNetworkInventory.map((item) => item.id));
   const institutionNetworkMedia = mediaResources.filter((resource) => institutionNetworkIds.has(resource.inventoryId));
@@ -442,7 +443,11 @@ export default function OohApp({
 
   async function submitCreative(bookingId: string, source: Creative["source"], file?: File | null) {
     if (!canBuyAds) return false;
-    const body = source === "upload" && file ? creativeUploadForm(creativeDraft, file) : JSON.stringify(creativeDraft);
+    const { htmlByTopic, ...creativeFields } = creativeDraft;
+    const body = source === "upload" && file ? creativeUploadForm(creativeDraft, file) : JSON.stringify({
+      ...creativeFields,
+      html: htmlByTopic?.[creativeDraft.template] ?? defaultCreativeHtml[creativeDraft.template],
+    });
     const response = await fetch(`/api/bookings/${bookingId}/creative`, {
       method: "POST",
       headers: source === "upload" && file ? undefined : { "Content-Type": "application/json" },
@@ -518,6 +523,23 @@ export default function OohApp({
     const payload = await response.json() as { resource: MediaResource };
     setMediaResources((current) => current.map((resource) => resource.id === id ? payload.resource : resource));
     return true;
+  }
+
+  async function saveScreenSettings(id: string, settings: import("./component/screen-settings-dialog").ScreenSettings) {
+    if (!canAccessInstitutionWorkspace(currentUser?.role)) return { error: "Institution account or Super Admin access required" };
+    try {
+      const response = await fetch(`/api/inventory/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const payload = await response.json().catch(() => ({})) as { item?: InventoryItem; error?: string };
+      if (!response.ok || !payload.item) return { error: payload.error ?? "Unable to save display settings. Try again." };
+      setInventory((current) => current.map((item) => item.id === id ? payload.item! : item));
+      return { value: payload.item };
+    } catch {
+      return { error: "Unable to save display settings. Try again." };
+    }
   }
 
   async function setInventoryPublishState(id: string, published: boolean) {
@@ -635,7 +657,7 @@ export default function OohApp({
     switch (view) {
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
-        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSetPublishState={setInventoryPublishState} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
+        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
       case "discover":
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (

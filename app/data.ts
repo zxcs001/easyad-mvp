@@ -199,7 +199,7 @@ export type Creative = {
   format: FormatKey;
   width: number;
   height: number;
-  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4";
+  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4" | "html";
   fileSize: number;
   safeZone: number;
   distortion: number;

@@ -24,8 +24,21 @@
   cursor: grabbing;
 }
 
+.maplibre-loading .maplibre-map,
 .maplibre-fallback-mode .maplibre-map {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.map-loading {
+  color: var(--workspace-muted);
+  font-size: .9rem;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .map-search {
@@ -114,6 +127,13 @@
 .maplibregl-ctrl-group {
   border-radius: 7px;
   box-shadow: 0 10px 24px #17202a29;
+}
+
+/* Scaling the anchor also scales MapLibre's pixel translation, making a
+   pressed pin jump toward the map origin. Keep geographic anchors fixed. */
+.maplibre-shell button.device-marker:not(:disabled):active,
+.maplibre-shell button.city-marker:not(:disabled):active {
+  scale: none;
 }
 
 .maplibre-device-marker {

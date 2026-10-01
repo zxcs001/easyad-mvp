@@ -247,7 +247,8 @@
 }
 
 .approval-creative-preview img,
-.approval-creative-preview video {
+.approval-creative-preview video,
+.approval-creative-preview iframe {
   border: 1px solid var(--line);
   object-fit: cover;
   background: #eef3f6;
@@ -257,8 +258,14 @@
   display: block;
 }
 
+.approval-creative-preview iframe {
+  border: 0;
+  pointer-events: none;
+}
+
 .approval-creative-preview:hover img,
-.approval-creative-preview:hover video {
+.approval-creative-preview:hover video,
+.approval-creative-preview:hover iframe {
   border-color: var(--blue);
 }
 

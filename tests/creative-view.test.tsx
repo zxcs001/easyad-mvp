@@ -4,10 +4,17 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Booking, InventoryItem } from "../app/data";
 import CreativeView from "../app/component/creative-view";
 import type { CreativeDraft } from "../app/types";
+
+const previewResponse = vi.fn(async (_url: string, options?: RequestInit) => ({
+  ok: true,
+  json: async () => options?.method === "POST"
+    ? { document: "<!doctype html><p>Safe preview</p>" }
+    : { examples: { retail: "<!doctype html><p>Retail example</p>", finance: "<!doctype html><p>Finance example</p>", event: "<!doctype html><p>Event example</p>" } },
+}));
 
 const inventory: InventoryItem[] = [
   {
@@ -75,14 +82,22 @@ const draft: CreativeDraft = {
 };
 
 describe("CreativeView", () => {
+  afterEach(() => vi.unstubAllGlobals());
   test("offers both fixed template and uploaded media production paths", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
+    vi.stubGlobal("fetch", previewResponse);
 
     render(<CreativeHarness onSubmit={onSubmit} />);
 
     expect(screen.getByRole("heading", { name: "Fixed template" })).toBeInTheDocument();
-    expect(screen.getByText("Weekend offer")).toBeInTheDocument();
+    expect((screen.getByRole("textbox", { name: "Template HTML" }) as HTMLTextAreaElement).value).toContain("GOOD<br>THINGS");
+    expect(screen.getByText("Choose a ready-made design")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Retail design: The weekend edit" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "Finance design: The next chapter" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Event design: After dark" })).toBeInTheDocument();
+    expect(await screen.findByTitle("Retail design example")).toHaveAttribute("sandbox", "");
+    expect(await screen.findByTitle("Template preview")).toHaveAttribute("sandbox", "");
     const campaignSelect = screen.getByRole("combobox", { name: "Campaign" });
     expect(within(campaignSelect).getAllByRole("option")).toHaveLength(1);
     expect(within(campaignSelect).queryByRole("option", { name: "Rejected Creative - Former Advertiser" })).not.toBeInTheDocument();
@@ -97,10 +112,27 @@ describe("CreativeView", () => {
   });
 
   test("locks the new campaign selected by the previous step", () => {
+    vi.stubGlobal("fetch", previewResponse);
     render(<CreativeHarness onSubmit={vi.fn()} lockBookingSelection />);
 
     expect(screen.getByRole("combobox", { name: "Campaign" })).toBeDisabled();
     expect(screen.getByText("This campaign was created in the previous step.")).toBeInTheDocument();
+  });
+
+  test("keeps edits per topic and sends edited HTML to the preview service", async () => {
+    const user = userEvent.setup();
+    const preview = vi.fn(previewResponse);
+    vi.stubGlobal("fetch", preview);
+    render(<CreativeHarness onSubmit={vi.fn()} />);
+    const editor = screen.getByRole("textbox", { name: "Template HTML" });
+    await user.clear(editor);
+    await user.type(editor, "<h1>My offer</h1>");
+    await screen.findByTitle("Template preview");
+    expect(preview).toHaveBeenCalledWith("/api/creative/template-preview", expect.objectContaining({ body: JSON.stringify({ template: "retail", html: "<h1>My offer</h1>" }) }));
+    await user.click(screen.getByRole("link", { name: "Finance design: The next chapter" }));
+    expect((screen.getByRole("textbox", { name: "Template HTML" }) as HTMLTextAreaElement).value).toContain("Make room<br>for what’s");
+    await user.click(screen.getByRole("link", { name: "Retail design: The weekend edit" }));
+    expect(screen.getByRole("textbox", { name: "Template HTML" })).toHaveValue("<h1>My offer</h1>");
   });
 });
 

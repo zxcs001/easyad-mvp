@@ -10,7 +10,7 @@ export type DeviceMediaSlide = {
   id: string;
   title: string;
   subtitle: string;
-  mediaType: "image" | "video";
+  mediaType: "image" | "video" | "html";
   publicUrl: string;
   createdAt: string;
 };
@@ -68,6 +68,8 @@ export default function DeviceMediaCarousel({ inventoryName, imageInterval, slid
             <section className="device-carousel-slide" key={slide.id}>
               {slide.mediaType === "video" ? (
                 <video src={slide.publicUrl} autoPlay muted playsInline onEnded={scrollNext} />
+              ) : slide.mediaType === "html" ? (
+                <iframe src={slide.publicUrl} title={slide.title} sandbox="" referrerPolicy="no-referrer" />
               ) : (
                 <img src={slide.publicUrl} alt="" />
               )}

@@ -527,12 +527,14 @@ export function ApprovalsView({
                   <small>{item?.name ?? booking.inventoryId} - {booking.start} {t("to")} {booking.end}</small>
                   <small>{t(booking.adSlots === 1 ? "{count} ad slot reserved for this device loop" : "{count} ad slots reserved for this device loop", { count: booking.adSlots })}</small>
                   <small>{creative ? t("Creative: {source} {width}x{height} {type}", { source: creative.source === "upload" ? creative.originalName ?? t("Uploaded media") : t(capitalize(creative.template)), width: creative.width, height: creative.height, type: creative.fileType.toUpperCase() }) : t("Creative: not submitted yet")}</small>
-                  {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a></small> : null}
+                  {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">{t(creative.source === "template" ? "Open HTML template" : "Open uploaded media")}</a></small> : null}
                 </div>
                 {creative?.publicUrl ? (
                   <a className="approval-creative-preview" href={creative.publicUrl} target="_blank" rel="noreferrer" aria-label={t("Preview uploaded creative for {campaign}", { campaign: booking.campaign })}>
                     {creative.mimeType?.startsWith("video/") ? (
                       <video muted playsInline preload="metadata" src={creative.publicUrl} />
+                    ) : creative.mimeType === "text/html" ? (
+                      <iframe src={creative.publicUrl} title={booking.campaign} sandbox="" referrerPolicy="no-referrer" />
                     ) : (
                       <img src={creative.publicUrl} alt={t("Uploaded creative for {campaign}", { campaign: booking.campaign })} loading="lazy" />
                     )}

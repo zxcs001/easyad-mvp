@@ -40,7 +40,7 @@ export function validatePlayback(body: Record<string, unknown>, manifest: Player
         throw new Error("Playback overlaps an emergency override");
     const duration = event.durationMs;
     const expected = (slide.durationSeconds ?? manifest.imageInterval) * 1000;
-    if (!["completed", "failed", "interrupted"].includes(event.outcome) || !Number.isFinite(duration) || duration < 0 || duration > expected + 2000 || Math.abs(end - start - duration) > 2000 || (event.outcome === "completed" && slide.mediaType === "image" && duration < expected - 250) || (event.outcome === "completed" && duration < 100))
+    if (!["completed", "failed", "interrupted"].includes(event.outcome) || !Number.isFinite(duration) || duration < 0 || duration > expected + 2000 || Math.abs(end - start - duration) > 2000 || (event.outcome === "completed" && (slide.mediaType === "image" || slide.mediaType === "html") && duration < expected - 250) || (event.outcome === "completed" && duration < 100))
         throw new Error("Invalid playback duration or outcome");
     return { event, slide, late: now - end > 120000 };
 }

@@ -76,7 +76,7 @@ export default function PlayerRotation({ manifest, onError }: {
             started = performance.now();
             wall = Date.now();
             clearTimeout(timer);
-            timer = setTimeout(() => void finish(slide.mediaType === "image" ? "completed" : "interrupted"), duration);
+            timer = setTimeout(() => void finish(slide.mediaType === "video" ? "interrupted" : "completed"), duration);
         };
         current.current = { start, finish: outcome => void finish(outcome) };
         timer = setTimeout(() => void finish("failed"), Math.min(8000, duration));
@@ -91,7 +91,8 @@ export default function PlayerRotation({ manifest, onError }: {
     if (!slide || hidden || halted || blank)
         return <div className="media-stage empty"><p>{t(halted ? "Player storage is unavailable. Playback is paused." : "Waiting for eligible content.")}</p></div>;
     return <div className="media-stage device-carousel-slide" data-player-slide={slide.id}>
-    {slide.mediaType === "image" ? <img key={`${slide.id}:${turn}`} ref={image} src={slide.publicUrl || undefined} alt="" onLoad={() => current.current?.start()} onError={() => current.current?.finish("failed")}/> :
+    {slide.mediaType === "image" ? <img key={`${slide.id}:${turn}`} ref={image} src={slide.publicUrl || undefined} alt="" onLoad={() => current.current?.start()} onError={() => current.current?.finish("failed")}/> : slide.mediaType === "html" ?
+            <iframe key={`${slide.id}:${turn}`} src={slide.publicUrl || undefined} title={slide.title} sandbox="" referrerPolicy="no-referrer" onLoad={() => current.current?.start()} onError={() => current.current?.finish("failed")}/> :
             <video key={`${slide.id}:${turn}`} ref={video} src={slide.publicUrl || undefined} muted playsInline autoPlay onPlaying={() => current.current?.start()} onEnded={() => current.current?.finish("completed")} onError={() => current.current?.finish("failed")}/>}
   </div>;
 }

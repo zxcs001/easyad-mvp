@@ -8,7 +8,7 @@ export type PublicDeviceMediaItem = {
   position: number;
   deviceId: string;
   source: "device" | "advertiser";
-  mediaType: "image" | "video";
+  mediaType: "image" | "video" | "html";
   mimeType: string;
   title: string;
   originalName: string;
@@ -26,7 +26,7 @@ export type ActiveDeviceMedia = {
 };
 
 const activeBookingStatuses = new Set(["approved", "scheduled", "live"]);
-const supportedMimeTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm"]);
+const supportedMimeTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm", "text/html"]);
 
 export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate(), client?: PoolClient, through = asOf, authenticated = false) {
   const inventory = authenticated ? await getInventory(deviceId, client) : await getPublishedInventory(deviceId, client);
@@ -76,7 +76,7 @@ export function buildActiveDeviceMedia(
       id: resource.id,
       deviceId: inventory.id,
       source: "advertiser" as const,
-      mediaType: resource.mimeType?.startsWith("video/") ? "video" as const : "image" as const,
+      mediaType: resource.mimeType === "text/html" ? "html" as const : resource.mimeType?.startsWith("video/") ? "video" as const : "image" as const,
       mimeType: resource.mimeType!,
       title: resource.campaign,
       originalName: resource.originalName ?? "uploaded-creative",

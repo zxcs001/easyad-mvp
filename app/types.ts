@@ -30,10 +30,11 @@ export type BookingDraft = {
 
 export type CreativeDraft = {
   template: "retail" | "finance" | "event";
+  htmlByTopic?: Partial<Record<"retail" | "finance" | "event", string>>;
   format: FormatKey;
   width: number;
   height: number;
-  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4";
+  fileType: "png" | "jpg" | "gif" | "pdf" | "mp4" | "html";
   fileSize: number;
   safeZone: number;
   distortion: number;

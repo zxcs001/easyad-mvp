@@ -48,6 +48,17 @@ test("single video restarts; failed media advances without a successful play", a
     await act(async () => { });
     expect(mocks.queue.mock.calls[1][1].outcome).toBe("failed");
 });
+test("HTML creative plays in a sandboxed frame for the full image interval", async () => {
+    const htmlManifest = { ...manifest, slides: [{ ...manifest.slides[0], mediaType: "html" as const, publicUrl: "/creative-html/CRV-1" }] };
+    const view = render(<PlayerRotation manifest={htmlManifest} onError={() => { }}/>);
+    const frame = view.container.querySelector("iframe");
+    expect(frame?.getAttribute("sandbox")).toBe("");
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(mocks.queue).not.toHaveBeenCalled();
+    fireEvent.load(frame!);
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(mocks.queue.mock.calls[0][1].outcome).toBe("completed");
+});
 test("outbox failure stops playback without silently discarding evidence", async () => {
     mocks.queue.mockRejectedValue(new Error("full"));
     const error = vi.fn();

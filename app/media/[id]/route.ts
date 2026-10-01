@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canManageInventoryRecord, getCurrentUser } from "../../lib/auth";
-import { getInventory, getMediaResource, getPublicMediaResource } from "../../lib/db";
+import { canManageInventoryRecord, canSubmitCreative, getCurrentUser } from "../../lib/auth";
+import { getBooking, getBookingOwnerId, getCreativeStoredMedia, getInventory, getMediaResource, getPublicMediaResource } from "../../lib/db";
 import { readStoredMedia } from "../../lib/media-storage";
 import { isSafeMediaMimeType } from "../../lib/uploads";
 
@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   let entry = await getPublicMediaResource(id);
   if (!entry) {
-    const [user, privateMedia] = await Promise.all([getCurrentUser(), getMediaResource(id)]);
+    const [user, privateMedia, privateCreative] = await Promise.all([getCurrentUser(), getMediaResource(id), getCreativeStoredMedia(id)]);
     if (user && privateMedia) {
       const inventory = await getInventory(privateMedia.resource.inventoryId);
       if (inventory && canManageInventoryRecord(user, inventory)) {
@@ -24,8 +24,21 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         };
       }
     }
+    if (!entry && user && privateCreative) {
+      const booking = await getBooking(privateCreative.booking_id);
+      const inventory = booking ? await getInventory(booking.inventoryId) : null;
+      if (booking && inventory && (canSubmitCreative(user, await getBookingOwnerId(booking.id)) || canManageInventoryRecord(user, inventory))) {
+        entry = {
+          originalName: privateCreative.original_name ?? "creative.html",
+          mimeType: privateCreative.mime_type ?? "application/octet-stream",
+          storagePath: privateCreative.storage_path,
+          cacheable: false,
+        };
+      }
+    }
   }
   if (!entry) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+  if (entry.mimeType === "text/html") return NextResponse.json({ error: "Resource not found" }, { status: 404 });
 
   let stored;
   try {

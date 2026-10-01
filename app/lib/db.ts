@@ -738,7 +738,7 @@ export async function getPublicMediaResource(id: string) {
     FROM creatives
     JOIN bookings ON bookings.id = creatives.booking_id JOIN inventory private_guard ON private_guard.id=bookings.inventory_id
     WHERE private_guard.content_visibility='public' AND creatives.id = $1
-      AND creatives.source = 'upload'
+      AND creatives.source IN ('upload', 'template')
       AND creatives.status = 'approved'
       AND creatives.storage_path IS NOT NULL
       AND bookings.status IN ('approved', 'scheduled', 'live')
@@ -753,6 +753,33 @@ export async function getPublicMediaResource(id: string) {
   } : null;
 }
 
+export async function getCreativeStoredMedia(id: string) {
+  return row<{ booking_id: string; original_name: string | null; mime_type: string | null; storage_path: string }>(`
+    SELECT booking_id, original_name, mime_type, storage_path FROM creatives
+    WHERE id = $1 AND storage_path IS NOT NULL
+  `, [id]);
+}
+
+export async function getLegacyTemplateCreative(id: string) {
+  return row<{
+    booking_id: string;
+    template: Creative["template"];
+    creative_status: Creative["status"];
+    booking_status: Booking["status"];
+    start_date: string;
+    end_date: string;
+    content_visibility: string;
+    today: string;
+  }>(`
+    SELECT creatives.booking_id, creatives.template, creatives.status AS creative_status,
+      bookings.status AS booking_status, bookings.start_date, bookings.end_date,
+      inventory.content_visibility, CURRENT_DATE::text AS today
+    FROM creatives JOIN bookings ON bookings.id = creatives.booking_id
+      JOIN inventory ON inventory.id = bookings.inventory_id
+    WHERE creatives.id = $1 AND creatives.source = 'template' AND creatives.storage_path IS NULL
+  `, [id]);
+}
+
 export async function listInventoryAdvertiserResources(inventoryId: string, asOf = new Date().toISOString().slice(0, 10), client?: PoolClient, through = asOf) {
   const result = await rows<InventoryAdvertiserResourceRow>(`
     SELECT
@@ -765,9 +792,9 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
     FROM creatives
     JOIN bookings ON bookings.id = creatives.booking_id
     WHERE bookings.inventory_id = $1
-      AND creatives.source = 'upload'
+      AND creatives.source IN ('upload', 'template')
       AND creatives.status = 'approved'
-      AND creatives.public_url IS NOT NULL
+      AND (creatives.public_url IS NOT NULL OR creatives.source = 'template')
       AND bookings.status IN ('approved', 'scheduled', 'live')
       AND bookings.start_date <= $3
       AND bookings.end_date >= $2
@@ -1312,8 +1339,8 @@ function mapCreative(entry: CreativeRow): Creative {
     safeZone: Number(entry.safe_zone),
     distortion: Number(entry.distortion),
     originalName: entry.original_name,
-    mimeType: entry.mime_type,
-    publicUrl: entry.public_url,
+    mimeType: entry.mime_type ?? (entry.source === "template" ? "text/html" : null),
+    publicUrl: entry.public_url ?? (entry.source === "template" ? `/creative-html/${entry.id}` : null),
     status: entry.status,
     createdAt: stringifyDate(entry.created_at),
   };
