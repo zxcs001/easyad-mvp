@@ -16,7 +16,6 @@ export type Filters = {
   audience: string;
   competitor: InventoryItem["competitor"] | "all";
   priceMax: number;
-  showCompetitors: boolean;
   selectedTags: string[];
 };
 

@@ -141,18 +141,23 @@ function DeviceScreenContent({
 
 function EmergencyAlertScreen({ alert }: { alert: DeviceAlert }) {
   const { formatDate, t } = useI18n();
-  const typeLabel = alert.alertType === "amber" ? "AMBER Alert" : alert.alertType === "evacuation" ? "Evacuation notice" : "Public safety alert";
+  const typeLabel = alert.alertType === "amber" ? "AMBER Alert" : alert.alertType === "weather" ? "Severe weather alert" : alert.alertType === "evacuation" ? "Evacuation notice" : "Public safety alert";
   // After mount: during the server render the expiry time came out in the
   // server's zone, so the kiosk flashed a different time and a hydration error.
   const mounted = useMounted();
   const expires = mounted ? formatDate(alert.expiresAt, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : "";
+  const [photoFailed, setPhotoFailed] = useState(false);
+  useEffect(() => setPhotoFailed(false), [alert.image?.url]);
   return (
     <section className={`emergency-screen emergency-${alert.alertType}`} role="alert" aria-label={`${typeLabel}: ${alert.title}`}>
       <header><span className="emergency-beacon" aria-hidden="true" /><strong>{t(typeLabel)}</strong><span>{t("Screen emergency override")}</span></header>
-      <div className="emergency-message">
+      <div className={`emergency-body${alert.image ? " with-photo" : ""}`}>
+      {alert.image ? <div className="emergency-photo">{photoFailed ? <p>{t("Photo unavailable. Emergency instructions remain active.")}</p> : <img data-emergency-photo src={alert.image.url} alt={t("Emergency photo: {title}", { title: alert.title })} onLoad={() => setPhotoFailed(false)} onError={() => setPhotoFailed(true)} />}</div> : null}
+      <div className={`emergency-message${alert.title.length + alert.message.length > 400 ? " emergency-copy-dense" : ""}`}>
         <span className="emergency-area">{alert.area}</span>
         <h1>{alert.title}</h1>
         <p>{alert.message}</p>
+      </div>
       </div>
       <footer><span>{t("Issued by {name}", { name: alert.issuedBy })}</span><span>{t("Display until {time}", { time: expires })}</span></footer>
     </section>

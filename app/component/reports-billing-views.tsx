@@ -111,7 +111,7 @@ export function BillingView({
   paymentsEnabled?: boolean;
 }) {
   const { locale, t } = useI18n();
-  const rows = bookings.map((booking) => {
+  const rows = bookings.filter((booking) => booking.status !== "cancelled").map((booking) => {
     const transaction = transactions.find((entry) => entry.bookingId === booking.id);
     const split = splitRevenue(booking.spend);
     return {

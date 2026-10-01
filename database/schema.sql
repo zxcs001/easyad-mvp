@@ -86,7 +86,7 @@ ALTER TABLE media_resources
 CREATE TABLE IF NOT EXISTS device_alerts (
   id TEXT PRIMARY KEY,
   institution_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  alert_type TEXT NOT NULL CHECK (alert_type IN ('amber', 'evacuation', 'public-safety')),
+  alert_type TEXT NOT NULL CHECK (alert_type IN ('amber', 'weather', 'evacuation', 'public-safety')),
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   area TEXT NOT NULL,
@@ -98,6 +98,13 @@ CREATE TABLE IF NOT EXISTS device_alerts (
   expires_at TEXT NOT NULL,
   ended_at TEXT
 );
+
+-- Add severe-weather alerts to existing installations as well as fresh databases.
+ALTER TABLE device_alerts ADD COLUMN IF NOT EXISTS image JSONB;
+ALTER TABLE device_alerts ADD COLUMN IF NOT EXISTS image_storage_path TEXT;
+ALTER TABLE device_alerts DROP CONSTRAINT IF EXISTS device_alerts_alert_type_check;
+ALTER TABLE device_alerts ADD CONSTRAINT device_alerts_alert_type_check
+  CHECK (alert_type IN ('amber', 'weather', 'evacuation', 'public-safety'));
 
 CREATE TABLE IF NOT EXISTS transactions (
   id TEXT PRIMARY KEY,

@@ -49,8 +49,7 @@ export default function FiltersPanel({
     (filters.minImpressions !== defaultFilters.minImpressions ? 1 : 0) +
     (filters.minTraffic !== defaultFilters.minTraffic ? 1 : 0) +
     (filters.minIncome !== defaultFilters.minIncome ? 1 : 0) +
-    (filters.selectedTags.length ? 1 : 0) +
-    (filters.showCompetitors !== defaultFilters.showCompetitors ? 1 : 0);
+    (filters.selectedTags.length ? 1 : 0);
 
   useEffect(() => {
     if (readBrowserPreference(FILTERS_COOKIE_NAME) === "1") setAdvancedOpen(true);
@@ -214,11 +213,6 @@ export default function FiltersPanel({
           <span className="helper-text">{t("No device tags available.")}</span>
         )}
       </div>
-      <label className="check-row">
-        <input type="hidden" name="showCompetitors" value="false" />
-        <input type="checkbox" name="showCompetitors" value="true" checked={filters.showCompetitors} onChange={(event) => setFilters((current) => ({ ...current, showCompetitors: event.target.checked }))} />
-        {t("Show nearby businesses")}
-      </label>
       </div>
     </form>
   );

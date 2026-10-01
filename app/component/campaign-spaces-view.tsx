@@ -3,7 +3,7 @@
 import "./campaign-spaces-view.css";
 import type { Booking, InventoryItem } from "../data";
 import type { DbUser } from "../lib/db";
-import { money, reservedLoopSeconds } from "../utils";
+import { isCreativeSubmissionAllowed, money, reservedLoopSeconds } from "../utils";
 import { EmptyState, Meter, PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
 import { isDigitalInventory } from "../lib/inventory-delivery";
@@ -23,7 +23,7 @@ export default function CampaignSpacesView({
   // No filter by account name: the server already returns only this account's
   // bookings. Matching the free-text advertiser name hid every older booking
   // once an account was renamed.
-  const visibleBookings = bookings.filter((booking) => booking.status !== "rejected");
+  const visibleBookings = bookings.filter((booking) => !["rejected", "cancelled"].includes(booking.status));
   // Admin sees this screen too, and "find screens near you" is not their job.
   const isAdvertiser = currentUser?.role === "advertiser";
 
@@ -50,7 +50,7 @@ export default function CampaignSpacesView({
                 <span><span className="status">{t(booking.status)}</span></span>
                 <span>{t(booking.creativeStatus)}<small>{t("Submission state")}</small></span>
                 <div className="campaign-space-actions">
-                  <button className="secondary-button" type="button" onClick={() => onOpenCreative(booking)}>{t("Edit")}</button>
+                  {isCreativeSubmissionAllowed(booking) ? <button className="secondary-button" type="button" onClick={() => onOpenCreative(booking)}>{t("Edit")}</button> : <small>{t(booking.status === "creative review" ? "Artwork is awaiting review." : "Creative editing is unavailable for this campaign.")}</small>}
                   {isDigital ? <a className="secondary-button" href={`/inventory/${booking.inventoryId}`}>{t("Inventory")}</a> : null}
                 </div>
               </div>

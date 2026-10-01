@@ -9,6 +9,7 @@ export type UserStatus = "active" | "banned";
 export type View =
   | "portal"
   | "network"
+  | "emergency"
   | "discover"
   | "booking"
   | "campaigns"
@@ -118,7 +119,7 @@ export type MediaResource = {
   createdAt: string;
 };
 
-export type DeviceAlertType = "amber" | "evacuation" | "public-safety";
+export type DeviceAlertType = "amber" | "weather" | "evacuation" | "public-safety";
 
 export type DeviceAlert = {
   id: string;
@@ -134,6 +135,7 @@ export type DeviceAlert = {
   createdAt: string;
   expiresAt: string;
   endedAt: string | null;
+  image?: { url: string; mimeType: string; originalName: string; sizeBytes: number } | null;
 };
 
 export type Booking = {
@@ -145,7 +147,7 @@ export type Booking = {
   end: string;
   adSlots: number;
   creativeStatus: "not submitted" | "approved" | "pending review" | "needs changes";
-  status: "pending approval" | "creative review" | "approved" | "scheduled" | "live" | "completed" | "rejected";
+  status: "pending approval" | "creative review" | "approved" | "scheduled" | "live" | "completed" | "rejected" | "cancelled";
   spend: number;
   paid: boolean;
   pop: number;
@@ -259,15 +261,4 @@ export const locations = [
   { id: "university", label: "Lakehead University", x: 67.32, y: 40.94 },
   { id: "retail", label: "Intercity Retail District", x: 67.33, y: 40.99 },
   { id: "waterfront", label: "Marina Park Waterfront", x: 67.28, y: 40.88 },
-];
-
-export const businesses = [
-  { name: "Northline Fitness", category: "fitness", x: 67.28, y: 40.95 },
-  { name: "Civic Bank", category: "finance", x: 67.32, y: 40.89 },
-  { name: "Mesa Burger", category: "restaurant", x: 67.46, y: 41.02 },
-  { name: "Atlas Grocery", category: "retail", x: 67.43, y: 41.08 },
-  { name: "Bluebird Cinema", category: "entertainment", x: 67.25, y: 41.13 },
-  { name: "Arcade Coffee", category: "restaurant", x: 67.39, y: 40.81 },
-  { name: "Sprint Wireless", category: "telecom", x: 67.15, y: 41.05 },
-  { name: "Bloom Pharmacy", category: "health", x: 67.33, y: 40.96 },
 ];

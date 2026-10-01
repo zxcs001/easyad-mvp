@@ -1325,6 +1325,36 @@
   .sidebar-rail-toggle {
     display: none;
   }
+
+  .sidebar .tenant-card {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 5px 8px;
+    display: grid;
+  }
+
+  .sidebar .tenant-avatar,
+  .sidebar .tenant-identity small,
+  .sidebar .tenant-role {
+    display: none;
+  }
+
+  .sidebar .sidebar-signout {
+    width: auto;
+    min-height: 36px;
+    padding: 0 8px;
+    display: flex;
+    gap: 6px;
+  }
+
+  .sidebar .sidebar-signout > span {
+    clip: auto;
+    width: auto;
+    height: auto;
+    position: static;
+    overflow: visible;
+  }
 }
 
 /* ---- Buying steps ---------------------------------------------------------

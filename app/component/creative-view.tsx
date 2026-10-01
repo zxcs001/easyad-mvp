@@ -1,23 +1,25 @@
 "use client";
 
 import "./creative-view.css";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { Booking, Creative, FormatKey, InventoryItem, formats } from "../data";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Booking, Creative, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";
 import { creativeTemplateExamples, creativeTemplateTopics, defaultCreativeHtml, type CreativeTemplateTopic } from "../creative-templates";
-import { capitalize, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, validateCreative } from "../utils";
+import { capitalize, creativeDraftForFormat, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, validateCreative } from "../utils";
 import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 import LocalDateTime from "./local-date-time";
+import { isStaticInventory } from "../lib/inventory-delivery";
 
 export default function CreativeView({
-  draft,
+  draft: inputDraft,
   setDraft,
   bookings,
   inventory,
   creatives,
   onSubmit,
+  onCancel,
   canSubmit,
   selectedBookingId,
   setSelectedBookingId,
@@ -29,29 +31,86 @@ export default function CreativeView({
   inventory: InventoryItem[];
   creatives: Creative[];
   onSubmit: (bookingId: string, source: Creative["source"], file?: File | null) => Promise<boolean>;
+  onCancel?: (bookingId: string) => Promise<boolean>;
   canSubmit: boolean;
   selectedBookingId: string;
   setSelectedBookingId: (id: string) => void;
   lockBookingSelection?: boolean;
 }) {
-  const { formatDate, t } = useI18n();
-  const [sourceMode, setSourceMode] = useState<Creative["source"]>("template");
+  const { t } = useI18n();
+  const [preferredSource, setSourceMode] = useState<Creative["source"]>("template");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const eligibleBookings = bookings.filter((booking) => isCreativeSubmissionAllowed(booking));
+  const creativeBookings = bookings.filter((booking) => !["cancelled", "rejected"].includes(booking.status) && (booking.creativeStatus !== "approved" || booking.status === "creative review"));
+  const selectedBooking = selectedBookingId ? eligibleBookings.find((booking) => booking.id === selectedBookingId) : eligibleBookings[0];
+  const cancellationBookingId = selectedBooking?.id ?? selectedBookingId;
+  const selectedInventory = inventory.find((item) => item.id === selectedBooking?.inventoryId);
+  const requiresUpload = selectedInventory ? isStaticInventory(selectedInventory) : inputDraft.format === "static";
+  const sourceMode = requiresUpload ? "upload" : preferredSource;
+  const draft = selectedInventory ? creativeDraftForFormat(inputDraft, selectedInventory.format) : inputDraft;
   const templateHtml = draft.htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template];
   const previewKey = `${draft.template}\u0000${templateHtml}`;
   const [htmlPreview, setHtmlPreview] = useState<{ key: string; document: string } | null>(null);
   const [examplePreviews, setExamplePreviews] = useState<Partial<Record<CreativeTemplateTopic, string>>>({});
   const [htmlError, setHtmlError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<{ bookingId: string; message: string } | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+  const actionPendingRef = useRef(false);
   const spec = formats[draft.format];
-  const validations = validateCreative(sourceMode === "template" ? { ...draft, fileType: "html", fileSize: 1 } : draft);
+  const allowedUploadTypes = requiresUpload ? ["png", "jpg", "pdf"] : ["png", "jpg", "gif", "mp4"];
+  const detectedFileType = uploadFile ? fileTypeFromUpload(uploadFile) : null;
+  const uploadFileType = detectedFileType && allowedUploadTypes.includes(detectedFileType) ? detectedFileType : null;
+  const validations = validateCreative(sourceMode === "template" ? { ...draft, fileType: "html", fileSize: 1 } : {
+    ...draft,
+    fileType: uploadFileType ?? draft.fileType,
+    fileSize: uploadFile ? Math.max(1, Math.ceil(uploadFile.size / 1048576)) : draft.fileSize,
+  });
   const ready = validations.every((check) => check.ok);
-  const uploadFileType = uploadFile ? fileTypeFromUpload(uploadFile) : null;
   const canSubmitCurrentMode = ready && (sourceMode === "template" ? htmlPreview?.key === previewKey : Boolean(uploadFile && uploadFileType));
-  const eligibleBookings = bookings.filter((booking) => isCreativeSubmissionAllowed(booking));
-  const creativeBookings = bookings.filter((booking) => booking.creativeStatus !== "approved" || booking.status === "creative review");
-  const selectedBooking = eligibleBookings.find((booking) => booking.id === selectedBookingId) ?? eligibleBookings[0];
   const submittedCreative = selectedBooking ? creatives.find((creative) => creative.bookingId === selectedBooking.id) : undefined;
+
+  useEffect(() => {
+    if (selectedInventory) setDraft((current) => creativeDraftForFormat(current, selectedInventory.format));
+  }, [selectedInventory?.format, setDraft]);
+
+  async function submitCurrentCreative() {
+    if (!selectedBooking || actionPendingRef.current) return false;
+    actionPendingRef.current = true;
+    setActionPending(true);
+    setSubmissionError(null);
+    try {
+      const result = await onSubmit(selectedBooking.id, sourceMode, uploadFile);
+      if (!result) throw new Error("The creative submission was not confirmed. Please retry.");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The creative submission was not confirmed. Please retry.";
+      setSubmissionError({ bookingId: selectedBooking.id, message });
+      throw new Error(message);
+    } finally {
+      actionPendingRef.current = false;
+      setActionPending(false);
+    }
+  }
+
+  async function cancelCurrentCreative() {
+    if (!onCancel || actionPendingRef.current) return false;
+    actionPendingRef.current = true;
+    setActionPending(true);
+    setSubmissionError(null);
+    try {
+      const result = await onCancel(cancellationBookingId);
+      if (!result) throw new Error("Could not cancel this campaign. Your campaign is still here; please retry.");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not cancel this campaign. Your campaign is still here; please retry.";
+      setSubmissionError({ bookingId: cancellationBookingId, message });
+      throw new Error(message);
+    } finally {
+      actionPendingRef.current = false;
+      setActionPending(false);
+    }
+  }
 
   useEffect(() => {
     if (!uploadFile) {
@@ -101,14 +160,17 @@ export default function CreativeView({
   }, [sourceMode]);
 
   if (!selectedBooking) {
+    const unavailableCampaign = bookings.some((booking) => booking.id === selectedBookingId);
     return (
       <section className="panel">
-        <PanelHeading eyebrow="Your ad" title="Book a screen first" />
+        <PanelHeading eyebrow="Your ad" title={unavailableCampaign ? "Creative submission unavailable" : "Book a screen first"} />
         <EmptyState
-          title="You need a booking before you can add an ad"
-          copy="Pick a screen and your dates first. Your ad picture is attached to that booking, and the screen owner checks it before it goes live."
-          action={<a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a>}
+          title={unavailableCampaign ? "This campaign is not accepting artwork" : "You need a booking before you can add an ad"}
+          copy={unavailableCampaign ? "This campaign has ended or is no longer awaiting artwork. Check its status in Your campaigns." : "Pick a screen and your dates first. Your ad picture is attached to that booking, and the screen owner checks it before it goes live."}
+          action={<a className="primary-button" href={unavailableCampaign ? "/?role=advertiser&view=campaigns" : "/?role=advertiser&view=discover"}>{t(unavailableCampaign ? "Your campaigns" : "Find screens near you")}</a>}
         />
+        {onCancel ? <AsyncButton className="secondary-button" disabled={actionPending} onClick={cancelCurrentCreative} successMessage={lockBookingSelection ? "Campaign cancelled." : undefined}>{lockBookingSelection ? "Cancel campaign" : "Cancel editing"}</AsyncButton> : null}
+        {submissionError ? <p className="form-error" role="alert">{t(submissionError.message)}</p> : null}
       </section>
     );
   }
@@ -117,10 +179,10 @@ export default function CreativeView({
     <section className="grid creative-grid">
       <div className="panel">
         <PanelHeading eyebrow="Creative source" title={sourceMode === "template" ? "Fixed template" : "Upload media"} />
-        <div className="creative-source-tabs" role="tablist" aria-label={t("Creative source")}>
+        {requiresUpload ? <p className="helper-text">{t("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.")}</p> : <div className="creative-source-tabs" role="tablist" aria-label={t("Creative source")}>
           <button type="button" className={sourceMode === "template" ? "active" : ""} onClick={() => setSourceMode("template")}>{t("Fixed template")}</button>
           <button type="button" className={sourceMode === "upload" ? "active" : ""} onClick={() => setSourceMode("upload")}>{t("Upload media")}</button>
-        </div>
+        </div>}
         {sourceMode === "template" ? (
           <>
             <div className="template-gallery-heading">
@@ -152,7 +214,7 @@ export default function CreativeView({
               {htmlPreview?.key === previewKey ? <iframe title={t("Template preview")} sandbox="" referrerPolicy="no-referrer" srcDoc={htmlPreview.document} /> : <span>{t("Preparing safe preview…")}</span>}
             </div>
             <label className="creative-html-editor">{t("Template HTML")}
-              <textarea className="resize-none" value={templateHtml} maxLength={16384} rows={10} spellCheck={false} onChange={(event) => {
+              <textarea value={templateHtml} maxLength={16384} rows={20} spellCheck={false} onChange={(event) => {
                 const html = event.target.value;
                 setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: html } }));
               }} />
@@ -166,8 +228,9 @@ export default function CreativeView({
         ) : (
           <div className="upload-creative-panel">
             <label className="upload-dropzone">
-              <span>{t("Image or video creative")}</span>
-              <input type="file" accept="image/png,image/jpeg,image/gif,video/mp4" onChange={(event) => {
+              <span>{t(requiresUpload ? "Billboard artwork" : "Image or video creative")}</span>
+              <input type="file" accept={requiresUpload ? "image/png,image/jpeg,application/pdf" : "image/png,image/jpeg,image/gif,video/mp4"} onChange={(event) => {
+                setSubmissionError(null);
                 const file = event.target.files?.[0] ?? null;
                 setUploadFile(file);
                 if (!file) return;
@@ -182,7 +245,8 @@ export default function CreativeView({
             <div className="upload-preview" style={{ aspectRatio: spec.ratio }}>
               {uploadPreviewUrl && uploadFile?.type.startsWith("image/") ? <img src={uploadPreviewUrl} alt={t("Uploaded creative preview")} /> : null}
               {uploadPreviewUrl && uploadFile?.type.startsWith("video/") ? <video src={uploadPreviewUrl} controls muted /> : null}
-              {!uploadPreviewUrl ? <span>{t("Select a PNG, JPG, GIF, or MP4 file")}</span> : null}
+              {uploadPreviewUrl && uploadFileType === "pdf" ? <span>{t("PDF artwork selected. Open the file to check the print layout.")}</span> : null}
+              {!uploadPreviewUrl ? <span>{t(requiresUpload ? "Select a PNG, JPG, or PDF file" : "Select a PNG, JPG, GIF, or MP4 file")}</span> : null}
             </div>
             {uploadFile ? (
               <div className={`upload-summary ${uploadFileType ? "" : "bad"}`}>
@@ -198,17 +262,17 @@ export default function CreativeView({
         <div className="creative-form">
           <label className="field-block">
             {t("Campaign")}
-            <select className="select" value={selectedBooking.id} disabled={lockBookingSelection} aria-label={t("Campaign")} aria-describedby={lockBookingSelection ? "creation-campaign-help" : undefined} onChange={(event) => setSelectedBookingId(event.target.value)}>
+            <select className="select" value={selectedBooking.id} disabled={lockBookingSelection || actionPending} aria-label={t("Campaign")} aria-describedby={lockBookingSelection ? "creation-campaign-help" : undefined} onChange={(event) => setSelectedBookingId(event.target.value)}>
               {eligibleBookings.map((booking) => <option key={booking.id} value={booking.id}>{booking.campaign} - {booking.advertiser}</option>)}
             </select>
             {lockBookingSelection ? <small id="creation-campaign-help">{t("This campaign was created in the previous step.")}</small> : null}
           </label>
           <div className="form-grid compact">
-            <label>{t("Format")}<select className="select" value={draft.format} onChange={(event) => setCreativeFormat(event.target.value as FormatKey, setDraft)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>
-            <label>{t("Width")}<input type="number" value={draft.width} onChange={(event) => setDraft((current) => ({ ...current, width: Number(event.target.value) }))} /></label>
-            <label>{t("Height")}<input type="number" value={draft.height} onChange={(event) => setDraft((current) => ({ ...current, height: Number(event.target.value) }))} /></label>
-            {sourceMode === "template" ? <label>{t("File type")}<input value="HTML" readOnly /></label> : <label>{t("File type")}<select className="select" value={draft.fileType} onChange={(event) => setDraft((current) => ({ ...current, fileType: event.target.value as CreativeDraft["fileType"] }))}>{["png", "jpg", "gif", "pdf", "mp4"].map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select></label>}
-            {sourceMode === "upload" ? <Range label={t("File size: {count} MB", { count: draft.fileSize })} min={1} max={600} value={draft.fileSize} onChange={(fileSize) => setDraft((current) => ({ ...current, fileSize }))} /> : null}
+            <label>{t("Format")}<input value={t(spec.label)} readOnly /></label>
+            <label>{t("Width")}<input type="number" value={draft.width} readOnly /></label>
+            <label>{t("Height")}<input type="number" value={draft.height} readOnly /></label>
+            <label>{t("File type")}<input value={sourceMode === "template" ? "HTML" : uploadFileType?.toUpperCase() ?? t(uploadFile ? "Unsupported file type" : "No file selected")} readOnly /></label>
+            {sourceMode === "upload" ? <label>{t("File size")}<input value={uploadFile ? `${Math.max(1, Math.ceil(uploadFile.size / 1048576))} MB` : t("No file selected")} readOnly /></label> : null}
             <Range label={t("Safe zone: {count}%", { count: draft.safeZone })} min={0} max={18} value={draft.safeZone} onChange={(safeZone) => setDraft((current) => ({ ...current, safeZone }))} />
             <Range label={t("Distortion: {count}%", { count: draft.distortion })} min={0} max={12} value={draft.distortion} onChange={(distortion) => setDraft((current) => ({ ...current, distortion }))} />
           </div>
@@ -222,8 +286,13 @@ export default function CreativeView({
               {submittedCreative.publicUrl ? <a href={submittedCreative.publicUrl} target="_blank" rel="noreferrer">{t("Open uploaded media")}</a> : null}
             </div>
           ) : null}
+          {sourceMode === "upload" && !uploadFile ? <p className="helper-text">{t("Choose a media file before submitting your creative.")}</p> : null}
+          {submissionError?.bookingId === selectedBooking.id ? <p className="form-error" role="alert" style={{ whiteSpace: "pre-line" }}>{t(submissionError.message)}</p> : null}
           <div className="button-row">
-            <AsyncButton className="primary-button" disabled={!canSubmitCurrentMode || !canSubmit} onClick={() => onSubmit(selectedBooking.id, sourceMode, uploadFile)} successMessage="Creative submitted for review." errorMessage="Creative submission failed. Please check the requirements and try again.">
+            {onCancel ? <AsyncButton className="secondary-button" disabled={actionPending} onClick={cancelCurrentCreative} successMessage={lockBookingSelection ? "Campaign cancelled." : undefined}>
+              {lockBookingSelection ? "Cancel campaign" : "Cancel editing"}
+            </AsyncButton> : null}
+            <AsyncButton className="primary-button" disabled={actionPending || !canSubmitCurrentMode || !canSubmit} onClick={submitCurrentCreative} successMessage="Creative submitted for review.">
               {canSubmit ? (sourceMode === "template" ? "Submit template for review" : "Submit upload for review") : "Sign in as advertiser to submit"}
             </AsyncButton>
           </div>
@@ -237,16 +306,12 @@ export default function CreativeView({
   );
 }
 
-function setCreativeFormat(format: FormatKey, setDraft: Dispatch<SetStateAction<CreativeDraft>>) {
-  const defaults: Record<FormatKey, [number, number]> = { digital: [1920, 1080], static: [5760, 1440], transit: [3000, 1000] };
-  setDraft((current) => ({ ...current, format, width: defaults[format][0], height: defaults[format][1] }));
-}
-
 function fileTypeFromUpload(file: File): Creative["fileType"] | null {
   const name = file.name.toLowerCase();
   if (file.type === "image/png" || name.endsWith(".png")) return "png";
   if (file.type === "image/jpeg" || name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
   if (file.type === "image/gif" || name.endsWith(".gif")) return "gif";
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (file.type === "video/mp4" || name.endsWith(".mp4")) return "mp4";
   return null;
 }

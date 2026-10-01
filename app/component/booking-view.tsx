@@ -4,12 +4,12 @@ import "./booking-view.css";
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, InventoryItem } from "../data";
 import type { BookingDraft } from "../types";
-import { availableLoopSeconds, bookedLoopSeconds, capitalize, daysBetween, estimateSpend, money, overlaps, reservedLoopSeconds } from "../utils";
+import { availableLoopSeconds, bookedLoopSeconds, capitalize, daysBetween, estimateSpend, money, overlaps, reservedLoopSeconds, toDate } from "../utils";
 import { BookingsTable, Metric, PanelHeading } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
-import { isInventoryAvailableForDates } from "../lib/inventory-availability";
+import { isInventoryAvailableForDates, isValidAvailabilityDate } from "../lib/inventory-availability";
 
 export default function BookingView({ item, inventory, draft, bookings, setDraft, hasCapacityConflict, onSubmit, onCancel, canBuy, advertiserNameFixed = false, allowCreativeUpload = true }: {
   // An advertiser's booking always carries the account name (the server sets
@@ -41,13 +41,17 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
   const requestedSeconds = reservedLoopSeconds(item, draft.adSlots);
   const remainingSeconds = availableLoopSeconds(item, bookings, draft.start, draft.end);
   const showsLoopCapacity = isDigital;
-  const bookingDetailsReady = Boolean(draft.campaign.trim() && draft.start && draft.end && draft.start <= draft.end);
+  const today = toDate(new Date());
+  const pastDates = isValidAvailabilityDate(draft.start) && draft.start < today;
+  const bookingDetailsReady = Boolean(draft.campaign.trim() && isValidAvailabilityDate(draft.start) && isValidAvailabilityDate(draft.end) && draft.start <= draft.end && !pastDates);
 
   // The submit button has three independent blocking conditions. Before this,
   // only one of them changed the label, so the other two left a grey button and
   // no explanation. Every blocked state now names itself and says what to do.
   const blockedReason = !canBuy
     ? "Sign in with an advertiser account to book this screen."
+    : pastDates
+      ? "Choose a start date today or later. Campaigns cannot start in the past."
     : blocked
       ? isStatic
         ? "This billboard is already taken for these dates. Pick different dates."
@@ -91,7 +95,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
           {((advertiserNameFixed ? ["campaign", "start", "end"] : ["advertiser", "campaign", "start", "end"]) as (keyof BookingDraft)[]).map((key) => (
             <label key={key}>
               {t(capitalize(key === "start" ? "Start date" : key === "end" ? "End date" : key))}
-              <input type={key === "start" || key === "end" ? "date" : "text"} value={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
+              <input type={key === "start" || key === "end" ? "date" : "text"} min={key === "start" ? today : key === "end" ? draft.start || today : undefined} value={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
             </label>
           ))}
         </div>
@@ -147,7 +151,7 @@ export default function BookingView({ item, inventory, draft, bookings, setDraft
       <div className="panel">
         <PanelHeading eyebrow={isStatic ? "Placement availability" : "What else is booked"} title="Dates already taken" />
         <div className="timeline large">
-          {bookings.filter((booking) => booking.inventoryId === item.id).map((booking) => (
+          {bookings.filter((booking) => booking.inventoryId === item.id && !["cancelled", "rejected"].includes(booking.status)).map((booking) => (
             <div key={booking.id} className={overlaps(draft.start, draft.end, booking.start, booking.end) ? "warning" : ""}>
               <span>{booking.start} {t("to")} {booking.end}</span>
               <strong>{booking.campaign}</strong>

@@ -125,13 +125,13 @@ export function WeatherPanel({ city, seed, compact = false }: { city: string; se
       <div className="weather-compact">
         <span className="weather-compact-icon"><WeatherIcon condition={forecast.current} size={34} /></span>
         <strong>{forecast.temp}&deg;</strong>
-        <span>{t(forecast.currentLabel)}</span>
+        <span>{t("Sample weather")} · {t(forecast.currentLabel)}</span>
       </div>
     );
   }
   return (
     <div className="weather-panel">
-      <span className="device-widget-eyebrow">{t("Local weather")}</span>
+      <span className="device-widget-eyebrow">{t("Sample weather")}</span>
       <div className="weather-now">
         <WeatherIcon condition={forecast.current} size={64} />
         <div>
@@ -145,8 +145,8 @@ export function WeatherPanel({ city, seed, compact = false }: { city: string; se
         <span>{t("Wind {count} km/h", { count: forecast.wind })}</span>
       </div>
       <div className="weather-forecast">
-        {forecast.days.map((day) => (
-          <div className="weather-day" key={day.label}>
+        {forecast.days.map((day, offset) => (
+          <div className="weather-day" key={offset}>
             <span>{t(day.label)}</span>
             <WeatherIcon condition={day.condition} size={30} />
             <strong>{day.hi}&deg;</strong>
@@ -154,7 +154,7 @@ export function WeatherPanel({ city, seed, compact = false }: { city: string; se
           </div>
         ))}
       </div>
-      <span className="device-widget-source">{city} &middot; {t("updated continuously")}</span>
+      <span className="device-widget-source">{city} &middot; {t("Sample data — not a live forecast")}</span>
     </div>
   );
 }

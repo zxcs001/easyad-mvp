@@ -24,6 +24,7 @@ import {
   PanelsTopLeft,
   Search,
   ShieldCheck,
+  ShieldAlert,
   Users,
 } from "lucide-react";
 import { Booking, InventoryItem, Role, View } from "../data";
@@ -65,6 +66,7 @@ const roleNav: Record<Role, NavItem[]> = {
   institutional: [
     { view: "portal", label: "Portal", icon: Globe2, group: "Workspace" },
     { view: "network", label: "Network control", icon: Map, group: "Workspace" },
+    { view: "emergency", label: "Emergency updates", icon: ShieldAlert, group: "Operations" },
     { view: "inventory", label: "Inventory", icon: PanelsTopLeft, group: "Workspace" },
     { view: "resources", label: "Content", icon: Images, group: "Workspace" },
     { view: "calendar", label: "Schedule", icon: CalendarDays, group: "Operations" },
@@ -77,6 +79,7 @@ const roleNav: Record<Role, NavItem[]> = {
     { view: "portal", label: "Portal", icon: Globe2, group: "Workspace" },
     { view: "discover", label: "Marketplace", icon: Map, group: "Workspace" },
     { view: "network", label: "Screen control", icon: MonitorUp, group: "Workspace" },
+    { view: "emergency", label: "Emergency updates", icon: ShieldAlert, group: "Operations" },
     { view: "campaigns", label: "Campaigns", icon: Megaphone, group: "Operations" },
     { view: "resources", label: "Content", icon: Images, group: "Operations" },
     { view: "inventory", label: "Inventory", icon: Building2, group: "Operations" },
@@ -90,6 +93,7 @@ const roleNav: Record<Role, NavItem[]> = {
 const viewTitles: Record<View, { title: string; eyebrow: string }> = {
   portal: { title: "Outdoor campaign buying portal", eyebrow: "Marketplace" },
   network: { title: "Public screen network control", eyebrow: "Institution workspace" },
+  emergency: { title: "Emergency updates", eyebrow: "Public safety" },
   discover: { title: "Map-based inventory search", eyebrow: "Plan a campaign" },
   booking: { title: "Booking request", eyebrow: "Reserve media" },
   campaigns: { title: "Campaign spaces", eyebrow: "Manage campaigns" },
@@ -157,6 +161,7 @@ function BuyingSteps({ view }: { view: View }) {
 const groups: NavItem["group"][] = ["Workspace", "Operations", "Insights"];
 const governmentNav: NavItem[] = [
   { view: "network", label: "Command centre", icon: Map, group: "Workspace" },
+  { view: "emergency", label: "Emergency updates", icon: ShieldAlert, group: "Operations" },
   { view: "inventory", label: "Screens", icon: PanelsTopLeft, group: "Workspace" },
   { view: "resources", label: "Media library", icon: Images, group: "Workspace" },
   { view: "calendar", label: "Schedule", icon: CalendarDays, group: "Operations" },
@@ -372,7 +377,7 @@ function WorkspaceSwitcher({ role, options, onSelect, disabled = false }: { role
 export function Topbar({ view, visibleCount, inventory, bookings, role, surface = "marketplace", campaignCreationLocked = false }: { view: View; visibleCount: number; inventory: InventoryItem[]; bookings: Booking[]; role?: Role; surface?: AppSurface; campaignCreationLocked?: boolean }) {
   const { locale, t } = useI18n();
   const averageOccupancy = inventory.length ? Math.round(inventory.reduce((sum, item) => sum + item.occupancy, 0) / inventory.length) : 0;
-  const bookedValue = bookings.reduce((sum, booking) => sum + booking.spend, 0);
+  const bookedValue = bookings.filter((booking) => booking.status !== "cancelled").reduce((sum, booking) => sum + booking.spend, 0);
   const isGovernment = surface === "government";
   const isAdvertiser = role === "advertiser" && !isGovernment;
   const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
@@ -382,10 +387,10 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, surface 
       <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
       <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
       {showSteps ? <BuyingSteps view={view} /> : null}
-      {campaignCreationLocked ? <p className="campaign-flow-lock">{t(view === "booking" ? "Finish creating this campaign, or cancel to return to screen selection." : "Submit your ad for review to finish creating this campaign.")}</p> : null}
+      {campaignCreationLocked ? <p className="campaign-flow-lock">{t(view === "booking" ? "Finish creating this campaign, or cancel to return to screen selection." : "Submit your ad for review, or cancel this campaign to return to screen selection.")}</p> : null}
     </div>
   );
-  const metrics = view !== "network" ? (
+  const metrics = view !== "network" && view !== "emergency" ? (
     <div className="metrics" aria-label={t("Workspace summary")}>
       <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
       {/* Occupancy is a yield metric for the person selling the screen. It

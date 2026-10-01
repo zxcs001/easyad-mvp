@@ -66,3 +66,9 @@ test("static campaign spaces omit playback metrics and the public inventory link
   expect(screen.queryByRole("link", { name: "Inventory" })).not.toBeInTheDocument();
   expect(screen.queryByText(/s of 120s/)).not.toBeInTheDocument();
 });
+
+test("cancelled campaigns are removed from active campaign spaces", () => {
+  render(<CampaignSpacesView bookings={[{ ...booking, status: "cancelled" }]} inventory={inventory} onOpenCreative={vi.fn()} />);
+  expect(screen.queryByText(booking.campaign)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+});

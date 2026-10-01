@@ -17,14 +17,19 @@ import { toDate } from "../utils";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import PlayerControl from "./player-control";
 import ScreenSettingsDialog, { type ScreenSettings } from "./screen-settings-dialog";
+import type { EmergencyTargeting } from "../lib/emergency-updates";
+import EmergencyPhotoInput, { useEmergencyPhoto } from "./emergency-photo-input";
 
 export type EmergencyOverrideDraft = {
+  imageFile?: File | null;
   alertType: DeviceAlertType;
   title: string;
   message: string;
   area: string;
   targetDeviceIds: string[];
   expiresAt: string;
+  targeting?: EmergencyTargeting;
+  reviewedTargetDeviceIds?: string[];
 };
 
 type MutationResult<T> = { value?: T; error?: string };
@@ -78,7 +83,7 @@ export default function InstitutionNetworkView({
   const emergencyScopeDevices = useMemo(() => isSuperAdmin
     ? inventory.filter((device) => Boolean(selected?.institutionId) && device.institutionId === selected?.institutionId)
     : inventory, [inventory, isSuperAdmin, selected?.institutionId]);
-  const publishedAlertTargets = emergencyScopeDevices.filter((device) => device.approvalStatus === "approved");
+  const publishedAlertTargets = emergencyScopeDevices.filter((device) => device.approvalStatus === "approved" && isDigitalInventory(device));
   const alertClock = useExpiringClock(alerts.filter((alert) => alert.status === "active").map((alert) => alert.expiresAt));
   const activeAlerts = alerts.filter((alert) => alert.status === "active" && Date.parse(alert.expiresAt) > alertClock);
   const selectedAlert = selected ? activeAlerts.find((alert) => alert.targetDeviceIds.includes(selected.id)) ?? null : null;
@@ -156,7 +161,7 @@ export default function InstitutionNetworkView({
         <div className="panel network-map-panel">
           <PanelHeading eyebrow={isSuperAdmin ? "All institution fleets" : "Institution-owned fleet"} title="Device map" action={<span className="status good">{t("{count} scoped", { count: inventory.length })}</span>} />
           <div className="network-map-stage">
-            <MapLibreInventoryMap inventory={inventory} visibleInventory={filteredInventory} selectedInventoryId={selected.id} selectedLocation={mapCenter} radius={30} showCompetitors={false} followSelectedLocation={false} onSelect={onSelect} />
+            <MapLibreInventoryMap inventory={inventory} visibleInventory={filteredInventory} selectedInventoryId={selected.id} selectedLocation={mapCenter} radius={30} followSelectedLocation={false} onSelect={onSelect} />
           </div>
           <div className="network-search">
             <label>{t("Find a screen")}<input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search name, location or screen ID")} /></label>
@@ -272,6 +277,7 @@ function ContentUploadDialog({ open, screenName, isScreenPublished, onClose, onU
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const fileInput = event.currentTarget.elements.namedItem("file") as HTMLInputElement | null;
     const file = fileInput?.files?.[0];
     if (!file) {
@@ -296,8 +302,8 @@ function ContentUploadDialog({ open, screenName, isScreenPublished, onClose, onU
     <AppDialog dismissible={!busy} initialFocusRef={titleRef} open={open} title={t(isScreenPublished ? "Publish screen content" : "Add approved screen content")} description={t(isScreenPublished ? "Upload an image or video to {name}. Institution content publishes immediately without an approval queue." : "Upload an image or video to {name}. It is approved immediately and will enter rotation when the screen is published.", { name: screenName })} onClose={onClose}>
       <form className="network-upload-form" noValidate onSubmit={submit}>
         <div className="network-direct-publish-note" role="note"><Radio aria-hidden="true" /><span><strong>{t("No approval required")}</strong><small>{t(isScreenPublished ? "This content joins the live screen rotation after upload completes." : "This content is ready immediately, but the screen remains unpublished.")}</small></span></div>
-        <label>{t("Content title")}<input maxLength={120} placeholder={t("Community event poster")} ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-        <label>{t("Image or video")}<input accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" name="file" type="file" /></label>
+        <label>{t("Content title")}<input disabled={busy} maxLength={120} placeholder={t("Community event poster")} ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+        <label>{t("Image or video")}<input disabled={busy} accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" name="file" type="file" onChange={() => setError("")} /></label>
         <p className="network-upload-help">{t("PNG, JPEG, WebP, MP4, or WebM · Maximum 50 MB")}</p>
         {error ? <p className="dialog-error" role="alert">{t(error)}</p> : null}
         <div className="dialog-actions"><button className="secondary-button" disabled={busy} onClick={onClose} type="button">{t("Cancel")}</button><button className="primary-button" disabled={busy} type="submit">{t(busy ? "Publishing…" : isScreenPublished ? "Publish content" : "Add approved content")}</button></div>
@@ -328,7 +334,8 @@ function PublishStateDialog({ open, busy, error, isPublished, screenName, onClos
 
 function EmergencyOverrideDialog({ open, busy, devices, selectedDeviceId, institutionName, isSuperAdmin, onClose, onPublish }: { open: boolean; busy: boolean; devices: InventoryItem[]; selectedDeviceId: string; institutionName: string; isSuperAdmin: boolean; onClose: () => void; onPublish: (draft: EmergencyOverrideDraft) => Promise<string> }) {
   const { t } = useI18n();
-  const published = useMemo(() => devices.filter((device) => device.approvalStatus === "approved"), [devices]);
+  const photo = useEmergencyPhoto();
+  const published = useMemo(() => devices.filter((device) => device.approvalStatus === "approved" && isDigitalInventory(device)), [devices]);
   const titleRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => emptyAlertDraft(selectedDeviceId, published));
   const [duration, setDuration] = useState(60);
@@ -341,10 +348,11 @@ function EmergencyOverrideDialog({ open, busy, devices, selectedDeviceId, instit
     wasOpen.current = open;
     if (!opening) return;
     setDraft(emptyAlertDraft(selectedDeviceId, published));
+    photo.setFile(null);
     setDuration(60);
     setAuthorized(false);
     setError("");
-  }, [open, published, selectedDeviceId]);
+  }, [open, published, selectedDeviceId, photo.setFile]);
 
   function toggleTarget(id: string) {
     setDraft((current) => ({ ...current, targetDeviceIds: current.targetDeviceIds.includes(id) ? current.targetDeviceIds.filter((entry) => entry !== id) : [...current.targetDeviceIds, id] }));
@@ -358,7 +366,8 @@ function EmergencyOverrideDialog({ open, busy, devices, selectedDeviceId, instit
       return;
     }
     setError("");
-    const result = await onPublish({ ...draft, title: draft.title.trim(), message: draft.message.trim(), area: draft.area.trim(), expiresAt: new Date(Date.now() + duration * 60_000).toISOString() });
+    if (!photo.ready || photo.error || busy) return;
+    const result = await onPublish({ ...draft, imageFile: photo.file, title: draft.title.trim(), message: draft.message.trim(), area: draft.area.trim(), expiresAt: new Date(Date.now() + duration * 60_000).toISOString() });
     if (result) setError(result);
   }
 
@@ -367,16 +376,17 @@ function EmergencyOverrideDialog({ open, busy, devices, selectedDeviceId, instit
       <form className="emergency-compose-form" noValidate onSubmit={submit}>
         <div className="emergency-form-boundary"><ShieldAlert aria-hidden="true" /><p><strong>{t("Screen delivery only.")}</strong> {t(isSuperAdmin ? "Confirm the alert through the responsible agency's official process before using this override." : "Confirm the alert through your agency's official process before using this override.")}</p></div>
         <div className="emergency-form-grid">
-          <label>{t("Message type")}<select value={draft.alertType} onChange={(event) => setDraft((current) => ({ ...current, alertType: event.target.value as DeviceAlertType }))}><option value="public-safety">{t("Public safety")}</option><option value="evacuation">{t("Evacuation")}</option><option value="amber">{t("AMBER Alert")}</option></select></label>
+          <label>{t("Message type")}<select value={draft.alertType} onChange={(event) => setDraft((current) => ({ ...current, alertType: event.target.value as DeviceAlertType }))}><option value="public-safety">{t("Public safety")}</option><option value="weather">{t("Severe weather alert")}</option><option value="evacuation">{t("Evacuation")}</option><option value="amber">{t("AMBER Alert")}</option></select></label>
           <label>{t("Display duration")}<select value={duration} onChange={(event) => setDuration(Number(event.target.value))}><option value={30}>{t("30 minutes")}</option><option value={60}>{t("1 hour")}</option><option value={180}>{t("3 hours")}</option><option value={360}>{t("6 hours")}</option><option value={720}>{t("12 hours")}</option></select></label>
           <label className="span-2">{t("Alert headline")}<input aria-invalid={Boolean(error && !draft.title.trim())} maxLength={120} ref={titleRef} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={t("Short, specific headline")} /></label>
           <label className="span-2">{t("Area or location")}<input maxLength={160} value={draft.area} onChange={(event) => setDraft((current) => ({ ...current, area: event.target.value }))} placeholder={t("Affected neighbourhood, route, or municipality")} /></label>
           <label className="span-2">{t("Instructions")}<textarea className="resize-none" maxLength={600} rows={5} value={draft.message} onChange={(event) => setDraft((current) => ({ ...current, message: event.target.value }))} placeholder={t("State what happened and what people should do now.")} /></label>
         </div>
-        <fieldset className="emergency-targets"><legend>{t("Target published screens")}</legend><div className="emergency-target-toolbar"><span>{t("{selected} of {total} selected", { selected: draft.targetDeviceIds.length, total: published.length })}</span><button className="ghost-button" onClick={() => setDraft((current) => ({ ...current, targetDeviceIds: published.map((device) => device.id) }))} type="button">{t("Select all published")}</button></div><div className="emergency-target-list">{devices.map((device) => <label className={device.approvalStatus === "approved" ? "" : "disabled"} key={device.id}><input checked={draft.targetDeviceIds.includes(device.id)} disabled={device.approvalStatus !== "approved"} onChange={() => toggleTarget(device.id)} type="checkbox" /><span><strong>{device.name}</strong><small>{device.approvalStatus === "approved" ? device.address : t("Publish this screen before targeting it")}</small></span></label>)}</div></fieldset>
+        <EmergencyPhotoInput photo={photo} disabled={busy} onChange={() => { setAuthorized(false); setError(""); }} />
+        <fieldset className="emergency-targets"><legend>{t("Target published screens")}</legend><div className="emergency-target-toolbar"><span>{t("{selected} of {total} selected", { selected: draft.targetDeviceIds.length, total: published.length })}</span><button className="ghost-button" onClick={() => setDraft((current) => ({ ...current, targetDeviceIds: published.map((device) => device.id) }))} type="button">{t("Select all published")}</button></div><div className="emergency-target-list">{devices.filter(isDigitalInventory).map((device) => <label className={device.approvalStatus === "approved" ? "" : "disabled"} key={device.id}><input checked={draft.targetDeviceIds.includes(device.id)} disabled={device.approvalStatus !== "approved"} onChange={() => toggleTarget(device.id)} type="checkbox" /><span><strong>{device.name}</strong><small>{device.approvalStatus === "approved" ? device.address : t("Publish this screen before targeting it")}</small></span></label>)}</div></fieldset>
         <label className="emergency-authorization"><input checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} type="checkbox" /><span>{t(isSuperAdmin ? "I confirm that the responsible agency has authorized this exact message and target scope." : "I confirm that my agency has authorized this exact message and target scope.")}</span></label>
         {error ? <p className="dialog-error" role="alert">{t(error)}</p> : null}
-        <div className="dialog-actions"><button className="secondary-button" disabled={busy} onClick={onClose} type="button">{t("Cancel")}</button><button className="warning-button" disabled={busy || !authorized || !draft.targetDeviceIds.length} type="submit">{t(busy ? "Publishing…" : "Publish emergency override")}</button></div>
+        <div className="dialog-actions"><button className="secondary-button" disabled={busy} onClick={onClose} type="button">{t("Cancel")}</button><button className="warning-button" disabled={busy || !photo.ready || Boolean(photo.error) || !authorized || !draft.targetDeviceIds.length} type="submit">{t(busy ? "Publishing…" : "Publish emergency override")}</button></div>
       </form>
     </AppDialog>
   );

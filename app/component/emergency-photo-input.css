@@ -1,0 +1,6 @@
+.emergency-photo-input { display: grid; gap: 10px; min-width: 0; }
+.emergency-photo-input label { display: grid; gap: 7px; font-weight: 600; }
+.emergency-photo-input input { width: 100%; max-width: 100%; }
+.emergency-photo-input small { color: #526963; line-height: 1.5; }
+.emergency-photo-input img { max-width: 100%; width: 180px; max-height: 240px; object-fit: contain; border-radius: 8px; background: #edf2ef; }
+.emergency-photo-input button { justify-self: start; }

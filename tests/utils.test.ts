@@ -56,7 +56,7 @@ const validCreative: CreativeDraft = {
   width: 1920,
   height: 1080,
   fileType: "png",
-  fileSize: 84,
+  fileSize: 24,
   safeZone: 8,
   distortion: 1,
 };
@@ -189,7 +189,6 @@ test("URL helpers preserve dashboard intent in query strings", () => {
     audience: "Commuters",
     competitor: "Low",
     priceMax: 700,
-    showCompetitors: true,
     selectedTags: ["urban", "digital"],
   }, CURRENT_LOCATION_ID, "INV-1", { x: 12.345, y: 67.891 }, 8)}`);
 

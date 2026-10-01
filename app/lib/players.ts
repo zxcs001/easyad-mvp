@@ -15,7 +15,9 @@ export class PlayerError extends Error {
 }
 export function playersEnabled() { return process.env.FEATURE_PLAYER_CONTROL === "true"; }
 export function playerTiming(): PlayerTiming {
-    const pollMs = setting("PLAYER_POLL_MS", 10000, 1000, 60000);
+    // Every paired player remains responsive to emergency updates, even if an
+    // installation configured a slower ordinary-content interval.
+    const pollMs = setting("PLAYER_POLL_MS", 10000, 1000, 10000);
     const heartbeatMs = setting("PLAYER_HEARTBEAT_MS", 30000, 5000, 120000);
     return { pollMs, heartbeatMs, staleMs: Math.max(heartbeatMs * 3, setting("PLAYER_STALE_MS", 90000, 15000, 600000)) };
 }
@@ -161,7 +163,7 @@ async function manifestContent(inventoryId: string, client: PoolClient) {
         imageInterval: interval, template: resolveDeviceTemplate(undefined, inventory.displayTemplate),
         displayLanguage: inventory.displayLanguage ?? "en", activeAlert,
         loopSeconds: inventory.maxLoopSeconds,
-        slides: [...(media?.items ?? []).filter(item => {
+        slides: activeAlert ? [] : [...(media?.items ?? []).filter(item => {
                 if (item.source !== "advertiser")
                     return true;
                 const booking = legacy.rows.find(row => row.id === item.id);

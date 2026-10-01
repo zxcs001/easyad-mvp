@@ -23,6 +23,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const booking = await getBooking(id);
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  if (booking.status === "cancelled") return NextResponse.json({ error: "Cancelled campaigns cannot be charged." }, { status: 409 });
   const inventory = await getInventory(booking.inventoryId);
   if (!inventory || !canManageInventoryRecord(user, inventory)) return NextResponse.json({ error: "This campaign belongs to another institution" }, { status: 403 });
 
