@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import type { DeviceAlert, InventoryItem } from "../app/data";
 import InstitutionNetworkView from "../app/component/institution-network-view";
+import ScreenSettingsDialog from "../app/component/screen-settings-dialog";
 
 vi.mock("../app/component/maplibre-inventory-map", () => ({
   default: () => <div data-testid="institution-fleet-map">Fleet map</div>,
@@ -78,6 +79,73 @@ test("institution workspace combines the scoped fleet map with representative sc
   expect(screen.getByText("Screen delivery only")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Library Screen/ })).toHaveAttribute("aria-pressed", "false");
   expect(screen.getByRole("link", { name: "Open device view" })).toHaveAttribute("href", `/devices/${published.id}`);
+});
+
+test("screen search matches locations and clears without losing the selected screen", async () => {
+  const user = userEvent.setup();
+  renderWorkspace();
+  await user.type(screen.getByRole("searchbox", { name: "Find a screen" }), "Library Lane");
+  expect(screen.getByRole("button", { name: /Library Screen/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /City Hall Screen/ })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("City Hall Screen display preview")).toBeVisible();
+  await user.clear(screen.getByRole("searchbox"));
+  await user.type(screen.getByRole("searchbox"), "no such screen");
+  expect(screen.getByText("No matching screens. Clear the search to see your fleet.")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Clear search" }));
+  expect(screen.getByRole("searchbox")).toHaveFocus();
+  expect(screen.getByRole("button", { name: /City Hall Screen/ })).toBeVisible();
+});
+
+test("display settings save directly for the selected screen and preserve publishing state", async () => {
+  const user = userEvent.setup();
+  const onSaveSettings = vi.fn(async () => ({ value: unpublished }));
+  renderWorkspace({ inventory: [unpublished], selectedId: unpublished.id, onSaveSettings });
+  await user.click(screen.getByRole("button", { name: "Edit display settings" }));
+  const dialog = screen.getByRole("dialog", { name: "Edit display settings" });
+  await user.selectOptions(within(dialog).getByLabelText("Template"), "community");
+  await user.selectOptions(within(dialog).getByLabelText("Display language"), "fr");
+  await user.clear(within(dialog).getByLabelText("Image duration (seconds)"));
+  await user.type(within(dialog).getByLabelText("Image duration (seconds)"), "12");
+  await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(onSaveSettings).toHaveBeenCalledWith(unpublished.id, { displayTemplate: "community", displayLanguage: "fr", imageInterval: 12 }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("invalid display duration focuses the field; failed saves keep the draft for retry", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ value: published });
+  const onClose = vi.fn();
+  render(<ScreenSettingsDialog screen={published} onSave={onSave} onClose={onClose} />);
+  const duration = screen.getByLabelText("Image duration (seconds)");
+  await user.clear(duration);
+  await user.type(duration, "61");
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+  expect(duration).toHaveFocus();
+  expect(duration).toHaveAttribute("aria-invalid", "true");
+  expect(onSave).not.toHaveBeenCalled();
+  await user.clear(duration);
+  await user.type(duration, "10");
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Unable to save display settings");
+  expect(duration).toHaveValue(10);
+  expect(onClose).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
+test("closing edited display settings offers an explicit discard choice", async () => {
+  const user = userEvent.setup();
+  const onClose = vi.fn();
+  render(<ScreenSettingsDialog screen={published} onSave={vi.fn()} onClose={onClose} />);
+  await user.selectOptions(screen.getByLabelText("Display language"), "fr");
+  await user.keyboard("{Escape}");
+  expect(screen.getByText("Discard your unsaved display settings?")).toBeVisible();
+  expect(onClose).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Keep editing" }));
+  expect(screen.getByLabelText("Display language")).toHaveValue("fr");
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await user.click(screen.getByRole("button", { name: "Discard changes" }));
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 test("physical inventory never offers a standalone device view", () => {

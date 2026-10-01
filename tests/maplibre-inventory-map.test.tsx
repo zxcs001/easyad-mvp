@@ -124,4 +124,47 @@ describe("shared inventory map zoom behavior", () => {
     expect(container.querySelector(".fallback-radius")).not.toBeInTheDocument();
     expect(container.querySelector(".fallback-business")).not.toBeInTheDocument();
   });
+
+  test("a visible institution pin keeps its position when selected", async () => {
+    const second = { ...inventory[0], id: "INV-MAP-2", name: "Library Screen", x: 50.02, y: 50.02 };
+    const items = [inventory[0], second];
+    const onSelect = vi.fn();
+    const { rerender } = render(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={items[0].id} selectedLocation={items[0]} radius={30} showCompetitors={false} followSelectedLocation={false} onSelect={onSelect} />);
+    const pin = screen.getByRole("button", { name: "Library Screen, Digital Screen" });
+    const before = { left: pin.style.left, top: pin.style.top };
+    pin.focus();
+    fireEvent.click(pin);
+    expect(onSelect).toHaveBeenCalledWith(second.id);
+    rerender(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={second.id} selectedLocation={second} radius={30} showCompetitors={false} followSelectedLocation={false} onSelect={onSelect} />);
+    await waitFor(() => expect(pin).toHaveAttribute("aria-pressed", "true"));
+    expect({ left: pin.style.left, top: pin.style.top }).toEqual(before);
+    expect(pin).toHaveFocus();
+  });
+
+  test.each([false, true])("clicking an edge pin never pans the fallback map (follow location: %s)", async (followSelectedLocation) => {
+    const edge = { ...inventory[0], id: "INV-MAP-EDGE", name: "Edge Screen", x: 50.75 };
+    const items = [inventory[0], edge];
+    const onSelect = vi.fn();
+    const { rerender } = render(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={items[0].id} selectedLocation={items[0]} radius={30} showCompetitors={false} followSelectedLocation={followSelectedLocation} onSelect={onSelect} />);
+    const pin = screen.getByRole("button", { name: "Edge Screen, Digital Screen" });
+    const before = { left: pin.style.left, top: pin.style.top };
+    expect(parseFloat(before.left)).toBeGreaterThan(640);
+
+    fireEvent.click(pin);
+    expect(onSelect).toHaveBeenCalledWith(edge.id);
+    rerender(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={edge.id} selectedLocation={edge} radius={30} showCompetitors={false} followSelectedLocation={followSelectedLocation} onSelect={onSelect} />);
+
+    await waitFor(() => expect(pin).toHaveAttribute("aria-pressed", "true"));
+    expect({ left: pin.style.left, top: pin.style.top }).toEqual(before);
+  });
+
+  test("selecting an offscreen institution item brings its pin into the fallback viewport", async () => {
+    const far = { ...inventory[0], id: "INV-MAP-FAR", name: "Far Screen", x: 90, y: 90 };
+    const items = [inventory[0], far];
+    const { rerender } = render(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={items[0].id} selectedLocation={items[0]} radius={30} showCompetitors={false} followSelectedLocation={false} />);
+    const pin = screen.getByRole("button", { name: "Far Screen, Digital Screen" });
+    const before = pin.style.left;
+    rerender(<MapLibreInventoryMap inventory={items} visibleInventory={items} selectedInventoryId={far.id} selectedLocation={far} radius={30} showCompetitors={false} followSelectedLocation={false} />);
+    await waitFor(() => expect(pin.style.left).not.toBe(before));
+  });
 });

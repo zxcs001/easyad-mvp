@@ -27,8 +27,8 @@ export async function listCampaignSummaries(user: DbUser, options: { query?: str
   const pageSize = Math.min(50, Math.max(1, options.pageSize ?? 20));
   const page = Math.max(1, options.page ?? 1);
   const query = options.query?.trim() ?? "";
-  const params: unknown[] = [organizationIds, `%${query}%`, options.status?.trim() ?? ""];
-  const where = "campaigns.organization_id = ANY($1::text[]) AND ($2 = '%%' OR campaigns.name ILIKE $2 OR campaigns.geography ILIKE $2) AND ($3='' OR campaigns.status=$3)";
+  const params: unknown[] = [organizationIds, `%${query}%`, options.status?.trim() ?? "", user.role === "advertiser" ? user.id : ""];
+  const where = "campaigns.organization_id = ANY($1::text[]) AND ($2 = '%%' OR campaigns.name ILIKE $2 OR campaigns.geography ILIKE $2) AND ($3='' OR campaigns.status=$3) AND ($4::text='' OR campaigns.created_by=$4)";
   const sortColumn = options.sort === "name" ? "campaigns.name" : options.sort === "start" ? "campaigns.start_date" : "campaigns.updated_at";
   const direction = options.direction === "asc" ? "ASC" : "DESC";
   const totalResult = await getDb().query<{ count: string }>(`SELECT COUNT(*) count FROM campaigns WHERE ${where}`, params);
@@ -44,13 +44,13 @@ export async function listCampaignSummaries(user: DbUser, options: { query?: str
       OR (placements.delivery_mode='static' AND placements.status<>'live'))) blocker_count,
     COALESCE((SELECT SUM(l.amount) FROM quote_line_items l JOIN quotes q ON q.id=l.quote_id WHERE q.campaign_id=campaigns.id AND q.version=(SELECT MAX(version) FROM quotes WHERE campaign_id=campaigns.id)),0) estimated_total
     FROM campaigns LEFT JOIN placements ON placements.campaign_id=campaigns.id
-    WHERE ${where} GROUP BY campaigns.id ORDER BY ${sortColumn} ${direction},campaigns.id LIMIT $4 OFFSET $5`, [...params, pageSize, (page - 1) * pageSize]);
+    WHERE ${where} GROUP BY campaigns.id ORDER BY ${sortColumn} ${direction},campaigns.id LIMIT $5 OFFSET $6`, [...params, pageSize, (page - 1) * pageSize]);
   return { campaigns: result.rows.map(mapSummary), total: Number(totalResult.rows[0]?.count ?? 0), page, pageSize };
 }
 
 export async function getCampaignDetail(user: DbUser, id: string) {
   const orgs = await organizationIdsForUser(user);
-  const campaign = await getDb().query("SELECT * FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[])", [id, orgs]);
+  const campaign = await getDb().query("SELECT * FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[]) AND ($3::text='' OR created_by=$3)", [id, orgs, user.role === "advertiser" ? user.id : ""]);
   if (!campaign.rows[0]) return null;
   const placements = await getDb().query(`SELECT placements.*, inventory.name inventory_name, inventory.address
     FROM placements JOIN inventory ON inventory.id=placements.inventory_id WHERE campaign_id=$1 ORDER BY placements.created_at`, [id]);
@@ -65,7 +65,7 @@ export async function getCampaignDetail(user: DbUser, id: string) {
     LEFT JOIN production_jobs j ON j.placement_id=p.id
     LEFT JOIN installation_work_orders w ON w.placement_id=p.id AND w.work_type='install' WHERE p.campaign_id=$1`,[id]);
   const assets = await getDb().query(`SELECT a.id asset_id,v.id version_id,v.version,v.status,v.original_name FROM creative_assets a JOIN LATERAL (SELECT * FROM creative_versions WHERE asset_id=a.id ORDER BY version DESC LIMIT 1) v ON TRUE WHERE a.campaign_id=$1 ORDER BY a.created_at`,[id]);
-  const activity = await getDb().query("SELECT * FROM activity_events WHERE subject_type='campaign' AND subject_id=$1 ORDER BY created_at DESC LIMIT 100", [id]);
+  const activity = await getDb().query("SELECT id, actor_id, subject_type, subject_id, action, previous_state, next_state, created_at FROM activity_events WHERE subject_type='campaign' AND subject_id=$1 AND organization_id=$2 ORDER BY created_at DESC, id DESC LIMIT 20", [id, campaign.rows[0].organization_id]);
   return { campaign: campaign.rows[0], placements: placements.rows, quotes: quotes.rows.map(q=>({...q,lines:lines.rows.filter(l=>l.quote_id===q.id)})), readiness:readiness.rows, assets:assets.rows, activity: activity.rows };
 }
 
@@ -140,7 +140,7 @@ export async function createCampaignPlan(user: DbUser, input: {
 export async function transitionCampaign(user: DbUser, campaignId: string, input: { action: "operator_confirm"|"accept_offline"; expectedVersion: number; note?: string }) {
   const orgs = await organizationIdsForUser(user); const client = await getDb().connect();
   try { await client.query("BEGIN");
-    const found = await client.query<{organization_id:string;version:number;status:string}>("SELECT organization_id,version,status FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[]) FOR UPDATE",[campaignId,orgs]);
+    const found = await client.query<{organization_id:string;version:number;status:string}>("SELECT organization_id,version,status FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[]) AND ($3::text='' OR created_by=$3) FOR UPDATE",[campaignId,orgs,user.role==="advertiser"?user.id:""]);
     const campaign=found.rows[0]; if(!campaign) throw new CampaignError(404,"Campaign not found"); if(campaign.version!==input.expectedVersion) throw new CampaignError(409,"Campaign changed; refresh before retrying");
     const quote=await client.query<{id:string;status:string}>("SELECT id,status FROM quotes WHERE campaign_id=$1 ORDER BY version DESC LIMIT 1 FOR UPDATE",[campaignId]); const current=quote.rows[0]; if(!current) throw new CampaignError(422,"Quote not found");
     if(!["planning","draft","proposed"].includes(campaign.status))throw new CampaignError(422,"Confirmed campaign terms cannot be changed");
@@ -155,7 +155,7 @@ export async function mutateCampaignPlan(user: DbUser, campaignId: string, input
   const orgs = await organizationIdsForUser(user); const client = await getDb().connect();
   try {
     await client.query("BEGIN");
-    const found = await client.query<{ organization_id:string;version:number;status:string }>("SELECT organization_id,version,status FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[]) FOR UPDATE", [campaignId, orgs]);
+    const found = await client.query<{ organization_id:string;version:number;status:string }>("SELECT organization_id,version,status FROM campaigns WHERE id=$1 AND organization_id=ANY($2::text[]) AND ($3::text='' OR created_by=$3) FOR UPDATE", [campaignId, orgs, user.role==="advertiser"?user.id:""]);
     const campaign = found.rows[0]; if (!campaign) throw new CampaignError(404, "Campaign not found");
     if (campaign.version !== Number(input.expectedVersion)) throw new CampaignError(409, "Campaign changed; refresh before retrying");
     const membership = await getOrganizationMembership(user.id, campaign.organization_id);

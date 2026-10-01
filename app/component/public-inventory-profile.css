@@ -127,10 +127,16 @@
 }
 
 .public-media-preview img,
-.public-media-preview video {
+.public-media-preview video,
+.public-media-preview iframe {
   object-fit: contain;
   width: 100%;
   height: 100%;
+}
+
+.public-media-preview iframe {
+  border: 0;
+  pointer-events: none;
 }
 
 .public-media-body {

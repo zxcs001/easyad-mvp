@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     },
   };
 
-  if (item.mediaType === "video" || request.nextUrl.searchParams.get("encoding") === "url") {
+  if (item.mediaType === "video" || item.mediaType === "html" || request.nextUrl.searchParams.get("encoding") === "url") {
     return publicApiJson({ ...metadata, content: { encoding: "url", url: mediaUrl } });
   }
 

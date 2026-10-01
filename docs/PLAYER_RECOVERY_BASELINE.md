@@ -20,6 +20,12 @@ The pilot target remains a dedicated foreground Chrome window on Windows, over H
 
 The service worker caches only the player shell and versioned Next assets; API responses and credentials are never cached. Media blobs and the active manifest are switched in one IndexedDB transaction. A synchronous/quota write failure aborts that transaction and preserves the old cache. Corrupt assets cannot earn successful evidence. Approved public media must be same-origin or allow browser CORS downloads.
 
+At startup the player restores the valid cached manifest and media before polling the server. It can therefore show the cached rotation without a connection; when online, polling replaces it with a newly authorized revision. No valid cache, expired lease, or an ineligible campaign date produces a neutral fallback rather than an old ad.
+
+HTML creatives use the same media cache. The `/player` page alone permits local `blob:` fetches and frames in its Content Security Policy, so it can validate a downloaded HTML blob and display it again after an offline renderer restart. The creative remains in a sandboxed iframe with its own restrictive document policy. A browser check exercises an approved, sanitized HTML ad before and after an offline restart.
+
+Before relying on an offline screen, keep `/player` online until Screen control shows the published revision received, prepared, and applied with no media or storage error. In the managed display profile, disconnect the network, restart the player page, and confirm the scheduled ad still renders. Reconnect and confirm queued playback reports synchronize. Repeat this drill on the actual hardware; server acknowledgments alone do not prove that the browser shell or display panel survived a restart.
+
 Limits:
 
 | Resource | Limit / behavior |
@@ -28,8 +34,8 @@ Limits:
 | Shell | Player document plus at most 200 versioned Next assets |
 | Event outbox | 50,000 entries, including quarantined records; stable IDs and acknowledgment-based removal |
 | Minimum scheduled slot | 2 seconds; even a short video waits for its reserved slot before advancing |
-| Default offline lease | 300 seconds |
-| Explicit pilot lease | `PLAYER_OFFLINE_LEASE_SECONDS=86400` maximum |
+| Default offline lease | 24 hours for public ads; 60 seconds for private screens |
+| Configurable public lease | `PLAYER_OFFLINE_LEASE_SECONDS` between 60 and 86400 seconds |
 | Arrival window | Seven days; invalid/colliding records retained in bounded quarantine |
 | Retries | Conditional polling with jitter and bounded backoff; outbox follows heartbeat retry cycles |
 
@@ -41,7 +47,7 @@ Alerts retain cached ordinary content, suppress it while active, and let eligibl
 
 ## Stop and rollback
 
-Disconnected hardware cannot receive immediate cancellation. **The configured lease is the maximum intended offline delay for unpublish, revoke or feature shutdown**, plus browser scheduling latency. The five-minute default is deliberate. A 24-hour lease trades prompt cancellation for longer offline service and must be selected for the pilot knowingly. Private content remains unsupported.
+Disconnected hardware cannot receive immediate cancellation. **The configured lease is the maximum intended offline delay for unpublish, revoke or feature shutdown**, plus browser scheduling latency. The 24-hour public default favors offline ad continuity and can delay those changes for up to a day; private screens retain a 60-second cap.
 
 Online 401/404 responses clear the active manifest/media and return to pairing/disabled state. The outbox is retained under its original player identity and is never reassigned to a replacement player. To roll back, disable `FEATURE_PLAYER_CONTROL`, retain additive schema and evidence, and wait for outstanding offline leases to end. Do not re-enable the old shared-token ingestion boundary.
 

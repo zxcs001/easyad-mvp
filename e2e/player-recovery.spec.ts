@@ -123,6 +123,11 @@ test("P2 atomic cache survives quota failure; offline alert and lease expiry sur
         await expect(page.getByRole("heading", { name: "Offline expiry test" })).toHaveCount(0);
         await expect(page.locator(".device-player img")).toBeVisible();
         const lease = await cached();
+        expect(Date.parse(lease.validUntil) - Date.parse(lease.generatedAt)).toBe(86_400_000);
+        await page.clock.fastForward(3_600_000);
+        await expect(page.locator(".device-player img")).toBeVisible();
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(page.locator(".device-player img")).toBeVisible();
         await page.clock.fastForward(Math.max(1,Date.parse(lease.validUntil)-await page.evaluate(()=>Date.now())+1000));
         await expect(page.locator(".device-player")).toHaveCount(0);
         await page.reload({ waitUntil: "domcontentloaded" });

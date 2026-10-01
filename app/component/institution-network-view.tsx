@@ -16,6 +16,7 @@ import { useI18n } from "../i18n/client";
 import { toDate } from "../utils";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import PlayerControl from "./player-control";
+import ScreenSettingsDialog, { type ScreenSettings } from "./screen-settings-dialog";
 
 export type EmergencyOverrideDraft = {
   alertType: DeviceAlertType;
@@ -43,6 +44,7 @@ export default function InstitutionNetworkView({
   onSetPublishState,
   onCreateAlert,
   onEndAlert,
+  onSaveSettings,
 }: {
   institutionName: string;
   isSuperAdmin?: boolean;
@@ -58,6 +60,7 @@ export default function InstitutionNetworkView({
   onSetPublishState: (id: string, published: boolean) => Promise<MutationResult<InventoryItem>>;
   onCreateAlert: (draft: EmergencyOverrideDraft) => Promise<MutationResult<DeviceAlert>>;
   onEndAlert: (id: string) => Promise<MutationResult<DeviceAlert>>;
+  onSaveSettings?: (id: string, settings: ScreenSettings) => Promise<MutationResult<InventoryItem>>;
 }) {
   const { t } = useI18n();
   const [publishDialog, setPublishDialog] = useState(false);
@@ -66,6 +69,10 @@ export default function InstitutionNetworkView({
   const [endAlertDialog, setEndAlertDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const filteredInventory = useMemo(() => inventory.filter((device) => `${device.name} ${device.address} ${device.id} ${device.building ?? ""} ${device.department ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())), [inventory, query]);
   const selected = inventory.find((device) => device.id === selectedId) ?? inventory[0] ?? null;
   const publishedDevices = inventory.filter((device) => device.approvalStatus === "approved");
   const emergencyScopeDevices = useMemo(() => isSuperAdmin
@@ -149,19 +156,25 @@ export default function InstitutionNetworkView({
         <div className="panel network-map-panel">
           <PanelHeading eyebrow={isSuperAdmin ? "All institution fleets" : "Institution-owned fleet"} title="Device map" action={<span className="status good">{t("{count} scoped", { count: inventory.length })}</span>} />
           <div className="network-map-stage">
-            <MapLibreInventoryMap inventory={inventory} visibleInventory={inventory} selectedInventoryId={selected.id} selectedLocation={mapCenter} radius={30} showCompetitors={false} onSelect={onSelect} />
+            <MapLibreInventoryMap inventory={inventory} visibleInventory={filteredInventory} selectedInventoryId={selected.id} selectedLocation={mapCenter} radius={30} showCompetitors={false} followSelectedLocation={false} onSelect={onSelect} />
           </div>
+          <div className="network-search">
+            <label>{t("Find a screen")}<input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search name, location or screen ID")} /></label>
+            {query ? <button className="ghost-button" type="button" onClick={() => { setQuery(""); searchRef.current?.focus(); }}>{t("Clear search")}</button> : null}
+          </div>
+          <p className="network-result-count" role="status">{t("{count} of {total} screens", { count: filteredInventory.length, total: inventory.length })}</p>
           <div className="network-device-strip" aria-label={t(isSuperAdmin ? "Institution devices across the platform" : "Institution devices")}>
-            {inventory.map((device) => {
+            {filteredInventory.map((device) => {
               const alertActive = activeAlerts.some((alert) => alert.targetDeviceIds.includes(device.id));
               return (
                 <button aria-pressed={device.id === selected.id} className={device.id === selected.id ? "selected" : ""} key={device.id} onClick={() => onSelect(device.id)} type="button">
                   <span className={`network-device-dot ${device.approvalStatus === "approved" ? "published" : "unpublished"}${alertActive ? " alert" : ""}`} aria-hidden="true" />
-                  <span><strong>{device.name}</strong><small>{t(alertActive ? "Emergency override active" : device.approvalStatus === "approved" ? "Published" : "Unpublished")}</small></span>
+                  <span><strong>{device.name}</strong><small title={device.address}>{device.address}</small><small>{t(alertActive ? "Emergency override active" : device.approvalStatus === "approved" ? "Published" : "Unpublished")}</small></span>
                 </button>
               );
             })}
           </div>
+          {!filteredInventory.length ? <p>{t("No matching screens. Clear the search to see your fleet.")}</p> : null}
         </div>
 
         <div className="panel network-preview-panel">
@@ -178,15 +191,33 @@ export default function InstitutionNetworkView({
             <div><span>{t("Template")}</span><strong>{t(templateLabel)}</strong></div>
             <div><span>{t("Approved content")}</span><strong>{t(selectedApprovedResources.length === 1 ? "{count} item" : "{count} items", { count: selectedApprovedResources.length })}</strong></div>
             <div><span>{t("Location")}</span><strong>{selected.address}</strong></div>
+            <div><span>{t("Screen ID")}</span><strong>{selected.id}</strong></div>
+            <div><span>{t("Display language")}</span><strong>{t(selected.displayLanguage === "fr" ? "French" : "English")}</strong></div>
+            <div><span>{t("Image duration")}</span><strong>{t("{count} seconds", { count: selected.imageInterval })}</strong></div>
+            {selected.building ? <div><span>{t("Building")}</span><strong>{selected.building}</strong></div> : null}
+            {selected.department ? <div><span>{t("Department")}</span><strong>{selected.department}</strong></div> : null}
           </div>
           <div className="network-device-actions">
             <button className="secondary-button" onClick={() => onOpenInventory(selected.id)} type="button"><MonitorUp aria-hidden="true" />{t("Manage device")}</button>
             <button className="secondary-button" onClick={() => setUploadDialog(true)} type="button"><Images aria-hidden="true" />{t(isPublished ? "Publish content" : "Add approved content")}</button>
+            {onSaveSettings && isDigitalInventory(selected) ? <button className="secondary-button" onClick={() => setSettingsOpen(true)} type="button">{t("Edit display settings")}</button> : null}
             {isPublished && isDigitalInventory(selected) ? <a className="ghost-button" href={`/devices/${selected.id}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open device view")}</a> : <span aria-disabled="true" className="disabled-action">{t("Device view unavailable")}</span>}
             <button className={isPublished ? "warning-button" : "primary-button"} onClick={() => { setDialogError(""); setPublishDialog(true); }} type="button">{t(publishVerb)}</button>
           </div>
+          <p className="network-delivery-note">{t("Changes are available to connected players on their next refresh. Check Player connection for delivery status.")}</p>
         </div>
       </div>
+
+      <section className="panel network-content-panel" aria-label={t("Screen content")}>
+        <PanelHeading eyebrow={selected.name} title="Screen content" action={<button className="secondary-button" onClick={() => onOpenInventory(selected.id)} type="button">{t("Manage content")}</button>} />
+        <p className="network-delivery-note">{t("Uploaded resources and their approval status. Scheduled content and emergency overrides may change what plays.")}</p>
+        {selectedResources.length ? <ul className="network-content-list">{selectedResources.map((resource) => <li key={resource.id}>
+          <div className="network-content-thumbnail">{resource.mediaType === "image" ? <img src={resource.publicUrl} alt="" loading="lazy" /> : <Images aria-hidden="true" />}</div>
+          <div><strong>{resource.title}</strong><small>{resource.originalName}</small><span className={`status ${resource.approvalStatus === "approved" ? "good" : ""}`}>{t(resource.approvalStatus)}</span></div>
+        </li>)}</ul> : <div className="empty-state"><strong>{t("No content uploaded to this screen")}</strong><span>{t("Add an image or video to start your screen rotation.")}</span><button className="primary-button" type="button" onClick={() => setUploadDialog(true)}>{t("Add content")}</button></div>}
+      </section>
+
+      {settingsOpen && onSaveSettings ? <ScreenSettingsDialog key={`settings-${selected.id}`} screen={selected} onClose={() => setSettingsOpen(false)} onSave={onSaveSettings} /> : null}
 
       {isDigitalInventory(selected) ? <PlayerControl key={selected.id} inventoryId={selected.id} screenName={selected.name} /> : null}
 
@@ -373,7 +404,7 @@ function deviceSlides(selected: InventoryItem, mediaResources: MediaResource[], 
   const mediaSlides = mediaResources.filter((resource) => resource.inventoryId === selected.id && resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video")).map((resource) => ({ id: resource.id, title: resource.title, subtitle: resource.originalName, mediaType: resource.mediaType as "image" | "video", publicUrl: resource.publicUrl, createdAt: resource.createdAt }));
   const today = toDate(new Date()); // local date, not the UTC date
   const bookingMap = new Map(bookings.filter((booking) => booking.inventoryId === selected.id && booking.start <= today && booking.end >= today && ["approved", "scheduled", "live"].includes(booking.status)).map((booking) => [booking.id, booking]));
-  const creativeSlides = creatives.filter((creative) => creative.status === "approved" && Boolean(creative.publicUrl) && bookingMap.has(creative.bookingId)).map((creative) => { const booking = bookingMap.get(creative.bookingId)!; return { id: creative.id, title: booking.campaign, subtitle: booking.advertiser, mediaType: creative.mimeType?.startsWith("video/") ? "video" as const : "image" as const, publicUrl: creative.publicUrl!, createdAt: creative.createdAt }; });
+  const creativeSlides = creatives.filter((creative) => creative.status === "approved" && Boolean(creative.publicUrl) && bookingMap.has(creative.bookingId)).map((creative) => { const booking = bookingMap.get(creative.bookingId)!; return { id: creative.id, title: booking.campaign, subtitle: booking.advertiser, mediaType: creative.mimeType === "text/html" ? "html" as const : creative.mimeType?.startsWith("video/") ? "video" as const : "image" as const, publicUrl: creative.publicUrl!, createdAt: creative.createdAt }; });
   return [...mediaSlides, ...creativeSlides].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 

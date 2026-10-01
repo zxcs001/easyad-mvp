@@ -81,7 +81,7 @@ test.skipIf(!available)("shared approval eligibility, deletion, alert cancellati
   await createMediaResource({ id: "MED-PLAYER-PENDING", inventoryId: fixture.screen.id, ownerId: fixture.institution.id, title: "Pending", originalName: "pending.png", mimeType: "image/png", mediaType: "image", approvalStatus: "pending review", sizeBytes: 1, storagePath: "/unused", publicUrl: "/media/MED-PLAYER-PENDING", createdAt: new Date().toISOString() });
   const content = await fetchPlayerManifest(paired.token);
   expect(content.slides.map((slide) => slide.id)).toEqual(["MED-PLAYER-APPROVED"]);
-  expect(Date.parse(content.validUntil) - Date.now()).toBeLessThanOrEqual(300_000);
+  expect(Date.parse(content.validUntil) - Date.parse(content.generatedAt)).toBe(86_400_000);
   await createDeviceAlert({ institutionId: fixture.institution.id, alertType: "public-safety", title: "Pilot alert", message: "Test only", area: "Lobby", targetDeviceIds: [fixture.screen.id], issuedBy: "Pilot", createdBy: fixture.institution.id, expiresAt: new Date(Date.now() + 60_000).toISOString() });
   const alert = await fetchPlayerManifest(paired.token);
   expect(alert.activeAlert?.title).toBe("Pilot alert"); expect(alert.slides).toHaveLength(1); // Cached ordinary content resumes after offline alert expiry.

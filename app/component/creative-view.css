@@ -30,9 +30,26 @@
 
 .template-tabs {
   grid-template-columns: repeat(3,1fr);
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 16px;
   display: grid;
+}
+
+.template-gallery-heading {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+
+.template-gallery-heading strong {
+  color: var(--ink);
+  font-size: .95rem;
+}
+
+.template-gallery-heading span {
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.4;
 }
 
 .creative-source-tabs {
@@ -56,25 +73,152 @@
   border-color: #17202a;
 }
 
-.template-tabs button,
-.template-tabs a {
-  color: #394650;
-  border-color: var(--line);
-  background: #f4f6f4;
-  justify-content: center;
-  min-height: 40px;
+.template-tabs .template-choice {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: #17202a;
+  text-decoration: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.template-tabs button.active,
-.template-tabs a.active {
-  background: var(--soft-blue);
+.template-tabs .template-choice:hover,
+.template-tabs .template-choice:focus-visible {
+  border-color: #487895;
+  box-shadow: 0 3px 14px #17202a1a;
+}
+
+.template-tabs .template-choice:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.template-tabs .template-choice.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #2f5f9f21;
+}
+
+.template-choice-art {
+  display: block;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.template-choice-art.retail { background: #f8cf79; }
+.template-choice-art.finance { background: #e4efe5; }
+.template-choice-art.event { background: #27204a; }
+
+.template-choice-art iframe {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
+.template-choice-copy {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px 12px;
+  min-height: 84px;
+}
+
+.template-choice-topic {
   color: var(--blue);
-  border-color: #cbd8e8;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: .66rem;
+  font-weight: 850;
+}
+
+.template-choice-copy strong {
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.template-choice-copy small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.25;
 }
 
 .creative-form {
   gap: 14px;
   display: grid;
+}
+
+.creative-html-preview {
+  width: 100%;
+  min-height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #17202a;
+  color: #fff;
+  position: relative;
+}
+
+.creative-html-preview iframe {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
+.creative-html-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  font-weight: 750;
+}
+
+.creative-html-editor textarea {
+  width: 100%;
+  min-height: 210px;
+  padding: 12px;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  color: #17202a;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.creative-html-editor textarea:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.creative-html-editor-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.creative-html-editor-foot button {
+  flex: none;
+  color: var(--blue);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 }
 
 .field-block {
@@ -228,6 +372,16 @@
 .template-tabs {
   grid-template-columns: 1fr;
 }
+
+.template-tabs .template-choice {
+  display: grid;
+  grid-template-columns: minmax(112px,38%) minmax(0,1fr);
+  align-items: stretch;
+}
+
+.template-choice-art { height: 100%; min-height: 88px; aspect-ratio: auto; }
+.template-choice-art iframe { top: 50%; height: auto; aspect-ratio: 16 / 9; transform: translateY(-50%); }
+.template-choice-copy { align-content: center; min-height: 88px; }
 }
 
 .validation-list>div {

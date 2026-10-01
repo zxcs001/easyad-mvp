@@ -41,6 +41,7 @@ type Props = {
   onSelect?: (id: string) => void;
   onMarkerOpen?: (id: string) => void;
   variant?: "workspace" | "portal";
+  followSelectedLocation?: boolean;
 };
 
 const tileSize = 256;
@@ -65,6 +66,7 @@ export default function MapLibreInventoryMap({
   onSelect,
   onMarkerOpen,
   variant = "workspace",
+  followSelectedLocation = true,
 }: Props) {
   const { locale, t } = useI18n();
   const isPortal = variant === "portal";
@@ -74,6 +76,7 @@ export default function MapLibreInventoryMap({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRefs = useRef<Marker[]>([]);
+  const pinSelectedIdRef = useRef<string | null>(null);
   const centerMarkerRef = useRef<Marker | null>(null);
   const onAreaChangeRef = useRef(onAreaChange);
   const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "fallback">("loading");
@@ -89,6 +92,8 @@ export default function MapLibreInventoryMap({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    setMapStatus("loading");
 
     const probe = document.createElement("canvas");
     const hasWebGl = Boolean(probe.getContext("webgl2") || probe.getContext("webgl") || probe.getContext("experimental-webgl"));
@@ -138,7 +143,27 @@ export default function MapLibreInventoryMap({
     const handleZoom = () => syncMapMarkerVisibility(map, setDeviceMarkersVisible);
     map.on("zoom", handleZoom);
 
+    // A slow WebGL map gets one chance to load. If it times out, retire it so
+    // hidden WebGL events cannot move or replace the clickable raster pins.
+    let disposed = false;
+    const disposeMap = () => {
+      if (disposed) return;
+      disposed = true;
+      markerRefs.current.forEach((marker) => marker.remove());
+      markerRefs.current = [];
+      centerMarkerRef.current?.remove();
+      centerMarkerRef.current = null;
+      map.off("zoom", handleZoom);
+      map.remove();
+      if (mapRef.current === map) mapRef.current = null;
+    };
+    const loadTimeout = window.setTimeout(() => {
+      disposeMap();
+      setMapStatus("fallback");
+    }, 8000);
+
     map.on("load", () => {
+      if (disposed) return;
       if (initialZoom === undefined) fitDefaultOperatingRadius(map, selectedLocation, containerRef.current);
       if (!isPortal) {
         map.addSource("radius-area", { type: "geojson", data: radiusFeature(selectedLocation, radius) });
@@ -165,12 +190,10 @@ export default function MapLibreInventoryMap({
 
       syncMapData(map, selectedLocation, radius);
       syncMapMarkerVisibility(map, setDeviceMarkersVisible);
+      window.clearTimeout(loadTimeout);
       setMapStatus("ready");
     });
 
-    map.on("error", () => {
-      if (!map.isStyleLoaded()) setMapStatus("fallback");
-    });
     map.on("dblclick", (event) => {
       event.originalEvent.preventDefault();
       onAreaChangeRef.current?.(lngLatToPercent(event.lngLat.lng, event.lngLat.lat));
@@ -179,13 +202,8 @@ export default function MapLibreInventoryMap({
     mapRef.current = map;
 
     return () => {
-      markerRefs.current.forEach((marker) => marker.remove());
-      markerRefs.current = [];
-      centerMarkerRef.current?.remove();
-      centerMarkerRef.current = null;
-      map.off("zoom", handleZoom);
-      map.remove();
-      mapRef.current = null;
+      window.clearTimeout(loadTimeout);
+      disposeMap();
     };
   }, [locale]);
 
@@ -223,7 +241,10 @@ export default function MapLibreInventoryMap({
         onAreaChangeRef.current?.(city);
         map.easeTo({ center: percentToLngLat(city), zoom: DEFAULT_MAP_ZOOM, duration: 500 });
       }, locale),
-      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryIdRef.current, selectionEnabled, locale, onSelect, onMarkerOpen),
+      ...createInventoryMarkers(map, inventory, visibleInventory, selectedInventoryIdRef.current, selectionEnabled, locale, (id) => {
+        pinSelectedIdRef.current = id;
+        onSelect?.(id);
+      }, onMarkerOpen),
     ];
     syncMapMarkerVisibility(map, setDeviceMarkersVisible);
   }, [availableCities, competitorsVisible, inventory, locale, onMarkerOpen, onSelect, selectionEnabled, visibleInventory]);
@@ -245,20 +266,23 @@ export default function MapLibreInventoryMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !followSelectedLocation) return;
+    if (pinSelectedIdRef.current === selectedInventoryId) return;
     map.easeTo({ center: percentToLngLat(selectedLocation), duration: 500 });
-  }, [selectedLocation]);
+  }, [followSelectedLocation, selectedInventoryId, selectedLocation]);
 
-  // A list click can select a screen that sits outside the current view, so
-  // bring it into view. Only when it is outside: panning on every pin click
-  // would move the map under the cursor, and the first render must keep the
-  // operating-radius fit, which is why the initial selection is skipped.
+  // An offscreen list selection comes into view. A pin click only changes
+  // selection; it must never move the map beneath the pointer.
   const lastPannedInventoryId = useRef(selectedInventoryId);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selectionEnabled || !selectedInventoryId) return;
     if (lastPannedInventoryId.current === selectedInventoryId) return;
     lastPannedInventoryId.current = selectedInventoryId;
+    if (pinSelectedIdRef.current === selectedInventoryId) {
+      pinSelectedIdRef.current = null;
+      return;
+    }
     const item = inventory.find((entry) => entry.id === selectedInventoryId);
     if (!item) return;
     const target = percentToLngLat(item);
@@ -278,8 +302,9 @@ export default function MapLibreInventoryMap({
   }
 
   return (
-    <div className={`maplibre-shell ${mapStatus === "fallback" ? "maplibre-fallback-mode" : ""}`}>
-      <div ref={containerRef} className="city-map maplibre-map" role="application" aria-label={t("MapLibre inventory map")} />
+    <div className={`maplibre-shell ${mapStatus === "ready" ? "maplibre-ready" : mapStatus === "loading" ? "maplibre-loading" : "maplibre-fallback-mode"}`}>
+      <div ref={containerRef} className="city-map maplibre-map" role="application" aria-label={t("MapLibre inventory map")} aria-hidden={mapStatus !== "ready"} />
+      {mapStatus === "loading" ? <div className="map-loading" role="status">{t("Loading map…")}</div> : null}
       <div className="map-search" role="search">
         <input
           aria-label={t("Map search")}
@@ -304,7 +329,7 @@ export default function MapLibreInventoryMap({
           </div>
         ) : null}
       </div>
-      {mapStatus !== "ready" ? (
+      {mapStatus === "fallback" ? (
         <FallbackMap
           inventory={inventory}
           visibleInventory={visibleInventory}
@@ -317,11 +342,12 @@ export default function MapLibreInventoryMap({
           onSelect={onSelect}
           onMarkerOpen={onMarkerOpen}
           onDeviceMarkerVisibilityChange={setDeviceMarkersVisible}
+          followSelectedLocation={followSelectedLocation}
           availableCities={availableCities}
           variant={variant}
         />
       ) : null}
-      <div className="map-legend" aria-label={t("Map legend")}>
+      {mapStatus !== "loading" ? <div className="map-legend" aria-label={t("Map legend")}>
         {deviceMarkersVisible ? (
           <>
             <span><i className="legend-device available" />{t("Available device")}</span>
@@ -334,7 +360,7 @@ export default function MapLibreInventoryMap({
           </>
         ) : <span className="map-zoom-guidance" role="status">{t("No available cities match the current filters")}</span>}
         {competitorsVisible ? <span><i className="legend-square" />{t("Nearby business")}</span> : null}
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -398,12 +424,14 @@ function FallbackMap({
   onDeviceMarkerVisibilityChange,
   availableCities,
   variant = "workspace",
+  followSelectedLocation = true,
 }: Props & { availableCities: AvailableCity[]; onDeviceMarkerVisibilityChange: (visible: boolean) => void }) {
   const { locale, t } = useI18n();
   const isPortal = variant === "portal";
   const selectionEnabled = !isPortal;
   const competitorsVisible = showCompetitors && !isPortal;
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const pinSelectedIdRef = useRef<string | null>(null);
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -433,9 +461,33 @@ function FallbackMap({
   }, [deviceMarkersVisible, onDeviceMarkerVisibilityChange]);
 
   useEffect(() => {
+    if (!followSelectedLocation) return;
+    if (pinSelectedIdRef.current === selectedInventoryId) return;
     const [lng, lat] = percentToLngLat(selectedLocation);
     setMapCenter({ lng, lat });
-  }, [selectedLocation]);
+  }, [followSelectedLocation, selectedInventoryId, selectedLocation]);
+
+  // Only an offscreen list selection moves the viewport; clicking any pin
+  // leaves its position unchanged, even at the edge of the map.
+  const lastSelectedId = useRef(selectedInventoryId);
+  useEffect(() => {
+    if (!selectionEnabled || !selectedInventoryId) return;
+    if (lastSelectedId.current === selectedInventoryId) return;
+    lastSelectedId.current = selectedInventoryId;
+    if (pinSelectedIdRef.current === selectedInventoryId) {
+      pinSelectedIdRef.current = null;
+      return;
+    }
+    if (followSelectedLocation) return;
+    const item = inventory.find((entry) => entry.id === selectedInventoryId);
+    if (!item) return;
+    const [lng, lat] = percentToLngLat(item);
+    const point = lngLatToWorld(lng, lat, zoom);
+    const middle = lngLatToWorld(centerRef.current.lng, centerRef.current.lat, zoom);
+    if (Math.abs(point.x - middle.x) > size.width / 2 || Math.abs(point.y - middle.y) > size.height / 2) {
+      setMapCenter({ lng, lat });
+    }
+  }, [followSelectedLocation, inventory, selectedInventoryId, selectionEnabled, size.height, size.width, zoom]);
 
   useEffect(() => {
     if (initialZoom) setZoom(initialZoom);
@@ -659,7 +711,7 @@ function FallbackMap({
         const style = markerStyle(item, viewportOrigin, zoom);
 
         return (
-          <button aria-label={`${item.name}, ${t(formats[item.format].label)}`} aria-pressed={selectionEnabled ? selected : undefined} className={className} key={item.id} onClick={() => { onSelect?.(item.id); onMarkerOpen?.(item.id); }} style={style} type="button">
+          <button aria-label={`${item.name}, ${t(formats[item.format].label)}`} aria-pressed={selectionEnabled ? selected : undefined} className={className} key={item.id} onClick={() => { pinSelectedIdRef.current = item.id; onSelect?.(item.id); onMarkerOpen?.(item.id); }} style={style} type="button">
             <DevicePinGlyph />
           </button>
         );
@@ -816,6 +868,8 @@ function createInventoryMarkers(
       // That click bubbled to the map, which toggled the popup shut and left
       // focus on the page body. A keyboard click (detail 0) stops at the pin.
       if (event.detail === 0) event.stopPropagation();
+      // Freeze any drag momentum at the moment the pin is chosen.
+      map.stop();
       onSelect?.(item.id);
       onMarkerOpen?.(item.id);
     });

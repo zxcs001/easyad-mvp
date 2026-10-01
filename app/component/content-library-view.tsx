@@ -118,6 +118,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 function ResourcePreview({ item, large = false }: { item: LibraryItem; large?: boolean }) {
   const { t } = useI18n();
   if (item.publicUrl && item.mimeType?.startsWith("video/")) return <video className={large ? "large" : ""} muted playsInline preload="metadata" src={item.publicUrl} />;
+  if (item.publicUrl && item.mimeType === "text/html") return <iframe className={large ? "large" : ""} src={item.publicUrl} title={item.title} sandbox="" referrerPolicy="no-referrer" />;
   if (item.publicUrl && item.mediaType === "image") return <img className={large ? "large" : ""} src={item.publicUrl} alt="" loading="lazy" />;
   return <span className={`cms-placeholder ${large ? "large" : ""}`}>{item.mediaType === "video" ? <Film /> : <FileImage />}<small>{t(item.mediaType === "template" ? "Template creative" : capitalize(item.mediaType))}</small></span>;
 }

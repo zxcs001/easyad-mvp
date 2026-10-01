@@ -46,7 +46,7 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
       id: resource.id,
       title: resource.campaign,
       subtitle: `Advertiser creative - ${resource.advertiser} - ${resource.originalName ?? "uploaded media"}`,
-      mediaType: resource.mimeType?.startsWith("video/") ? "video" : "image",
+      mediaType: resource.mimeType === "text/html" ? "html" : resource.mimeType?.startsWith("video/") ? "video" : "image",
       publicUrl: resource.publicUrl ?? "",
       createdAt: resource.createdAt,
     }));
@@ -138,6 +138,8 @@ function AdvertiserResourceCard({ resource, locale }: { resource: InventoryAdver
       <div className="public-media-preview">
         {resource.mimeType?.startsWith("video/") ? (
           <video controls src={resource.publicUrl ?? undefined} />
+        ) : resource.mimeType === "text/html" ? (
+          <iframe src={resource.publicUrl ?? undefined} title={resource.campaign} sandbox="" referrerPolicy="no-referrer" />
         ) : (
           <img alt={resource.originalName ?? resource.campaign} src={resource.publicUrl ?? ""} />
         )}

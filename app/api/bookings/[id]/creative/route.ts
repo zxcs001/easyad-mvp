@@ -6,6 +6,8 @@ import { createCreative, getBooking, getBookingOwnerId, listCreatives, updateBoo
 import { deleteStoredMedia, storeMedia } from "../../../../lib/media-storage";
 import { inspectMediaUpload } from "../../../../lib/uploads";
 import { isCreativeSubmissionAllowed, truncateFileName, validateCreative } from "../../../../utils";
+import { defaultCreativeHtml } from "../../../../creative-templates";
+import { renderCreativeDocument, sanitizeCreativeHtml } from "../../../../lib/creative-template";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -43,13 +45,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (upload && "error" in upload) return NextResponse.json({ error: upload.error }, { status: upload.status });
 
   const body = upload ? upload.fields : await request.json().catch(() => ({}));
+  const template = ["retail", "finance", "event"].includes(body.template) ? (body.template as Creative["template"]) : "retail";
   const draft = {
-    template: ["retail", "finance", "event"].includes(body.template) ? (body.template as Creative["template"]) : "retail",
+    template,
     format: isFormat(body.format) ? body.format : "digital",
     width: cleanNumber(body.width, 1920),
     height: cleanNumber(body.height, 1080),
-    fileType: upload ? upload.fileType : isFileType(body.fileType) ? body.fileType : "png",
-    fileSize: upload ? upload.fileSize : cleanNumber(body.fileSize, 80),
+    fileType: upload ? upload.fileType as Creative["fileType"] : "html" as const,
+    fileSize: upload ? upload.fileSize : 1,
     safeZone: cleanNumber(body.safeZone, 10),
     distortion: cleanNumber(body.distortion, 1),
   };
@@ -57,6 +60,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const checks = validateCreative(draft);
   if (!checks.every((check) => check.ok)) {
     return NextResponse.json({ error: "Creative failed validation", checks }, { status: 422 });
+  }
+
+  let templateDocument: string | null = null;
+  if (!upload) {
+    try {
+      templateDocument = renderCreativeDocument(template, sanitizeCreativeHtml(body.html === undefined ? defaultCreativeHtml[template] : body.html));
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid template HTML" }, { status: 422 });
+    }
   }
 
   const creativeId = `CRV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
@@ -77,6 +89,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       publicUrl: `/media/${creativeId}`,
       storagePath,
     };
+  } else if (templateDocument) {
+    const bytes = Buffer.from(templateDocument, "utf8");
+    const storagePath = await storeMedia(`creatives/${creativeId}.html`, bytes, "text/html");
+    uploadMetadata = {
+      source: "template",
+      originalName: `${template}-template.html`,
+      mimeType: "text/html",
+      publicUrl: `/creative-html/${creativeId}`,
+      storagePath,
+    };
   }
 
   let creative;
@@ -92,10 +114,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
 function isFormat(value: unknown): value is FormatKey {
   return typeof value === "string" && Object.keys(formats).includes(value);
-}
-
-function isFileType(value: unknown): value is Creative["fileType"] {
-  return typeof value === "string" && ["png", "jpg", "gif", "pdf", "mp4"].includes(value);
 }
 
 function cleanNumber(value: unknown, fallback: number) {

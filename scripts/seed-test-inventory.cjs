@@ -16,6 +16,8 @@ const devices = [
     format: "digital",
     x: 67.23008,
     y: 40.96646,
+    latitude: 48.37054,
+    longitude: -89.34998,
     address: "100 Princess Street, Thunder Bay, ON",
     price: 780,
     impressions: 168000,
@@ -37,6 +39,8 @@ const devices = [
     format: "digital",
     x: 67.29667,
     y: 40.91754,
+    latitude: 48.40569,
+    longitude: -89.24396,
     address: "1000 Fort William Road, Thunder Bay, ON",
     price: 690,
     impressions: 142000,
@@ -58,6 +62,8 @@ const devices = [
     format: "static",
     x: 67.32333,
     y: 40.86154,
+    latitude: 48.44593,
+    longitude: -89.20151,
     address: "Harbour Expressway at Memorial Avenue, Thunder Bay, ON",
     price: 540,
     impressions: 126000,
@@ -79,6 +85,8 @@ const devices = [
     format: "transit",
     x: 67.28175,
     y: 40.89000,
+    latitude: 48.42548,
+    longitude: -89.26771,
     address: "955 Oliver Road, Thunder Bay, ON",
     price: 430,
     impressions: 96000,
@@ -100,6 +108,8 @@ const devices = [
     format: "digital",
     x: 67.32117,
     y: 40.86431,
+    latitude: 48.44394,
+    longitude: -89.20495,
     address: "Marina Park Drive, Thunder Bay, ON",
     price: 620,
     impressions: 114000,
@@ -121,6 +131,8 @@ const devices = [
     format: "digital",
     x: 67.29117,
     y: 40.95185,
+    latitude: 48.38104,
+    longitude: -89.25271,
     address: "500 Donald Street East, Thunder Bay, ON",
     price: 470,
     impressions: 88000,
@@ -216,9 +228,9 @@ async function main() {
         INSERT INTO inventory
           (id, name, operator, format, x, y, address, price, impressions, traffic, income, audience, competitor, occupancy,
            image_interval, max_loop_seconds, available_from, available_to, approval_status, tags, display_template,
-           comments_enabled, institution_id, created_by, created_at, updated_at)
+           comments_enabled, institution_id, created_by, created_at, updated_at, latitude, longitude)
         VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21, TRUE, $22, $23, $24, $24)
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21, TRUE, $22, $23, $24, $24, $25, $26)
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           operator = EXCLUDED.operator,
@@ -243,7 +255,9 @@ async function main() {
           comments_enabled = EXCLUDED.comments_enabled,
           institution_id = EXCLUDED.institution_id,
           created_by = EXCLUDED.created_by,
-          updated_at = EXCLUDED.updated_at
+          updated_at = EXCLUDED.updated_at,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude
       `, [
         device.id,
         device.name,
@@ -269,6 +283,8 @@ async function main() {
         owner.institution_id,
         owner.id,
         now,
+        device.latitude,
+        device.longitude,
       ]);
     }
 

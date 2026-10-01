@@ -48,11 +48,17 @@
 }
 
 .device-carousel-slide img,
-.device-carousel-slide video {
+.device-carousel-slide video,
+.device-carousel-slide iframe {
   object-fit: contain;
   background: #050708;
   width: 100%;
   height: 100%;
+}
+
+.device-carousel-slide iframe {
+  border: 0;
+  pointer-events: none;
 }
 
 .device-nav {

@@ -29,7 +29,9 @@ export function pausePlayer(ms: number, signal: AbortSignal): Promise<void> {
 // and is not evidence of playback. P2 owns persistent caching and per-play events.
 export async function preparePlayerManifest(manifest: PlayerManifest, signal: AbortSignal) {
   if (!manifest.published || manifest.activeAlert) return;
-  await Promise.all(manifest.slides.map((slide) => new Promise<void>((resolve, reject) => {
+  await Promise.all(manifest.slides.map((slide) => slide.mediaType === "html" ? fetch(slide.publicUrl, { signal, credentials: "same-origin" }).then((response) => {
+    if (!response.ok || !response.headers.get("content-type")?.startsWith("text/html")) throw new Error("media_unavailable");
+  }) : new Promise<void>((resolve, reject) => {
     const media = slide.mediaType === "image" ? new Image() : document.createElement("video");
     const event = slide.mediaType === "image" ? "load" : "loadeddata";
     let done = false;

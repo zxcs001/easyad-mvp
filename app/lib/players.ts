@@ -23,6 +23,7 @@ function setting(name: string, fallback: number, min: number, max: number) {
     const value = Number(process.env[name] ?? fallback);
     return Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
 }
+function offlineLeaseSeconds() { return setting("PLAYER_OFFLINE_LEASE_SECONDS", 86400, 60, 86400); }
 export function hashPlayerSecret(value: string) { return createHash("sha256").update(value).digest("hex"); }
 type PlayerRow = {
     id: string;
@@ -142,7 +143,7 @@ async function manifestContent(inventoryId: string, client: PoolClient) {
     if (!inventory)
         throw new PlayerError(401, "Pair this screen to continue.");
     const now = Date.now();
-    const through = new Date(now + setting("PLAYER_OFFLINE_LEASE_SECONDS", 300, 60, 86400) * 1000).toISOString().slice(0, 10);
+    const through = new Date(now + offlineLeaseSeconds() * 1000).toISOString().slice(0, 10);
     const media = await getActiveDeviceMedia(inventoryId, undefined, client, through,true);
     const legacy = await client.query<{
         id: string;
@@ -194,7 +195,7 @@ async function currentManifest(client: PoolClient, player: PlayerRow): Promise<P
     // Do not create endlessly competing revisions in the last 30 seconds of an alert/date window.
     if (existing?.content_hash === hash && previousExpiry > now && (previousExpiry > now + 30000 || previousExpiry >= contentBoundary))
         return existing.manifest;
-    const validUntil = now + (content.privateContent?60:setting("PLAYER_OFFLINE_LEASE_SECONDS", 300, 60, 86400)) * 1000;
+    const validUntil = now + (content.privateContent?60:offlineLeaseSeconds()) * 1000;
     const manifest: PlayerManifest = { ...content, playerId: player.id, revision: player.expected_revision + 1, generatedAt: new Date(now).toISOString(), validUntil: new Date(validUntil).toISOString() };
     await client.query("INSERT INTO player_manifests(player_id,revision,content_hash,manifest,valid_until) VALUES ($1,$2,$3,$4::jsonb,$5)", [player.id, manifest.revision, hash, JSON.stringify(manifest), manifest.validUntil]);
     await client.query("UPDATE players SET expected_revision=$2 WHERE id=$1", [player.id, manifest.revision]);
