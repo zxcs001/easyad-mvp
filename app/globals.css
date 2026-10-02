@@ -1,48 +1,58 @@
 :root {
-  --bg: #f3f5f7;
-  --ink: #131b24;
-  --muted: #5b6770;
+  /* Refined technical palette: cool slate neutrals, one emerald action colour
+     and one cobalt information colour. Every component reads these tokens. */
+  --font-sans: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+  --bg: #f6f7f9;
+  --ink: #0e141b;
+  --muted: #5a6472;
   --panel: #fff;
   /* Decorative hairline only. It gives 1.23:1, so it must never be the edge
      of a control. Use --line-strong for a control edge (WCAG 2.2 SC 1.4.11). */
-  --line: #e4e8ea;
-  --line-strong: #767f86;
-  --green: #1f7a5a;
-  --green-dark: #14503c;
-  --blue: #2f5f9f;
-  --blue-dark: #1f497a;
-  --soft-green: #e3f2ea;
-  --soft-blue: #e8eef6;
+  --line: #e5e8ec;
+  --line-strong: #7a8391;
+  /* Resting edge of a text field or outline button. 3.11:1 on white, so it
+     meets WCAG 2.2 SC 1.4.11 on its own. */
+  --control-edge: #8a93a0;
+  --green: #0c7a56;
+  --green-dark: #08573d;
+  --blue: #2459b3;
+  --blue-dark: #1a428a;
+  --soft-green: #e6f4ee;
+  --soft-blue: #eaf0fa;
+  /* Decorative signal colour for dark surfaces only (glows, lamps, grids). */
+  --signal: #34d399;
+  --signal-cyan: #38bdf8;
 
   /* Status ladder. Severity is encoded by visual weight, not by hue.
      Colour blindness removes hue. It never removes lightness.
      Every state must also carry an icon shape and a text label. */
-  --state-idle-surface: #eef1f3;
-  --state-idle-ink: #5b6770;
-  --state-success-surface: #e3f2ea;
-  --state-success-ink: #14503c;
+  --state-idle-surface: #eff1f4;
+  --state-idle-ink: #5a6472;
+  --state-success-surface: #e4f3ec;
+  --state-success-ink: #08573d;
   --state-warning-surface: #fbeab4;
   --state-warning-ink: #7a5510;
   --state-danger: #b3192e;
   --state-danger-surface: #fbe9ec;
   --state-danger-ink: #a11228;
-  --state-info-surface: #e8eef6;
-  --state-info-ink: #1f497a;
+  --state-info-surface: #eaf0fa;
+  --state-info-ink: #1a428a;
 
   /* Reserved for an active screen override only. Never use it for a routine
      state. It must not resemble a normal campaign action. */
   --state-emergency-surface: #1a1206;
   --state-emergency-ink: #ffc845;
-  --radius: 12px;
-  --radius-sm: 9px;
-  --shadow-sm: 0 1px 2px #101b240a, 0 2px 8px #101b240d;
-  --shadow: 0 12px 34px #101b2417, 0 2px 6px #101b240a;
-  --shadow-lg: 0 28px 64px #101b2429;
-  --ring: 0 0 0 3px #1f7a5a42;
-  --scrollbar-thumb: #9aa8a2;
-  --scrollbar-thumb-hover: #71827b;
-  --scrollbar-thumb-active: #53645d;
-  --scrollbar-track: #edf1ef;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px #0e141b0a;
+  --shadow: 0 1px 2px #0e141b0a, 0 6px 20px #0e141b0d;
+  --shadow-lg: 0 24px 56px #0e141b2e, 0 2px 8px #0e141b14;
+  --ring: 0 0 0 3px #0c7a5640;
+  --scrollbar-thumb: #b4bbc4;
+  --scrollbar-thumb-hover: #8d96a2;
+  --scrollbar-thumb-active: #6b7480;
+  --scrollbar-track: transparent;
   --z-dropdown: 200;
   --z-popover: 300;
   --z-header: 400;
@@ -57,7 +67,8 @@
   --lightningcss-light: initial;
   --lightningcss-dark:  ;
   color-scheme: light;
-  font-family: Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
 }
 
 * {
@@ -133,7 +144,7 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
   border-radius: 7px;
   box-shadow: var(--shadow-sm);
   font-size: .78rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   backdrop-filter: blur(12px);
   transition: border-color .16s, background .16s, transform .16s, scale .11s ease;
@@ -216,7 +227,7 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
   border: 0;
   border-radius: 5px;
   font-size: .82rem;
-  font-weight: 750;
+  font-weight: 600;
   text-align: left;
 }
 
@@ -264,7 +275,8 @@ body:has(.portal, .shell, .government-about-page) > .language-selector--floating
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -284,11 +296,11 @@ button:disabled {
 }
 
 :root {
-  --accent-grad: linear-gradient(135deg, #2f8f6b, #2f5f9f);
+  --accent-grad: linear-gradient(135deg, #0c7a56, #2459b3);
 }
 
 input {
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-edge);
   width: 100%;
   min-height: 40px;
   color: var(--ink);
@@ -297,16 +309,33 @@ input {
   padding: 0 11px;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: #8a93a0;
+}
+
 input[type=range] {
   accent-color: var(--green);
   padding: 0;
 }
 
+/* Native check controls keep their platform shape but take the action colour. */
+input[type=checkbox],
+input[type=radio] {
+  accent-color: var(--green);
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+}
+
 label {
-  color: #394650;
+  color: #343d49;
   gap: 6px;
-  font-size: .82rem;
-  font-weight: 760;
+  font-size: .8rem;
+  font-weight: 560;
   display: grid;
 }
 
@@ -314,7 +343,7 @@ label {
    the translateY(-50%) that centres the carousel arrows and the fallback map
    markers, so a pressed arrow dropped 23-32px and the click could be lost. */
 button:not(:disabled):active {
-  scale: .96;
+  scale: .97;
 }
 
 @media (prefers-reduced-motion:reduce) {
@@ -336,11 +365,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizelegibility;
-  letter-spacing: -.006em;
 }
 
 ::selection {
-  background: #1f7a5a2e;
+  background: #0c7a5629;
 }
 
 a:focus-visible,
@@ -356,13 +384,13 @@ textarea:focus-visible {
 input,
 textarea {
   border-radius: var(--radius-sm);
-  border-color: var(--line);
+  border-color: var(--control-edge);
   transition: border-color .15s,box-shadow .15s,background .15s;
 }
 
 input:hover,
 textarea:hover {
-  border-color: #c5cdc8;
+  border-color: #5a6472;
 }
 
 input:focus,
@@ -376,16 +404,123 @@ textarea.resize-none {
   resize: none;
 }
 
+/* Baseline for controls that no component class styles. :where() keeps the
+   specificity at zero, so every component rule still wins. Without this a
+   bare select, textarea, fieldset or file input fell back to the browser's
+   grey chrome inside an otherwise finished panel. */
+:where(textarea) {
+  width: 100%;
+  min-height: 88px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  line-height: 1.5;
+}
+
+:where(select) {
+  appearance: none;
+  width: 100%;
+  min-height: 40px;
+  color: var(--ink);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%235a6472' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E") no-repeat right 11px center;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
+  padding: 0 32px 0 11px;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+:where(select:hover) {
+  border-color: #5a6472;
+}
+
+:where(select[multiple]) {
+  background-image: none;
+  padding: 6px;
+}
+
+:where(fieldset) {
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+:where(legend) {
+  color: var(--muted);
+  padding: 0 4px;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+:where(input[type=file]) {
+  min-height: 44px;
+  padding: 6px;
+  color: var(--muted);
+  font-size: .82rem;
+  background: #fafbfc;
+  border-style: dashed;
+}
+
+input[type=file]::file-selector-button {
+  margin-right: 12px;
+  min-height: 30px;
+  padding: 0 12px;
+  color: var(--ink);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+input[type=file]::file-selector-button:hover {
+  background: var(--bg);
+  border-color: var(--line-strong);
+}
+
+/* A bare button with no component class: a quiet outline control. */
+:where(button:not([class])) {
+  min-height: 36px;
+  padding: 0 14px;
+  color: var(--ink);
+  font-size: .8rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--control-edge);
+  border-radius: 7px;
+  transition: border-color .15s, background .15s, scale .11s ease;
+}
+
+:where(button:not([class]):hover:not(:disabled)) {
+  background: var(--bg);
+  border-color: var(--line-strong);
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+}
+
 :root {
-  --workspace-bg: #f4f6f7;
+  --workspace-bg: #f6f7f9;
   --workspace-panel: #fff;
-  --workspace-ink: #162027;
-  --workspace-muted: #66727b;
-  --workspace-line: #dfe4e7;
+  --workspace-ink: #0e141b;
+  --workspace-muted: #5a6472;
+  --workspace-line: #e5e8ec;
   /* A control edge needs 3:1. The old #ccd4d8 gave 1.28:1. */
   --workspace-line-strong: var(--line-strong);
-  --workspace-nav: #111b22;
-  --workspace-nav-soft: #1b2932;
+  --workspace-nav: #0a0e13;
+  --workspace-nav-soft: #141b23;
+  --workspace-nav-line: #ffffff14;
   /* These four names stay for the existing call sites, but they now resolve to
      the one palette above. DESIGN.md forbids a second token palette. */
   --workspace-green: var(--green);
@@ -393,11 +528,11 @@ textarea.resize-none {
   --workspace-blue: var(--blue);
   --workspace-amber: var(--state-warning-ink);
   --workspace-danger: var(--state-danger);
-  --workspace-shadow: 0 1px 2px #111b220a, 0 8px 24px #111b220f;
+  --workspace-shadow: 0 1px 2px #0e141b08, 0 1px 3px #0e141b0a;
 }
 
 body {
-  letter-spacing: 0;
+  letter-spacing: -.003em;
   background: var(--workspace-bg);
 }
 
@@ -405,14 +540,22 @@ button,
 input,
 select,
 textarea,
-h1,
-h2,
-h3,
 p,
 span,
 small,
 strong {
-  letter-spacing: 0;
+  letter-spacing: inherit;
+}
+
+/* Display type tightens as it grows; that is what makes large Geist read as
+   engineered rather than loud. */
+h1 {
+  letter-spacing: -.025em;
+}
+
+h2,
+h3 {
+  letter-spacing: -.015em;
 }
 
 /* Public device URL box. Used by the public inventory page and by the Inventory
@@ -421,7 +564,7 @@ strong {
    read as one URL, and the links overlapped when they wrapped. */
 .public-url-box {
   background: var(--soft-blue);
-  border: 1px solid #cbd8e8;
+  border: 1px solid #cdd9ee;
   border-radius: 8px;
   gap: 6px;
   min-width: 0;
@@ -435,7 +578,8 @@ strong {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-  font-size: .85rem;
-  font-weight: 850;
+  font-family: var(--font-mono);
+  font-size: .8rem;
+  font-weight: 500;
   overflow: hidden;
 }

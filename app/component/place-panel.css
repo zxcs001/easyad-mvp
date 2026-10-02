@@ -26,19 +26,21 @@
 }
 
 .place-comment-meta strong {
-  font-size: .88rem;
+  font-size: .8rem;
+  font-weight: 600;
 }
 
 .place-comment-meta span {
   color: var(--muted);
-  font-size: .76rem;
+  font-family: var(--font-mono);
+  font-size: .68rem;
 }
 
 .place-comment p {
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
-  font-size: .9rem;
+  font-size: .8rem;
   line-height: 1.45;
 }
 
@@ -46,9 +48,11 @@
   min-height: 60px;
   color: var(--muted);
   text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
   place-items: center;
   padding: 14px;
-  font-size: .88rem;
+  font-size: .78rem;
   display: grid;
 }
 
@@ -61,11 +65,12 @@
 .place-comment-form textarea {
   resize: none;
   resize: vertical;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius-sm);
-  min-height: 44px;
+  min-height: 40px;
   color: var(--ink);
   font: inherit;
+  font-size: .8rem;
   background: #fff;
   flex: 1;
   padding: 9px 11px;
@@ -79,7 +84,7 @@
 .place-comment-signin {
   color: var(--muted);
   margin: 12px 0 0;
-  font-size: .86rem;
+  font-size: .78rem;
 }
 
 @media (max-width:560px) {

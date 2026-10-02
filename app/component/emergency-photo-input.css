@@ -1,6 +1,8 @@
-.emergency-photo-input { display: grid; gap: 10px; min-width: 0; }
-.emergency-photo-input label { display: grid; gap: 7px; font-weight: 600; }
-.emergency-photo-input input { width: 100%; max-width: 100%; }
-.emergency-photo-input small { color: #526963; line-height: 1.5; }
-.emergency-photo-input img { max-width: 100%; width: 180px; max-height: 240px; object-fit: contain; border-radius: 8px; background: #edf2ef; }
+.emergency-photo-input { display: grid; gap: 8px; min-width: 0; }
+.emergency-photo-input label { display: grid; gap: 6px; font-size: .8rem; font-weight: 560; }
+/* The base file-input look (dashed well, outline picker button) comes from
+   globals.css; this only sizes it to the column. */
+.emergency-photo-input input { width: 100%; max-width: 100%; font-weight: 400; }
+.emergency-photo-input small { color: var(--muted); font-size: .74rem; line-height: 1.5; }
+.emergency-photo-input img { max-width: 100%; width: 180px; max-height: 240px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--state-idle-surface); }
 .emergency-photo-input button { justify-self: start; }

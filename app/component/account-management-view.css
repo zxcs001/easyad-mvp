@@ -1,5 +1,8 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
+/* Account rows: name and email on the left; the status pill over the role on
+   the right, so long names no longer wrap to three lines beside two columns. */
+
 @media (max-width:620px) {
 
 .account-filters {
@@ -21,15 +24,27 @@
 
 .account-list {
   max-height: 420px;
-  margin-top: 18px;
+  margin-top: 14px;
   overflow: auto;
 }
 
+.account-list,
+.account-campaign-list,
+.account-upload-list {
+  gap: 6px;
+}
+
+/* Search takes its own line: in the narrow list column it shared a row with
+   both filters and cut its placeholder to "Name,". */
 .account-filters {
-  grid-template-columns: minmax(0,1fr) repeat(2,minmax(106px,.6fr));
+  grid-template-columns: repeat(2,minmax(0,1fr));
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 14px;
   display: grid;
+}
+
+.account-filters > .account-search-field {
+  grid-column: 1 / -1;
 }
 
 .account-filters label {
@@ -69,7 +84,7 @@
 
 .account-search-control button:hover {
   color: var(--ink);
-  background: var(--soft-green);
+  background: var(--bg);
 }
 
 .account-search-control svg {
@@ -91,17 +106,61 @@
   cursor: pointer;
   text-align: left;
   background: #fff;
-  grid-template-columns: minmax(0,1fr) auto auto;
+  grid-template-columns: minmax(0,1fr) auto;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 11px;
+  gap: 3px 10px;
+  padding: 9px 11px;
+  font-size: .8rem;
   display: grid;
+  transition: border-color .14s, background .14s;
 }
 
-.account-list-item:hover,
+.account-list-item > span:first-child {
+  grid-row: 1 / 3;
+  min-width: 0;
+}
+
+.account-list-item > .status {
+  justify-self: end;
+}
+
+.account-list-item > small:last-child {
+  text-align: right;
+  justify-self: end;
+  font-size: .7rem;
+}
+
+.account-list-item strong {
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.account-list-item > span:first-child small {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.account-list-item:hover {
+  border-color: var(--control-edge);
+  background: #fafbfc;
+}
+
 .account-list-item.selected {
-  border-color: var(--blue);
-  background: var(--soft-blue);
+  border-color: var(--green);
+  background: #f2faf6;
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.account-list-item:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
+}
+
+.account-list-item.selected:focus-visible {
+  box-shadow: inset 3px 0 0 var(--green), var(--ring);
 }
 
 .account-list-item strong,
@@ -118,30 +177,37 @@
 .account-campaign-row small,
 .account-upload-row small {
   color: var(--muted);
-  font-size: .78rem;
+  font-size: .74rem;
 }
 
 .account-create-form {
   border-top: 1px solid var(--line);
   gap: 10px;
-  margin-top: 18px;
-  padding-top: 18px;
+  margin-top: 16px;
+  padding-top: 16px;
   display: grid;
+}
+
+.account-create-form > .eyebrow {
+  color: var(--muted);
+  letter-spacing: .08em;
+  font-size: .62rem;
 }
 
 .account-create-form label,
 .account-controls label {
-  color: var(--muted);
-  gap: 5px;
-  font-size: .82rem;
+  color: var(--ink);
+  gap: 6px;
+  font-size: .78rem;
+  font-weight: 560;
   display: grid;
 }
 
 .account-role-help {
-  color: var(--muted);
-  background: var(--soft-blue);
+  color: var(--state-info-ink);
+  background: var(--state-info-surface);
   border-inline-start: 3px solid var(--blue);
-  border-radius: 5px;
+  border-radius: 6px;
   margin: 0;
   padding: 9px 10px;
   font-size: .78rem;
@@ -152,9 +218,17 @@
   border-bottom: 1px solid var(--line);
   color: var(--ink);
   justify-content: space-between;
+  align-items: baseline;
   gap: 12px;
-  padding-bottom: 16px;
+  padding-bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: .8rem;
   display: flex;
+}
+
+.account-identity small {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
 .account-controls {
@@ -166,9 +240,10 @@
 }
 
 .account-message {
-  color: var(--blue);
+  color: var(--state-info-ink);
+  font-size: .82rem;
   margin: 0 0 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .account-delete-confirmation {
@@ -182,11 +257,30 @@
   padding-top: 16px;
 }
 
+/* Straight after the identity row its own hairline already divides them. */
+.account-identity + .account-history-section {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 14px;
+}
+
 .account-history-heading {
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: 10px;
   display: flex;
+}
+
+.account-history-heading .eyebrow {
+  color: var(--muted);
+  letter-spacing: .08em;
+  font-size: .62rem;
+}
+
+.account-history-heading > strong {
+  font-size: .8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .account-campaign-row {
@@ -196,7 +290,9 @@
   grid-template-columns: minmax(0,1fr) auto auto;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 9px 11px;
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
   display: grid;
 }
 
@@ -214,7 +310,8 @@
 }
 
 a.account-upload-row:hover {
-  border-color: var(--blue);
+  border-color: var(--control-edge);
+  background: #fafbfc;
 }
 
 .account-upload-row.unavailable {
@@ -224,8 +321,8 @@ a.account-upload-row:hover {
 .account-upload-row img,
 .account-upload-row video {
   object-fit: cover;
-  background: #eef3f6;
-  border-radius: 3px;
+  background: var(--state-idle-surface);
+  border-radius: 4px;
   width: 72px;
   height: 52px;
   display: block;
@@ -260,5 +357,12 @@ a.account-upload-row:hover {
 .account-controls,
 .account-campaign-row {
   grid-template-columns: 1fr;
+}
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.account-list-item {
+  transition: none;
 }
 }

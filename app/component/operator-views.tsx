@@ -611,7 +611,7 @@ function CalendarCell({ item, weekStart, bookings }: { item: InventoryItem; week
   const booking = bookings.find((entry) => entry.status !== "cancelled" && entry.inventoryId === item.id && overlaps(toDate(weekStart), toDate(weekEnd), entry.start, entry.end));
   // A short label per status. It printed the first word of the status, so a
   // cell read "pending" or "creative", untranslated even in French.
-  return <span className={`cal-cell ${booking ? "booked" : "available"}`}>{t(booking ? calendarStatusLabels[booking.status] ?? capitalize(booking.status) : "Available")}</span>;
+  return <span className={`cal-cell ${booking ? `booked cal-${booking.status.replace(/\s+/g, "-")}` : "available"}`}>{t(booking ? calendarStatusLabels[booking.status] ?? capitalize(booking.status) : "Available")}</span>;
 }
 
 const calendarStatusLabels: Record<string, string> = {

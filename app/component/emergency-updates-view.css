@@ -1,26 +1,48 @@
-.emergency-updates { display: grid; gap: 20px; }
-.emergency-delivery-note { margin: 0; line-height: 1.6; max-width: 1000px; }
-.emergency-update-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-.emergency-compose-fields { border: 0; padding: 0; margin: 0 0 18px; display: grid; gap: 16px; min-width: 0; }
-.emergency-compose-fields label { display: grid; gap: 7px; font-weight: 600; }
-.emergency-compose-fields input:not([type="checkbox"]), .emergency-compose-fields select, .emergency-compose-fields textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line, #cdd8d4); border-radius: 8px; background: #fff; color: #182c28; font: inherit; }
-.emergency-compose-fields textarea { resize: vertical; min-height: 160px; }
-.emergency-compose-fields .emergency-confirm { display: flex; align-items: flex-start; line-height: 1.5; }
-.emergency-confirm input { margin-top: 5px; }
-.emergency-template-prompts { display: grid; gap: 7px; padding: 12px 14px; background: #fff7e2; border: 1px solid #e2c47c; border-radius: 8px; line-height: 1.5; }
-.emergency-template-prompts span { font-size: .9rem; color: #665522; }
-.emergency-photo-hint { margin: 0; color: #526963; line-height: 1.5; }
-.emergency-matched-screens ul { max-height: 240px; overflow: auto; list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
-.emergency-matched-screens li, .emergency-delivery-list > div { display: grid; gap: 5px; }
-.emergency-matched-screens small, .emergency-update-record small { color: #526963; }
-.emergency-preview-frame { border: 1px solid #cdd8d4; border-radius: 10px; overflow: hidden; }
+/* Emergency updates. Emergency controls stay visually apart from routine
+   campaign actions: publishing uses the amber .warning-button, never the green
+   primary. The weight-4 emergency pair (--state-emergency-*) is reserved for an
+   active override on screen and is not used here. */
+.emergency-updates { display: grid; gap: 16px; }
+.emergency-delivery-note { color: var(--muted); margin: 0; font-size: .86rem; line-height: 1.6; max-width: 92ch; }
+.emergency-update-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.emergency-compose-fields { border: 0; padding: 0; margin: 0 0 16px; display: grid; gap: 14px; min-width: 0; }
+.emergency-compose-fields label { display: grid; gap: 6px; font-size: .8rem; font-weight: 560; }
+/* background-color, not the shorthand: the shorthand removed the select chevron. */
+.emergency-compose-fields input:not([type="checkbox"]):not([type="file"]), .emergency-compose-fields select, .emergency-compose-fields textarea { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--control-edge); border-radius: var(--radius-sm); background-color: #fff; color: var(--ink); font: inherit; font-size: .86rem; font-weight: 400; }
+.emergency-compose-fields select { padding-right: 32px; }
+.emergency-compose-fields input:not([type="checkbox"]):not([type="file"]):hover, .emergency-compose-fields select:hover, .emergency-compose-fields textarea:hover { border-color: #5a6472; }
+.emergency-compose-fields input:not([type="checkbox"]):not([type="file"]):focus, .emergency-compose-fields select:focus, .emergency-compose-fields textarea:focus { border-color: var(--green); box-shadow: var(--ring); outline: none; }
+.emergency-compose-fields textarea { resize: vertical; min-height: 140px; line-height: 1.5; }
+.emergency-compose-fields > .secondary-button { justify-self: stretch; }
+/* The confirmation: one framed row, checkbox at the start of the first line.
+   As a flex label with a full-width input rule it drew a large empty box and
+   pushed the sentence to the right. */
+.emergency-compose-fields .emergency-confirm { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 10px; padding: 11px 12px; border: 1px solid var(--control-edge); border-radius: var(--radius-sm); background: #fafbfc; font-weight: 500; line-height: 1.45; cursor: pointer; }
+.emergency-compose-fields .emergency-confirm:hover { border-color: var(--line-strong); }
+.emergency-compose-fields .emergency-confirm:has(input:checked) { border-color: var(--ink); background: #fff; box-shadow: inset 0 0 0 1px var(--ink); }
+.emergency-confirm input { width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; accent-color: var(--ink); }
+.emergency-template-prompts { display: grid; gap: 5px; padding: 10px 12px; color: var(--state-warning-ink); background: var(--state-warning-surface); border: 1px solid #e3c46f; border-radius: var(--radius-sm); font-size: .8rem; line-height: 1.5; }
+.emergency-template-prompts span { font-size: .78rem; color: var(--state-warning-ink); }
+.emergency-photo-hint { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.emergency-matched-screens { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; font-size: .8rem; }
+.emergency-matched-screens > strong { font-family: var(--font-mono); font-size: .64rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.emergency-matched-screens ul { max-height: 240px; overflow: auto; list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; }
+.emergency-matched-screens li { padding: 7px 0; border-top: 1px solid var(--line); }
+.emergency-matched-screens li strong { font-size: .8rem; font-weight: 600; }
+.emergency-matched-screens li, .emergency-delivery-list > div { display: grid; gap: 4px; }
+.emergency-matched-screens small, .emergency-update-record small { color: var(--muted); font-size: .74rem; }
+.emergency-preview-frame { border: 1px solid #0a0e13; border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-sm); }
 .emergency-update-preview p { line-height: 1.6; }
-.emergency-update-record { margin-top: 20px; border: 1px solid #cdd8d4; border-radius: 10px; padding: 18px; }
-.emergency-record-photo { display: block; width: 160px; max-width: 100%; max-height: 200px; object-fit: contain; margin-bottom: 16px; background: #edf2ef; border-radius: 8px; }
-.emergency-record-head { display: flex; gap: 16px; align-items: start; justify-content: space-between; }
-.emergency-record-head h3 { margin: 0 0 6px; }
-.emergency-delivery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.emergency-delivery-list > div { background: #f3f7f5; border-radius: 8px; padding: 12px; }
+/* Only the panel's own note: a bare "p" also restyled the alert text inside the screen preview. */
+.emergency-update-preview > p { color: var(--muted); font-size: .84rem; line-height: 1.55; }
+.emergency-update-record { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.emergency-record-photo { display: block; width: 160px; max-width: 100%; max-height: 200px; object-fit: contain; margin-bottom: 14px; background: var(--state-idle-surface); border-radius: var(--radius-sm); }
+.emergency-record-head { display: flex; gap: 16px; align-items: start; justify-content: space-between; margin-bottom: 12px; }
+.emergency-record-head h3 { margin: 0 0 4px; font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
+.emergency-delivery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.emergency-delivery-list > div { background: #fafbfc; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; font-size: .8rem; font-variant-numeric: tabular-nums; }
 .emergency-delivery-list .status { width: fit-content; }
 @media (max-width: 1000px) { .emergency-update-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .emergency-delivery-list { grid-template-columns: 1fr; } .emergency-record-head { flex-direction: column; } }
+/* Delivery status panel notes (bare paragraphs in the panel). */
+.emergency-updates > .panel > p:not(.form-error) { color: var(--muted); margin: 0 0 8px; font-size: .84rem; line-height: 1.55; }

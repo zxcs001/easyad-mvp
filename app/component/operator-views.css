@@ -10,7 +10,7 @@
 
 .media-card a {
   color: var(--blue);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .media-upload {
@@ -26,7 +26,7 @@
   align-items: center;
   min-height: 38px;
   padding: 0 14px;
-  font-weight: 800;
+  font-weight: 600;
   display: inline-flex;
 }
 
@@ -39,14 +39,17 @@
 
 .automation-list>div {
   border: 1px solid var(--line);
-  background: #fbfcfb;
+  background: #fafbfc;
   border-radius: 8px;
-  padding: 12px;
+  padding: 11px 12px;
+  font-size: .82rem;
 }
 
 .automation-list span {
   color: var(--muted);
-  font-size: .82rem;
+  margin-top: 2px;
+  font-size: .76rem;
+  line-height: 1.45;
   display: block;
 }
 
@@ -78,7 +81,7 @@
 .media-card img,
 .media-card video {
   object-fit: cover;
-  background: #edf1f2;
+  background: var(--state-idle-surface);
   border-radius: 7px;
   width: 96px;
   height: 70px;
@@ -114,8 +117,87 @@
 
 .inventory-management-table .table-head,
 .inventory-management-table .table-row {
-  grid-template-columns: minmax(0,1.2fr) minmax(0,.85fr) minmax(0,.85fr) minmax(0,.72fr) minmax(0,.75fr) minmax(0,.9fr) minmax(0,.9fr);
+  grid-template-columns: minmax(0,1.75fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,.5fr) minmax(0,.8fr) minmax(0,.8fr) minmax(0,.8fr);
+  column-gap: 14px;
   min-width: 760px;
+}
+
+/* Console table: flush rows divided by hairlines instead of one boxed card per
+   row, and one text size in every cell. The Operator cell was plain text at the
+   body size (1rem) beside .78rem secondary lines. */
+.inventory-management-table.inventory-table {
+  gap: 0;
+}
+
+.inventory-management-table .table-head {
+  padding: 8px 12px;
+}
+
+.inventory-management-table .table-row {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: .8rem;
+  line-height: 1.4;
+}
+
+.inventory-management-table .table-row:last-child {
+  border-bottom: 0;
+}
+
+.inventory-management-table .table-row.selected {
+  border-color: var(--line);
+}
+
+.inventory-management-table .table-row strong {
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.inventory-management-table .table-row small {
+  margin-top: 2px;
+  font-size: .74rem;
+  line-height: 1.4;
+}
+
+/* The tag line under the address: one quiet mono line, cut with an ellipsis.
+   The full tag list stays editable in the record panel. */
+.inventory-management-table .table-row > span:first-child small + small {
+  font-family: var(--font-mono);
+  font-size: .66rem;
+  letter-spacing: .01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+}
+
+.inventory-management-table .table-row > span:nth-child(4),
+.inventory-management-table .table-row > span:nth-child(5),
+.inventory-management-table .table-row > span:nth-child(6) {
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-management-table .table-row > span:nth-child(3) .status {
+  border-radius: 5px;
+  min-height: 20px;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+
+.inventory-management-table .table-row > span:nth-child(3) small {
+  margin-top: 4px;
+}
+
+.inventory-management-table .meter {
+  height: 5px;
+  margin-bottom: 5px;
 }
 
 /* With minmax(0, ...) a cell no longer grows, so a long pill such as
@@ -144,35 +226,85 @@
   display: grid;
 }
 
+.calendar-head,
+.calendar-row {
+  gap: 6px;
+}
+
 .calendar-head {
   color: var(--muted);
-  margin-bottom: 8px;
-  font-size: .76rem;
-  font-weight: 850;
+  border-bottom: 1px solid var(--line);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 0;
+  padding-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
 }
 
 .calendar-row {
-  border-top: 1px solid var(--line);
-  padding: 8px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
 }
 
+.calendar-row:last-child {
+  border-bottom: 0;
+}
+
+.calendar-row > strong {
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Each cell keeps its text label; the state ladder only reinforces it. */
 .cal-cell {
-  border-radius: 7px;
+  color: var(--state-idle-ink);
+  background: var(--state-idle-surface);
+  border: 1px solid #0000;
+  border-radius: 6px;
   place-items: center;
-  min-height: 34px;
-  font-size: .76rem;
-  font-weight: 850;
+  min-height: 30px;
+  font-size: .72rem;
+  font-weight: 560;
   display: grid;
 }
 
 .cal-cell.available {
-  background: var(--soft-green);
-  color: var(--green-dark);
+  color: var(--muted);
+  background: #fff;
+  border: 1px dashed var(--control-edge);
 }
 
-.cal-cell.booked {
-  background: var(--soft-blue);
-  color: var(--blue);
+.cal-cell.booked.cal-live,
+.cal-cell.booked.cal-approved {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+}
+
+.cal-cell.booked.cal-live {
+  border-color: #b9dccb;
+}
+
+.cal-cell.booked.cal-scheduled {
+  color: var(--state-info-ink);
+  background: var(--state-info-surface);
+}
+
+.cal-cell.booked.cal-pending-approval,
+.cal-cell.booked.cal-creative-review {
+  color: var(--state-warning-ink);
+  /* A paler tint of the weight-2 surface: a grid of many pending weeks read as
+     an alarm at full strength. Ink stays the weight-2 ink (6.1:1). */
+  background: #fdf4d8;
+  border-color: #f1d98c;
+}
+
+.cal-cell.booked.cal-rejected {
+  color: var(--state-danger-ink);
+  background: var(--state-danger-surface);
 }
 
 .approval-list {
@@ -191,7 +323,9 @@
   grid-template-columns: .72fr 1.4fr 1fr 1.1fr;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 12px;
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
   display: grid;
 }
 
@@ -202,22 +336,87 @@
 
 .approval-history-row small {
   color: var(--muted);
-  font-size: .78rem;
+  font-size: .74rem;
+}
+
+.approval-history-row strong {
+  font-weight: 600;
 }
 
 .approval-card {
   border: 1px solid var(--line);
   background: #fff;
   border-radius: 8px;
-  grid-template-columns: minmax(220px,1fr) auto auto auto;
+  grid-template-columns: minmax(220px,1fr) minmax(5.5rem,max-content) minmax(7.5rem,max-content) auto;
   align-items: center;
   gap: 12px;
-  padding: 13px;
+  padding: 12px 14px;
+  font-size: .8rem;
   display: grid;
 }
 
 .approval-card.has-creative-preview {
-  grid-template-columns: minmax(220px,1fr) minmax(132px,174px) auto auto auto;
+  grid-template-columns: minmax(220px,1fr) 160px minmax(5.5rem,max-content) minmax(7.5rem,max-content) auto;
+}
+
+/* Fixed status tracks line the pills and buttons up from card to card. A
+   device-media card has one status, so it fills both status tracks. */
+.approval-card > .status {
+  justify-self: start;
+}
+
+@media (min-width:1181px) {
+
+.approval-card.has-creative-preview > .approval-creative-preview + .status:nth-last-child(2) {
+  grid-column: span 2;
+}
+}
+
+.approval-card > div:first-child {
+  gap: 2px;
+  min-width: 0;
+  display: grid;
+}
+
+.approval-card .eyebrow {
+  color: var(--muted);
+  letter-spacing: .08em;
+  font-size: .62rem;
+}
+
+.approval-card > div:first-child > strong {
+  margin: 1px 0 2px;
+  font-size: .88rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.approval-card small {
+  font-size: .74rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The capacity check reads as a quiet note, not a second pill competing with
+   the review state: a dot and its label. "Over capacity" stays a danger pill. */
+.approval-card > .status.good {
+  color: var(--state-success-ink);
+  background: transparent;
+  border-color: transparent;
+  padding: 0 2px;
+}
+
+.approval-card > .status.good::before {
+  content: "";
+  background: var(--green);
+  border-radius: 50%;
+  flex: none;
+  width: 6px;
+  height: 6px;
+}
+
+.approval-card > .status:not(.good):not(.bad) {
+  border-radius: 5px;
 }
 
 /* Five columns need at least 758px. This rule is more specific than the
@@ -241,7 +440,7 @@
   color: var(--blue);
   gap: 5px;
   font-size: .76rem;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   display: grid;
 }
@@ -251,8 +450,8 @@
 .approval-creative-preview iframe {
   border: 1px solid var(--line);
   object-fit: cover;
-  background: #eef3f6;
-  border-radius: 4px;
+  background: var(--state-idle-surface);
+  border-radius: 6px;
   width: 100%;
   height: 84px;
   display: block;
@@ -302,12 +501,12 @@
 
 .device-creation-steps li {
   color: var(--muted);
-  border-bottom: 3px solid var(--line);
+  border-bottom: 2px solid var(--line);
   align-items: center;
   gap: 8px;
   padding: 0 4px 10px;
   font-size: .82rem;
-  font-weight: 750;
+  font-weight: 600;
   display: flex;
 }
 
@@ -315,21 +514,24 @@
   border: 1px solid var(--line);
   border-radius: 50%;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 500;
   display: grid;
 }
 
 .device-creation-steps .is-current {
   color: var(--ink);
-  border-bottom-color: var(--blue);
+  border-bottom-color: var(--green);
 }
 
 .device-creation-steps .is-current > span,
 .device-creation-steps .is-complete > span {
   color: #fff;
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--green);
+  border-color: var(--green);
 }
 
 .device-creation-stage {
@@ -347,7 +549,9 @@
 
 .device-stage-heading h3 {
   margin-top: 3px;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -.015em;
 }
 
 .device-stage-heading p {
@@ -367,7 +571,7 @@
 .device-type-choice legend {
   margin-bottom: 7px;
   font-size: .82rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .device-type-choice label {
@@ -381,8 +585,9 @@
 }
 
 .device-type-choice label:has(input:checked) {
-  background: var(--soft-blue);
-  border-color: var(--blue);
+  background: #f2faf6;
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
 }
 
 .device-type-choice strong,
@@ -418,7 +623,7 @@
 .device-review-list dt {
   color: var(--muted);
   font-size: .78rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .device-review-list dd {
@@ -453,14 +658,34 @@
 .approval-actions button:first-child,
 .approval-actions a:first-child {
   background: var(--green);
+  border-color: var(--green);
   color: #fff;
 }
 
+.approval-actions button:first-child:hover:not(:disabled),
+.approval-actions a:first-child:hover {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+/* Reject: danger outline, so it never carries the same weight as Approve. */
 .approval-actions button:last-child,
 .approval-actions a:last-child {
-  color: #8f301f;
-  background: #fff0ec;
-  border-color: #efc2b8;
+  color: var(--state-danger-ink);
+  background: #fff;
+  border-color: #eab3bc;
+}
+
+.approval-actions button:last-child:hover:not(:disabled),
+.approval-actions a:last-child:hover {
+  background: var(--state-danger-surface);
+  border-color: var(--state-danger);
+}
+
+.approval-actions button:focus-visible,
+.approval-actions a:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
 }
 
 .decision-banner,
@@ -470,24 +695,25 @@
   gap: 4px;
   margin-bottom: 12px;
   padding: 12px 14px;
+  font-size: .82rem;
   display: grid;
 }
 
 .decision-banner.good {
-  color: #276849;
-  background: #eaf7ef;
-  border-color: #bfddca;
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: #b9dccb;
 }
 
 .decision-banner.bad {
-  color: #9d4534;
-  background: #fff0ed;
-  border-color: #f1c5ba;
+  color: var(--state-danger-ink);
+  background: var(--state-danger-surface);
+  border-color: #f2c6cd;
 }
 
 .empty-state {
   color: var(--muted);
-  background: #f8faf9;
+  background: #fafbfc;
 }
 
 /* The record panel was a fixed 360px column down to 901px. With the full
@@ -548,7 +774,7 @@
   border-radius: 6px;
   min-height: 36px;
   font-size: .78rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .inventory-table {
@@ -605,5 +831,32 @@
 
 .device-creation-actions button {
   width: 100%;
+}
+}
+
+/* Stacked approval cards: the capacity note and the review pill share one line
+   instead of taking a row each, and Approve and Reject sit side by side. */
+@media (max-width:900px) {
+
+.approval-list .approval-card,
+.approval-list .approval-card.has-creative-preview {
+  grid-template-columns: max-content minmax(0,1fr);
+  gap: 10px 12px;
+}
+
+.approval-list .approval-card > * {
+  grid-column: 1 / -1;
+}
+
+.approval-list .approval-card > .status {
+  grid-column: auto;
+  justify-self: start;
+}
+}
+
+@media (max-width:600px) {
+
+.approval-list .approval-actions {
+  grid-template-columns: 1fr 1fr;
 }
 }

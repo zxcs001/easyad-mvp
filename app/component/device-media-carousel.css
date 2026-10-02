@@ -89,11 +89,12 @@
   right: clamp(14px,3cqw,40px);
 }
 
+/* Hover is a fill and edge change, not a lift; the translateY keeps it centred. */
 .device-nav:hover {
   opacity: 1;
   background: #12161ab8;
   border-color: #fff9;
-  transform: translateY(-50%)scale(1.06);
+  transform: translateY(-50%);
 }
 
 .device-nav:active {

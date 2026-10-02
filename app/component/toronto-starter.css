@@ -51,18 +51,19 @@
   display: grid;
   gap: 3px;
   padding-left: 13px;
-  border-left: 4px solid #111713;
+  border-left: 2px solid #111713;
   text-transform: uppercase;
 }
 
 .toronto-starter-brand strong {
-  font-size: .92rem;
+  font-size: .86rem;
+  font-weight: 600;
   letter-spacing: .08em;
 }
 
 .toronto-starter-brand span,
 .toronto-starter-meta {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: .64rem;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -103,27 +104,27 @@
 .starter-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   margin: 0;
-  padding: 8px 14px;
-  color: #ecf3ee;
-  background: rgba(13, 21, 16, .8);
-  border: 1px solid rgba(255, 255, 255, .14);
-  border-radius: 999px;
+  padding: 6px 10px;
+  color: #e8edf2;
+  background: #0a0e13d9;
+  border: 1px solid #ffffff1f;
+  border-radius: 6px;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: .64rem;
-  font-weight: 700;
-  letter-spacing: .14em;
+  font-weight: 500;
+  letter-spacing: .1em;
   text-transform: uppercase;
 }
 
 .starter-eyebrow i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #3ddc97;
+  background: var(--signal);
   animation: starter-pulse 2.2s ease-out infinite;
 }
 
@@ -136,26 +137,29 @@
 .toronto-starter-action h1 {
   margin: 0;
   color: #0d1410;
-  font-size: clamp(2.9rem, 7.2vw, 6.2rem);
-  font-weight: 750;
-  letter-spacing: -.035em;
-  line-height: .94;
+  font-size: clamp(2.6rem, 6.2vw, 5.4rem);
+  font-weight: 600;
+  letter-spacing: -.045em;
+  line-height: .98;
   text-wrap: balance;
 }
 
+/* The accent word stays in the Geist face: emerald, upright, same weight.
+   A serif italic read as editorial; this reads as product. */
 .toronto-starter-action h1 em {
-  font-family: Iowan Old Style, Baskerville, Times New Roman, Times, serif;
-  font-style: italic;
-  font-weight: 500;
-  letter-spacing: -.01em;
+  color: var(--green-dark);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -.045em;
 }
 
 .starter-sub {
   margin: 0;
   max-width: 54ch;
-  color: #17211bd6;
-  font-size: clamp(.98rem, 1.4vw, 1.12rem);
-  font-weight: 500;
+  color: #17211be0;
+  font-size: clamp(.98rem, 1.3vw, 1.08rem);
+  font-weight: 450;
   line-height: 1.55;
 }
 
@@ -170,50 +174,50 @@
 .toronto-starter-action button {
   display: inline-flex;
   align-items: center;
-  gap: 18px;
-  min-height: 64px;
-  padding: 0 10px 0 30px;
-  border: 1px solid #0d1410;
-  border-radius: 999px;
-  color: #f4f6ef;
-  background: #0d1410;
-  font-size: 1.06rem;
-  font-weight: 650;
+  gap: 14px;
+  min-height: 52px;
+  padding: 0 8px 0 22px;
+  border: 1px solid var(--workspace-nav);
+  border-radius: 10px;
+  color: #f3f6f9;
+  background: var(--workspace-nav);
+  font-size: .95rem;
+  font-weight: 600;
   letter-spacing: -.01em;
-  box-shadow: 0 20px 44px rgba(13, 20, 16, .32);
-  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+  box-shadow: 0 1px 2px #0e141b29, 0 10px 28px #0e141b29;
+  transition: box-shadow .2s ease, background .2s ease;
 }
 
 .toronto-starter-action button:hover,
 .toronto-starter-action button:focus-visible {
-  background: #16241c;
-  transform: translateY(-2px);
-  box-shadow: 0 26px 56px rgba(13, 20, 16, .38);
+  background: #18212b;
 }
 
 .toronto-starter-action button:active {
-  transform: translateY(0) scale(.985);
+  scale: .985;
 }
 
 .starter-cta-arrow {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #f4f6ef;
-  color: #0d1410;
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  background: var(--green);
+  color: #fff;
   transition: transform .22s ease;
 }
 
 .starter-cta-arrow svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  transition: transform .22s ease;
   stroke-width: 2px;
 }
 
-.toronto-starter-action button:hover .starter-cta-arrow,
-.toronto-starter-action button:focus-visible .starter-cta-arrow {
+/* The arrow glyph turns, not its square tile. */
+.toronto-starter-action button:hover .starter-cta-arrow svg,
+.toronto-starter-action button:focus-visible .starter-cta-arrow svg {
   transform: rotate(45deg);
 }
 
@@ -221,9 +225,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #17211bcc;
+  color: #17211be0;
   font-size: .78rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -245,11 +249,11 @@
   padding: 15px 0 0;
   list-style: none;
   border-top: 1px solid #10191426;
-  color: #17211bab;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #17211bcc;
+  font-family: var(--font-mono);
   font-size: .62rem;
-  font-weight: 700;
-  letter-spacing: .13em;
+  font-weight: 500;
+  letter-spacing: .1em;
   text-transform: uppercase;
 }
 
@@ -264,7 +268,7 @@
   width: 5px;
   height: 5px;
   border-radius: 1px;
-  background: #1f7a5a;
+  background: var(--green);
 }
 
 .toronto-starter-meta {
@@ -299,15 +303,16 @@
 
 .toronto-map-loader span,
 .toronto-map-fallback small {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .1em;
   text-transform: uppercase;
 }
 
 .toronto-map-fallback span {
-  font-size: 4rem;
-  font-weight: 900;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -.02em;
   text-transform: uppercase;
 }
 
@@ -327,14 +332,16 @@ body.starter-active .chatbot-panel {
 
 @media (max-width: 640px) {
   .toronto-starter-brand { top: 18px; left: 18px; }
-  .toronto-starter-action { left: 18px; right: 18px; bottom: 24px; gap: 14px; }
-  .toronto-starter-action button { min-height: 56px; padding: 0 8px 0 22px; gap: 12px; font-size: .95rem; }
-  .starter-cta-arrow { width: 38px; height: 38px; }
+  /* Bottom 64px, not 24px: the fixed "Cookie settings" trigger (bottom-left,
+     about 32px tall) sat on top of the "Don't show this screen again" row. */
+  .toronto-starter-action { left: 18px; right: 18px; bottom: 64px; gap: 14px; }
+  .toronto-starter-action button { min-height: 50px; padding: 0 7px 0 18px; gap: 12px; font-size: .92rem; }
+  .starter-cta-arrow { width: 34px; height: 34px; }
   .starter-cta-arrow svg { width: 17px; height: 17px; }
   .starter-cta-row { gap: 14px; }
   .starter-features { display: none; }
   .toronto-starter-meta { display: none; }
-  .toronto-map-fallback span { font-size: 2.7rem; }
+  .toronto-map-fallback span { font-size: 1.6rem; }
   .toronto-starter .maplibregl-ctrl-top-right { top: 70px; right: 8px; }
 }
 

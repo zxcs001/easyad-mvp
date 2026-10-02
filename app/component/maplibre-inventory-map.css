@@ -10,7 +10,11 @@
   width: 100%;
   height: 100%;
   min-height: inherit;
-  background: #eaf1ed;
+  /* Neutral canvas with a faint survey grid. It shows only while tiles are
+     loading or unavailable; loaded tiles paint over it. */
+  background-color: var(--state-idle-surface);
+  background-image: linear-gradient(#0e141b0a 1px, transparent 1px), linear-gradient(90deg, #0e141b0a 1px, transparent 1px);
+  background-size: 40px 40px;
   position: relative;
   overflow: hidden;
 }
@@ -32,8 +36,10 @@
 
 .map-loading {
   color: var(--workspace-muted);
-  font-size: .9rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: .04em;
+  font-size: .74rem;
+  font-weight: 500;
   display: grid;
   place-items: center;
   position: absolute;
@@ -44,15 +50,15 @@
 .map-search {
   z-index: 3;
   background: #fff;
-  border: 1px solid #d6dde0;
-  border-radius: 7px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
   grid-template-columns: minmax(0,1fr) auto;
   width: min(340px,100% - 84px);
   display: grid;
   position: absolute;
   top: 14px;
   left: 14px;
-  box-shadow: 0 8px 22px #17202a2e;
+  box-shadow: 0 8px 22px #0e141b2e;
 }
 
 .map-search input {
@@ -71,10 +77,17 @@
 .map-search-actions > button {
   border: 0;
   color: var(--ink);
-  background: #f3f6f5;
+  background: var(--bg);
   border-radius: 0;
-  padding: 0 12px;
-  font-weight: 800;
+  min-height: 0;
+  padding: 0 14px;
+  font-size: .8rem;
+  font-weight: 600;
+  transition: background .14s;
+}
+
+.map-search-actions > button:hover {
+  background: var(--state-idle-surface);
 }
 
 .map-search-actions > button:first-child:not(:last-child) {
@@ -84,49 +97,63 @@
   font-size: 1.1rem;
 }
 
-.map-search-actions > button:last-child { border-radius: 0 6px 6px 0; }
+.map-search-actions > button:last-child { border-radius: 0 7px 7px 0; }
 
 .map-search-results {
   background: #fff;
-  border: 1px solid #d6dde0;
-  border-radius: 7px;
-  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 0;
   display: grid;
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
   overflow: hidden;
-  box-shadow: 0 10px 24px #17202a2e;
+  box-shadow: var(--shadow-lg);
 }
 
 .map-search-results button {
   text-align: left;
   background: #fff;
   border: 0;
+  border-bottom: 1px solid var(--line);
   border-radius: 0;
   gap: 2px;
-  padding: 9px 11px;
+  min-height: 0;
+  padding: 9px 12px;
+  font-size: .8rem;
   display: grid;
 }
 
+.map-search-results button:last-child {
+  border-bottom: 0;
+}
+
 .map-search-results button:hover {
-  background: var(--soft-green);
+  background: var(--bg);
 }
 
 .map-search-results span,
 .map-search-empty {
   color: var(--muted);
-  font-size: .76rem;
+  font-size: .72rem;
+  font-weight: 400;
 }
 
 .map-search-empty {
   padding: 10px 11px;
 }
 
-.maplibregl-ctrl-group {
-  border-radius: 7px;
-  box-shadow: 0 10px 24px #17202a29;
+.maplibre-shell .maplibregl-ctrl-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.maplibre-shell .maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
 }
 
 /* Scaling the anchor also scales MapLibre's pixel translation, making a
@@ -146,11 +173,11 @@
   display: block;
   overflow: visible;
   cursor: pointer;
-  filter: drop-shadow(0 3px 3px #17202a52);
+  filter: drop-shadow(0 3px 3px #0e141b52);
 }
 
 .maplibre-device-marker:hover {
-  filter: drop-shadow(0 3px 4px #17202a66);
+  filter: drop-shadow(0 3px 4px #0e141b66);
 }
 
 .maplibre-device-marker:focus-visible {
@@ -173,9 +200,9 @@
   min-width: 44px;
   min-height: 44px;
   padding: 0 9px;
-  box-shadow: 0 8px 18px #14503c52;
+  box-shadow: 0 0 0 1px #08573d33, 0 4px 12px #08573d40;
   font-size: .85rem;
-  font-weight: 850;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -189,7 +216,7 @@
 .maplibre-city-marker:hover,
 .fallback-city-marker:hover {
   background: var(--green-dark);
-  box-shadow: 0 10px 22px #14503c66;
+  box-shadow: 0 0 0 1px #08573d4d, 0 6px 16px #08573d4d;
 }
 
 .maplibre-city-marker:focus-visible,
@@ -213,7 +240,7 @@
   padding: 0;
   display: block;
   overflow: visible;
-  filter: drop-shadow(0 3px 3px #17202a52);
+  filter: drop-shadow(0 3px 3px #0e141b52);
   z-index: 4;
   margin: -40px 0 0 -17px;
   position: absolute;
@@ -285,11 +312,11 @@
 
 .maplibre-center {
   border: 2px solid #fff;
-  box-shadow: 0 8px 18px #17202a33;
+  box-shadow: 0 8px 18px #0e141b33;
 }
 
 .maplibre-center {
-  background: #17202a;
+  background: #0e141b;
   border-radius: 50%;
   width: 18px;
   height: 18px;
@@ -301,7 +328,9 @@
   min-height: inherit;
   cursor: grab;
   touch-action: none;
-  background: #dbe7df;
+  background-color: var(--state-idle-surface);
+  background-image: linear-gradient(#0e141b0a 1px, transparent 1px), linear-gradient(90deg, #0e141b0a 1px, transparent 1px);
+  background-size: 40px 40px;
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -332,35 +361,39 @@
 .fallback-city-label {
   z-index: 5;
   pointer-events: none;
-  background: #ffffffeb;
-  border: 1px solid #d8ddd8eb;
+  background: #fffffff2;
+  border: 1px solid var(--line);
   border-radius: 8px;
   gap: 3px;
   max-width: min(320px,100% - 28px);
-  padding: 10px 12px;
+  padding: 8px 11px;
   display: grid;
   position: absolute;
-  top: 14px;
-  left: 14px;
-  box-shadow: 0 12px 26px #17202a24;
+  /* Under the map search bar (top 12px, 42px tall), not on top of it. At
+     top 14px this label printed straight over the search field. */
+  top: 64px;
+  left: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
 .fallback-city-label strong {
+  font-size: .86rem;
+  font-weight: 600;
   line-height: 1;
 }
 
 .fallback-city-label span,
 .fallback-city-label small {
   color: var(--muted);
-  font-size: .74rem;
-  font-weight: 750;
+  font-size: .72rem;
+  font-weight: 500;
 }
 
 .fallback-radius {
   z-index: 1;
-  border: 2px dashed var(--green);
+  border: 1.5px dashed var(--green);
   pointer-events: none;
-  background: #26735b24;
+  background: #0c7a561a;
   border-radius: 50%;
   position: absolute;
   transform: translate(-50%,-50%);
@@ -374,12 +407,12 @@
 }
 
 .fallback-center {
-  background: #17202a;
+  background: #0e141b;
   border: 2px solid #fff;
   border-radius: 50%;
   width: 18px;
   height: 18px;
-  box-shadow: 0 8px 18px #17202a33;
+  box-shadow: 0 8px 18px #0e141b33;
 }
 
 .fallback-center:after {
@@ -393,14 +426,14 @@
 .raster-controls {
   z-index: 6;
   background: #fff;
-  border: 1px solid #d8ddd8eb;
-  border-radius: 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   display: grid;
   position: absolute;
   top: 14px;
   right: 14px;
   overflow: hidden;
-  box-shadow: 0 12px 26px #17202a24;
+  box-shadow: var(--shadow);
 }
 
 .raster-control {
@@ -412,9 +445,15 @@
   background: #fff;
   border-radius: 0;
   place-items: center;
-  font-size: 1.15rem;
-  font-weight: 900;
+  min-height: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: background .14s;
   display: grid;
+}
+
+.raster-control:hover {
+  background: var(--bg);
 }
 
 .raster-control:last-child {
@@ -449,29 +488,29 @@
 
 .map-legend {
   z-index: 1;
-  background: #ffffffeb;
-  border: 1px solid #d8ddd8eb;
-  border-radius: 8px;
+  background: #fffffff2;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px 14px;
   max-width: calc(100% - 28px);
-  padding: 10px;
+  padding: 7px 11px;
   display: flex;
   position: absolute;
   /* The MapLibre attribution control sits in the bottom-right corner and was
      printing straight through the legend. The legend now clears it. */
   bottom: 40px;
   left: 14px;
-  box-shadow: 0 12px 26px #17202a24;
+  box-shadow: var(--shadow-sm);
 }
 
 .map-legend span {
-  color: #394650;
+  color: var(--ink);
   white-space: nowrap;
   align-items: center;
   gap: 6px;
   font-size: .72rem;
-  font-weight: 850;
+  font-weight: 500;
   display: inline-flex;
 }
 
@@ -482,8 +521,8 @@
 .legend-device,
 .legend-city {
   border-radius: 50%;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   display: inline-block;
 }
 
@@ -506,17 +545,32 @@
 }
 
 .map-search {
-  border-color: #cbd5d8;
-  border-radius: 7px;
+  border-color: var(--control-edge);
+  border-radius: var(--radius-sm);
   width: min(390px,100% - 78px);
   top: 12px;
   left: 12px;
-  box-shadow: 0 8px 28px #121f2729;
+  box-shadow: var(--shadow);
+}
+
+.map-search:focus-within {
+  border-color: var(--green);
+  box-shadow: var(--ring), var(--shadow);
+}
+
+/* The field sits inside the bordered bar, so it carries no edge or ring of
+   its own; the bar's :focus-within ring above is the visible focus. */
+.map-search input,
+.map-search input:hover,
+.map-search input:focus,
+.map-search input:focus-visible {
+  border: 0;
+  box-shadow: none;
 }
 
 .map-search input {
-  min-height: 42px;
-  font-size: .82rem;
+  min-height: 40px;
+  font-size: .8rem;
 }
 
 @media (max-width:600px) {
@@ -537,8 +591,10 @@
 .map-legend {
   gap: 6px;
   max-width: calc(100% - 20px);
-  padding: 8px;
-  bottom: 10px;
+  padding: 6px 9px;
+  /* Still clear of the MapLibre attribution bar, which spans the bottom edge
+     at this width; at 10px the bar printed over the legend. */
+  bottom: 38px;
   left: 10px;
 }
 

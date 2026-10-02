@@ -50,9 +50,11 @@
 }
 
 .inventory-card > .status {
-  display: flex;
-  justify-content: center;
-  text-align: center;
+  justify-self: start;
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: .68rem;
+  display: inline-flex;
 }
 
 .card-meta,
@@ -63,7 +65,7 @@
 }
 
 .meter {
-  background: #e6e9e7;
+  background: var(--state-idle-surface);
   border-radius: 999px;
   height: 8px;
   overflow: hidden;
@@ -89,7 +91,7 @@
 .spec-box,
 .timeline>div {
   border: 1px solid var(--line);
-  background: #fbfcfb;
+  background: var(--bg);
   border-radius: 8px;
   padding: 12px;
 }
@@ -98,7 +100,7 @@
 .timeline span,
 .timeline small {
   color: var(--muted);
-  font-size: .82rem;
+  font-size: .74rem;
   display: block;
 }
 
@@ -107,8 +109,8 @@
 }
 
 .timeline .warning {
-  background: #fff0ec;
-  border-color: #ebb0a3;
+  background: var(--state-warning-surface);
+  border-color: var(--state-warning-ink);
 }
 
 .detail-tags {
@@ -164,8 +166,7 @@
 }
 
 .inventory-card:hover {
-  box-shadow: var(--shadow-sm);
-  border-color: #c5cdc8;
+  border-color: var(--control-edge);
 }
 
 /* The canonical Discover grid. A second .discover-grid block sits higher in
@@ -237,6 +238,25 @@
   display: contents;
 }
 
+/* The tag picker is taller than a select. As one grid cell beside the
+   selects it stretched its row and, with end alignment, pushed the select
+   after it to the bottom of a mostly empty row. It takes its own row. */
+.filters-panel .filter-advanced .tag-filter-field {
+  grid-column: 1 / -1;
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.filters-panel .tag-filter-heading {
+  justify-content: flex-start;
+  align-items: baseline;
+}
+
+.filters-panel .tag-filter-heading .helper-text {
+  font-family: var(--font-mono);
+  font-size: .66rem;
+}
+
 .filters-reset {
   flex: none;
   align-self: end;
@@ -300,6 +320,14 @@
   white-space: normal;
 }
 
+/* The fallback map's place label sits under the search bar, which on this
+   screen is where the floating card starts, so it moves beside the card like
+   the legend. Reset with the legend in the 1120px block below. */
+.discover-grid .map-stage .fallback-city-label {
+  left: 388px;
+  max-width: min(300px, calc(100% - 464px));
+}
+
 /* The list fills what the panel heading leaves. A fixed max-height (582px, or
    362px at 1120px) plus the 65px heading was taller than the panel's own
    max-height, which clips, so the last card and the end of the scrollbar could
@@ -316,37 +344,57 @@
 .inventory-card {
   background: 0 0;
   border: 0;
-  border-bottom: 1px solid #e9edef;
+  border-bottom: 1px solid var(--line);
   border-radius: 6px;
-  gap: 9px;
-  padding: 12px;
+  gap: 7px;
+  padding: 11px 12px;
+  transition: background .14s;
 }
 
 .inventory-card:hover {
   box-shadow: none;
-  background: #f7f9f9;
-  border-color: #0000 #0000 #dce3e6;
+  background: var(--bg);
+  border-color: #0000 #0000 var(--line);
 }
 
 .inventory-card.selected {
   box-shadow: inset 3px 0 0 var(--workspace-green);
-  background: #edf6f2;
-  border-color: #bcd6cc;
+  background: var(--soft-green);
+  border-color: #0000 #0000 var(--line);
 }
 
 .inventory-card strong {
   color: var(--workspace-ink);
   font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
+/* One secondary size for the whole row (address, format, rate, reach). The
+   .67rem it replaced sat below the console's .72rem floor. */
 .inventory-card span,
 .card-meta,
 .card-stats {
-  font-size: .67rem;
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
+.inventory-card > div:first-child > span {
+  margin-top: 2px;
+}
+
+.card-meta > span:last-child,
+.card-stats {
+  font-variant-numeric: tabular-nums;
+}
+
+.card-meta > span:last-child {
+  color: var(--ink);
+  font-weight: 560;
 }
 
 .inventory-card .meter {
-  height: 4px;
+  height: 3px;
 }
 
 .detail-panel {
@@ -360,7 +408,7 @@
 }
 
 .detail-panel .metric {
-  background: #f8faf9;
+  background: var(--bg);
   border-radius: 7px;
   min-height: 66px;
 }
@@ -372,6 +420,45 @@
 
 .detail-panel .timeline {
   margin-top: 14px;
+}
+
+/* Bookings on the selected screen: one ruled list, the same as "Dates already
+   taken" on the request step, instead of a stack of tinted cards. */
+.detail-panel .timeline {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 0;
+  overflow: hidden;
+}
+
+.detail-panel .timeline > div {
+  background: var(--panel);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  gap: 2px;
+  padding: 9px 12px;
+  display: grid;
+}
+
+.detail-panel .timeline > div:last-child {
+  border-bottom: 0;
+}
+
+.detail-panel .timeline span {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .68rem;
+}
+
+.detail-panel .timeline strong {
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.detail-panel .timeline small {
+  font-size: .72rem;
 }
 
 @media (max-width:1380px) {
@@ -417,6 +504,12 @@
   max-width: calc(100% - 28px);
 }
 
+.discover-grid .map-stage .fallback-city-label {
+  top: 64px;
+  left: 12px;
+  max-width: min(320px, calc(100% - 28px));
+}
+
 .filters-panel {
   flex-wrap: wrap;
 }
@@ -436,6 +529,22 @@
 .detail-panel {
   padding: 14px;
 }
+
+/* On a phone the bar's controls take the full width: location, then distance
+   and price side by side, then More filters. The 150px minimums left the
+   location select at half width beside an empty column. */
+.filters-panel .filter-stack,
+.filters-panel .filter-stack > label,
+.filters-panel .filter-pair,
+.filters-panel .filter-disclosure {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.filters-panel .filter-pair > label {
+  flex: 1 1 0;
+  min-width: 0;
+}
 }
 
 /* The detail panel now lives in the 300px left column, so its metric tiles wrap
@@ -447,29 +556,70 @@
 
 .detail-profile-link {
   color: var(--green-dark);
-  font-size: .85rem;
-  font-weight: 600;
+  margin-top: 12px;
+  padding-bottom: 10px;
+  font-size: .8rem;
+  font-weight: 560;
   text-decoration: none;
+  display: block;
 }
 
 .detail-profile-link:hover {
   text-decoration: underline;
 }
 
-/* The detail tiles sit in a narrow column, so they carry less padding than a
-   full-width tile and their values step down a size. "Digital Screen" wrapped
-   to two lines inside a tile sized for one. */
+/* The detail tiles sit in a narrow column, so they read as one hairline-ruled
+   spec block rather than four bold cards: label above, value below, both left
+   aligned. "Digital Screen" wrapped to two lines inside a tile sized for one;
+   at .9rem it fits. The 1px gap over a --line background draws the rules. */
+.discover-grid .detail-panel .detail-grid {
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 1px;
+  overflow: hidden;
+}
+
 .discover-grid .detail-panel .detail-grid .metric {
-  min-height: 78px;
-  padding: 10px 8px;
+  background: var(--panel);
+  border: 0;
+  border-radius: 0;
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+  min-height: 0;
+  padding: 9px 11px 10px;
+}
+
+.discover-grid .detail-panel .detail-grid .metric span {
+  font-size: .6rem;
+  font-weight: 500;
+  letter-spacing: .08em;
 }
 
 .discover-grid .detail-panel .detail-grid .metric strong {
-  font-size: 1.02rem;
+  font-size: .9rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
 }
 
-.discover-grid .detail-panel .detail-grid {
-  gap: 8px;
+/* An odd tile (static screens add Status) spans the last row instead of
+   leaving an empty grey cell. */
+.discover-grid .detail-panel .detail-grid .metric:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.discover-grid .detail-panel .panel-heading h2 {
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+
+.discover-grid .detail-panel .panel-heading .primary-button {
+  flex: none;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: .78rem;
 }
 
 .detail-more {
@@ -481,8 +631,8 @@
   color: var(--green-dark);
   cursor: pointer;
   padding: 2px 0;
-  font-size: .85rem;
-  font-weight: 600;
+  font-size: .8rem;
+  font-weight: 560;
   list-style: none;
 }
 
@@ -493,7 +643,7 @@
 .detail-more > summary::after {
   content: " +";
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .detail-more[open] > summary::after {
@@ -523,7 +673,7 @@
    The stage is the size the profile page renders the player at; the frame
    scales it down to the card's width and clips it to 16:9. */
 .detail-preview {
-  border: 1px solid #1c2c35;
+  border: 1px solid var(--ink);
   border-radius: var(--radius-sm);
   background: #050708;
   width: 100%;

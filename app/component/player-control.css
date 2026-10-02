@@ -1,18 +1,22 @@
-.player-control { display: grid; gap: 16px; }
-.player-boundary, .player-pairing p { color: var(--muted); line-height: 1.6; margin: 0; }
+.player-control { display: grid; gap: 14px; }
+.player-boundary, .player-pairing p { color: var(--muted); font-size: .84rem; line-height: 1.55; margin: 0; }
 .player-status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
 .player-status-grid div { min-width: 0; border-left: 2px solid var(--line); padding-left: 12px; }
-.player-status-grid dt { color: var(--muted); font-size: 12px; }
+.player-status-grid dt { color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-family: var(--font-mono); font-size: .6rem; font-weight: 500; }
 .player-status-grid dd { margin: 6px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .player-pairing { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .player-pairing > p { flex-basis: 100%; }
 .player-pairing .primary-button { min-width: 172px; }
 .player-code { flex-basis: 100%; max-width: 520px; display: grid; gap: 8px; }
-.player-code input { font-family: ui-monospace, monospace; letter-spacing: .12em; }
+.player-code input { font-family: var(--font-mono); letter-spacing: .12em; }
 .player-control > button { justify-self: start; }
 .player-setup { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--bg); }
-.player-setup-panel { width: min(100%, 520px); display: grid; gap: 20px; }
+.player-setup-panel { width: min(100%, 440px); display: grid; gap: 14px; padding: 28px; border-radius: 12px; box-shadow: 0 1px 2px #0e141b0a, 0 12px 32px #0e141b0f; }
+.player-setup-panel > .eyebrow { color: var(--green); font-size: .62rem; }
 .player-setup-panel h1, .player-setup-panel p { margin: 0; }
-.player-setup-panel form { display: grid; gap: 20px; }
-.player-setup-panel .primary-button { min-width: 160px; justify-self: start; }
-@media (max-width: 700px) { .player-status-grid { grid-template-columns: 1fr; } .player-setup { padding: 16px; } }
+.player-setup-panel h1 { letter-spacing: -.035em; font-size: 1.75rem; font-weight: 600; line-height: 1.12; }
+.player-setup-panel p { color: var(--muted); font-size: .88rem; line-height: 1.5; }
+.player-setup-panel form { display: grid; gap: 16px; margin-top: 6px; }
+.player-setup-panel input { font-family: var(--font-mono); letter-spacing: .12em; }
+.player-setup-panel .primary-button { width: 100%; min-height: 40px; }
+@media (max-width: 700px) { .player-status-grid { grid-template-columns: 1fr; } .player-setup { padding: 16px; } .player-setup-panel { padding: 22px 18px; } }
