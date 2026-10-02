@@ -31,7 +31,8 @@
     "parse5": "^8.0.1",
     "pg": "^8.22.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@next/env": "16.2.9",

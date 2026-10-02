@@ -6,6 +6,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { ApprovalEvent, Booking, Creative, DeviceAlert, DeviceAlertType, DisplayTemplate, InventoryAdvertiserResource, InventoryComment, InventoryItem, InventorySpecification, MediaResource, MembershipRole, Organization, PopLog, Role, Transaction, TransactionStatus, UserStatus, displayTemplates } from "../data";
 import { isLocale, type Locale } from "../i18n/config";
 import { expectedPlays, splitRevenue } from "../utils";
+import { isDigitalInventory } from "./inventory-delivery";
 
 type UserRow = {
   screen_scope?: string[]|null;
@@ -125,6 +126,7 @@ type DeviceAlertRow = {
   created_at: string;
   expires_at: string;
   ended_at: string | null;
+  image: DeviceAlert["image"];
 };
 
 type TransactionRow = {
@@ -516,6 +518,14 @@ export async function updateBookingRecord(id: string, updates: Partial<Booking>)
   const locked = await database.query<BookingRow & {schedule_snapshot:import("./digital-schedule").Allocation|null}>("SELECT * FROM bookings WHERE id=$1 FOR UPDATE", [id]);
   const current = locked.rows[0] ? mapBooking(locked.rows[0]) : null;
   if (!current) { await database.query("COMMIT"); return null; }
+  if (current.status === "cancelled") {
+    if (updates.status !== "cancelled") throw new ScheduleError("Cancelled campaigns cannot be changed.");
+    await database.query("COMMIT");
+    return current;
+  }
+  if (updates.status === "cancelled" && (current.paid || !["pending approval", "creative review"].includes(current.status))) {
+    throw new ScheduleError("Only unpaid pending campaigns can be cancelled.");
+  }
   const next = { ...current, ...updates };
   const unit = (await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE", [next.inventoryId])).rows[0];
   if (unit?.delivery_mode === "digital" && ["approved", "scheduled", "live"].includes(next.status)) {
@@ -530,8 +540,8 @@ export async function updateBookingRecord(id: string, updates: Partial<Booking>)
       ad_slots = $7, status = $8, spend = $9, paid = $10, pop = $11, updated_at = $12
     WHERE id = $13
   `, [next.advertiser, next.inventoryId, next.campaign, next.start, next.end, next.creativeStatus, clampAdSlots(next.adSlots), next.status, next.spend, next.paid, next.pop, new Date().toISOString(), id]);
-  const compatibilityStatus = next.status === "approved" ? "confirmed" : "requested";
-  await database.query("UPDATE campaigns SET name=$1,start_date=$2,end_date=$3,status=$4,version=version+1,updated_at=$5 WHERE id='CMP-LEGACY-' || $6", [next.campaign,next.start,next.end,next.status === "approved" ? "confirmed" : "planning",new Date().toISOString(),id]);
+  const compatibilityStatus = next.status === "cancelled" ? "cancelled" : next.status === "approved" ? "confirmed" : "requested";
+  await database.query("UPDATE campaigns SET name=$1,start_date=$2,end_date=$3,status=$4,version=version+1,updated_at=$5 WHERE id='CMP-LEGACY-' || $6", [next.campaign,next.start,next.end,next.status === "cancelled" ? "archived" : next.status === "approved" ? "confirmed" : "planning",new Date().toISOString(),id]);
   await database.query("UPDATE placements SET inventory_id=$1,start_date=$2,end_date=$3,status=$4,estimated_media_cost=$5,version=version+1,updated_at=$6 WHERE id='PLC-LEGACY-' || $7", [next.inventoryId,next.start,next.end,compatibilityStatus,next.spend,new Date().toISOString(),id]);
   await database.query("UPDATE placements SET schedule_snapshot=(SELECT schedule_snapshot FROM bookings WHERE id=$1) WHERE id='PLC-LEGACY-' || $1",[id]);
   await database.query("COMMIT");
@@ -901,11 +911,13 @@ export async function getActiveDeviceAlertForDevice(deviceId: string, asOf = new
 
 export async function createDeviceAlert(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">) {
   const created = materializeDeviceAlert(alert);
-  await exec(deviceAlertInsertSql, deviceAlertInsertParams(created));
+  await exec(deviceAlertInsertSql, [...deviceAlertInsertParams(created), null]);
   return created;
 }
 
-export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">) {
+export class DeviceAlertTargetError extends Error {}
+
+export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">, imageStoragePath?: string) {
   await ensureSchema();
   const database = await getPool().connect();
   const created = materializeDeviceAlert(alert);
@@ -913,6 +925,15 @@ export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id
   try {
     await database.query("BEGIN");
     await database.query("SELECT pg_advisory_xact_lock(hashtext('device-alert'), hashtext($1))", [alert.institutionId]);
+    const targets = await database.query<InventoryRow>(
+      "SELECT * FROM inventory WHERE id=ANY($1::text[]) ORDER BY id FOR UPDATE", [alert.targetDeviceIds],
+    );
+    if (targets.rows.length !== new Set(alert.targetDeviceIds).size || targets.rows.some(target =>
+      target.institution_id !== alert.institutionId || target.approval_status !== "approved" ||
+      !isDigitalInventory({ format: target.format, deliveryMode: target.delivery_mode ?? undefined })
+    )) {
+      throw new DeviceAlertTargetError("Selected screens changed. Find screens again and review the targets before publishing.");
+    }
     const conflict = await database.query<DeviceAlertRow>(`
       SELECT * FROM device_alerts
       WHERE institution_id = $1
@@ -928,7 +949,7 @@ export async function createDeviceAlertIfNoConflict(alert: Omit<DeviceAlert, "id
       return { alert: null, conflictingAlert: mapDeviceAlert(conflict.rows[0]) };
     }
 
-    await database.query(deviceAlertInsertSql, deviceAlertInsertParams(created));
+    await database.query(deviceAlertInsertSql, [...deviceAlertInsertParams(created), imageStoragePath ?? null]);
     if(process.env.FEATURE_FLEET_OPERATIONS==="true")for(const target of created.targetDeviceIds)await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,target_scope,action,revision,result,priority) VALUES($1,$2,$3,$4,$5,$6::jsonb,'alert_created',1,'success','emergency')",[`AUD-${randomUUID()}`,created.createdBy,created.institutionId,target,created.id,JSON.stringify(created.targetDeviceIds)]);
     await database.query("COMMIT");
     return { alert: created, conflictingAlert: null };
@@ -1259,19 +1280,22 @@ function mapDeviceAlert(entry: DeviceAlertRow): DeviceAlert {
     createdAt: stringifyDate(entry.created_at),
     expiresAt: stringifyDate(entry.expires_at),
     endedAt: entry.ended_at ? stringifyDate(entry.ended_at) : null,
+    image: entry.image ?? null,
   };
 }
 
 const deviceAlertInsertSql = `
   INSERT INTO device_alerts
-    (id, institution_id, alert_type, title, message, area, status, target_device_ids, issued_by, created_by, created_at, expires_at, ended_at)
-  VALUES ($1, $2, $3, $4, $5, $6, 'active', $7::jsonb, $8, $9, $10, $11, NULL)
+    (id, institution_id, alert_type, title, message, area, status, target_device_ids, issued_by, created_by, created_at, expires_at, ended_at, image, image_storage_path)
+  VALUES ($1, $2, $3, $4, $5, $6, 'active', $7::jsonb, $8, $9, $10, $11, NULL, $12::jsonb, $13)
 `;
 
 function materializeDeviceAlert(alert: Omit<DeviceAlert, "id" | "status" | "createdAt" | "endedAt">): DeviceAlert {
+  const id = `ALT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
   return {
     ...alert,
-    id: `ALT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+    id,
+    image: alert.image ? { ...alert.image, url: `/api/institution/alerts/${id}/image` } : null,
     status: "active",
     createdAt: new Date().toISOString(),
     endedAt: null,
@@ -1279,7 +1303,7 @@ function materializeDeviceAlert(alert: Omit<DeviceAlert, "id" | "status" | "crea
 }
 
 function deviceAlertInsertParams(alert: DeviceAlert) {
-  return [alert.id, alert.institutionId, alert.alertType, alert.title, alert.message, alert.area, JSON.stringify(alert.targetDeviceIds), alert.issuedBy, alert.createdBy, alert.createdAt, alert.expiresAt];
+  return [alert.id, alert.institutionId, alert.alertType, alert.title, alert.message, alert.area, JSON.stringify(alert.targetDeviceIds), alert.issuedBy, alert.createdBy, alert.createdAt, alert.expiresAt, JSON.stringify(alert.image ?? null)];
 }
 
 function mapUser(entry: UserRow): DbUser {

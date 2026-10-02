@@ -4,24 +4,27 @@ export function slideEligible(slide: PlayerSlide, now: number) {
     return (!slide.startsOn || (slide.startsOn.length>10?Date.parse(slide.startsOn)<=now:slide.startsOn<=date)) && (!slide.endsOn || (slide.endsOn.length>10?Date.parse(slide.endsOn)>now:slide.endsOn>=date));
 }
 export function rotationSlides(manifest: PlayerManifest, now: number) {
+    return rotationPlan(manifest, now).slides;
+}
+export function rotationPlan(manifest: PlayerManifest, now: number) {
     const eligible = manifest.slides.filter(slide => slideEligible(slide, now));
     const commercial = eligible.filter(slide => slide.placementId || slide.legacyBookingId).sort((a, b) => a.id.localeCompare(b.id));
     if (!commercial.length)
-        return eligible;
+        return { slides: eligible, issue: null };
     const loopSeconds = commercial[0]?.allocation?.loopSeconds ?? manifest.loopSeconds ?? 120;
     if (commercial.some(slide => slide.allocation && slide.allocation.loopSeconds !== loopSeconds))
-        return [];
+        return { slides: [], issue: "Screen bookings use conflicting loop settings. Ask the screen manager to correct the schedule." };
     let remaining = loopSeconds - commercial.reduce((sum, slide) => sum + (slide.durationSeconds ?? manifest.imageInterval), 0);
     // Overcommitted historical records fail closed; confirmation now prevents new overselling.
     if (remaining < 0)
-        return [];
-    return [...commercial, ...eligible.filter(slide => !slide.placementId && !slide.legacyBookingId).filter(slide => {
+        return { slides: [], issue: "Screen bookings exceed loop capacity. Ask the screen manager to correct the schedule." };
+    return { slides: [...commercial, ...eligible.filter(slide => !slide.placementId && !slide.legacyBookingId).filter(slide => {
             const duration = slide.durationSeconds ?? manifest.imageInterval;
             if (duration > remaining)
                 return false;
             remaining -= duration;
             return true;
-        })];
+        })], issue: null };
 }
 export function validatePlayback(body: Record<string, unknown>, manifest: PlayerManifest, now = Date.now()): {
     event: PlaybackEvent;

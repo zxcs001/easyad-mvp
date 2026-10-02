@@ -100,7 +100,6 @@ export default function Portal({
                 selectedInventoryId=""
                 selectedLocation={selectedLocation}
                 radius={filters.radius}
-                showCompetitors={false}
                 variant="portal"
               />
             </div>
@@ -132,7 +131,7 @@ export default function Portal({
           <SectionHeading eyebrow="Campaign intelligence" title="Target, buy, validate, and verify." />
           <div className="portal-feature-grid">
             {[
-              ["Geospatial Discovery", "Map search with radius, nearby businesses, competitor presence, and location-based inventory filtering."],
+              ["Geospatial Discovery", "Map search with radius and location-based inventory filtering."],
               ["Audience Filters", "Filter by demographics, traffic volume, impressions, income levels, media format, and operator network."],
               ["Creative Production", "Fixed templates and automated checks for aspect ratio, safe zones, file type, size, and distortion."],
               ["Inventory Control", "Multi-operator database with availability calendars, scheduling workflow, and double-booking protection."],
@@ -207,10 +206,10 @@ function AdvertiserHome({
   selectedLocation: { x: number; y: number };
 }) {
   const { locale, t } = useI18n();
-  const spend = bookings.reduce((sum, booking) => sum + booking.spend, 0);
+  const spend = bookings.filter((booking) => booking.status !== "cancelled").reduce((sum, booking) => sum + booking.spend, 0);
   const live = bookings.filter((booking) => booking.status === "live" || booking.status === "scheduled").length;
   const waiting = bookings.filter((booking) => booking.status === "pending approval" || booking.status === "creative review").length;
-  const recent = bookings.slice(0, 3);
+  const recent = bookings.filter((booking) => booking.status !== "cancelled").slice(0, 3);
   const steps: Array<[string, string, View]> = [
     ["Find screens near you", "Search a map of screens around your shop and compare what they cost.", "discover"],
     ["Request your dates", "Pick the days you want to run, and see the price before you commit.", "booking"],
@@ -249,7 +248,6 @@ function AdvertiserHome({
               selectedInventoryId=""
               selectedLocation={selectedLocation}
               radius={filters.radius}
-              showCompetitors={false}
               variant="portal"
             />
           </div>

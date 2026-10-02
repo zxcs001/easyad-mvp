@@ -29,6 +29,7 @@ export default function PlayerRuntime({ enabled }: {
             return;
         const controller = new AbortController();
         const signal = controller.signal;
+        const restorationController = new AbortController();
         let prepared: PreparedPlayer | null = null;
         let deadline = Infinity;
         let etag = "";
@@ -36,7 +37,7 @@ export default function PlayerRuntime({ enabled }: {
         let stopped = false;
         let health: string | null = null;
         let timing: PlayerTiming = { pollMs: 10000, heartbeatMs: 30000, staleMs: 90000 };
-        function clear() { manifestRef.current = null; setManifest(null); prepared?.release(); prepared = null; }
+        function clear() { restorationController.abort(); manifestRef.current = null; setManifest(null); prepared?.release(); prepared = null; }
         function denied(error: unknown) {
             if (error instanceof PlayerRequestError && [401, 404].includes(error.status)) {
                 stopped = true;
@@ -48,68 +49,84 @@ export default function PlayerRuntime({ enabled }: {
             }
             return false;
         }
+        let preparationController: AbortController | null = null;
+        let processingRevision: number | null = null;
+        function display(replacement: PreparedPlayer) {
+            restorationController.abort();
+            prepared?.release();
+            prepared = replacement;
+            manifestRef.current = replacement.manifest;
+            deadline = performance.now() + Date.parse(replacement.manifest.validUntil) - Date.now();
+            setManifest(replacement.manifest);
+        }
+        async function prepareUpdate(next: PlayerManifest, nextEtag: string, updateController: AbortController) {
+            const updateSignal = AbortSignal.any([signal, updateController.signal]);
+            const requestSignal = () => AbortSignal.any([updateSignal, AbortSignal.timeout(12000)]);
+            let replacement: PreparedPlayer | null = null;
+            try {
+                const clearing = mustClearPreviousContent(manifestRef.current, next);
+                if (next.activeAlert && next.published) {
+                    // Render the self-contained emergency text immediately. Receipt,
+                    // preparation and render evidence are acknowledged separately.
+                    display({ manifest: { ...next, slides: [] }, release: () => {} });
+                    await clearPlayerCache().catch(() => {});
+                } else if (clearing) {
+                    clear();
+                    await clearPlayerCache();
+                }
+                await playerPost("/api/player/acknowledgments", { revision: next.revision, stage: "received" }, requestSignal());
+                replacement = next.activeAlert?.image
+                    ? await cachePlayerManifest({ ...next, slides: [] }, updateSignal)
+                    : next.activeAlert
+                    ? { manifest: { ...next, slides: [] }, release: () => {} }
+                    : await cachePlayerManifest(next, updateSignal);
+                await playerPost("/api/player/acknowledgments", { revision: next.revision, stage: "validated" }, requestSignal());
+                if (updateSignal.aborted) return;
+                const unchanged = manifestRef.current?.revision === next.revision && manifestRef.current.activeAlert?.image?.url === replacement.manifest.activeAlert?.image?.url && manifestRef.current.slides.every((slide, index) => Boolean(slide.publicUrl) === Boolean(replacement!.manifest.slides[index]?.publicUrl));
+                if (!unchanged) { display(replacement); replacement = null; }
+                const applied = manifestRef.current!;
+                etag = applied.slides.some(slide => !slide.publicUrl) ? "" : nextEtag;
+                health = applied.slides.some(slide => !slide.publicUrl) ? "media_unavailable" : null;
+                setError("");
+                // Persist emergency text only after rendering, and tolerate storage
+                // failure: it must never prevent a connected screen showing an alert.
+                if (next.activeAlert && !next.activeAlert.image) void cachePlayerManifest({ ...next, slides: [] }, updateSignal).then(cached => cached.release()).catch(() => {});
+            } catch (error) {
+                if (updateSignal.aborted || stopped || denied(error)) return;
+                health = next.activeAlert && !next.activeAlert.image ? "connection_lost" : "media_unavailable";
+                etag = "";
+                setError(next.activeAlert?.image ? "Emergency photo could not be loaded. Instructions remain on screen; retrying automatically." : next.activeAlert ? "Alert acknowledgment pending. Retrying automatically." : "Content could not be loaded. Retrying automatically.");
+            } finally {
+                replacement?.release();
+                if (preparationController === updateController) processingRevision = null;
+            }
+        }
         async function poll() {
             while (!signal.aborted && !stopped) {
                 try {
                     const response = await playerRequest("/api/player/manifest", { headers: etag ? { "If-None-Match": etag } : {}, signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]) });
                     if (response.status !== 304) {
-                        const body = await response.json() as {
-                            manifest: PlayerManifest;
-                            timing: PlayerTiming;
-                        };
-                        const next = body.manifest;
+                        const body = await response.json() as { manifest: PlayerManifest; timing: PlayerTiming };
                         timing = body.timing;
                         setNeedsPairing(false);
-                        if (mustClearPreviousContent(manifestRef.current, next)) {
-                            clear();
-                            await clearPlayerCache();
+                        if (processingRevision !== body.manifest.revision) {
+                            preparationController?.abort();
+                            preparationController = new AbortController();
+                            processingRevision = body.manifest.revision;
+                            etag = response.headers.get("ETag") ?? "";
+                            // Keep checking for new revisions during media downloads.
+                            void prepareUpdate(body.manifest, etag, preparationController);
                         }
-                        await playerPost("/api/player/acknowledgments", { revision: next.revision, stage: "received" }, AbortSignal.any([signal, AbortSignal.timeout(12000)]));
-                        let replacement: PreparedPlayer;
-                        try {
-                            replacement = await cachePlayerManifest(next, signal);
-                        }
-                        catch (error) {
-                            health = "media_unavailable";
-                            throw error;
-                        }
-                        try {
-                            await playerPost("/api/player/acknowledgments", { revision: next.revision, stage: "validated" }, AbortSignal.any([signal, AbortSignal.timeout(12000)]));
-                        }
-                        catch (error) {
-                            replacement.release();
-                            throw error;
-                        }
-                        if (signal.aborted) {
-                            replacement.release();
-                            break;
-                        }
-                        const unchanged = manifestRef.current?.revision === next.revision && manifestRef.current.slides.every((slide, index) => Boolean(slide.publicUrl) === Boolean(replacement.manifest.slides[index]?.publicUrl));
-                        if (unchanged)
-                            replacement.release();
-                        else {
-                            prepared?.release();
-                            prepared = replacement;
-                            manifestRef.current = replacement.manifest;
-                            deadline = performance.now() + Date.parse(replacement.manifest.validUntil) - Date.now();
-                            setManifest(replacement.manifest);
-                        }
-                        etag = replacement.manifest.slides.some(slide => !slide.publicUrl) ? "" : response.headers.get("ETag") ?? "";
                     }
-                    health = prepared?.manifest.slides.some(slide => !slide.publicUrl) ? "media_unavailable" : null;
                     failures = 0;
-                    setError("");
-                }
-                catch (error) {
-                    if (signal.aborted || denied(error))
-                        break;
+                } catch (error) {
+                    if (signal.aborted || denied(error)) break;
                     failures += 1;
-                    if (health !== "media_unavailable")
-                        health = "connection_lost";
+                    if (health !== "media_unavailable") health = "connection_lost";
                     setError(health === "media_unavailable" ? "Content could not be loaded. Retrying automatically." : "Connection lost. Retrying automatically.");
                     etag = "";
                 }
-                await pausePlayer(Math.min(60000, timing.pollMs * 2 ** Math.min(failures, 3)) * (0.9 + Math.random() * 0.2), signal);
+                await pausePlayer(Math.min(60000, Math.min(10000, timing.pollMs) * 2 ** Math.min(failures, 3)), signal);
             }
         }
         async function heartbeat() {
@@ -141,22 +158,21 @@ export default function PlayerRuntime({ enabled }: {
             }
         }, 500);
         async function run() {
-            try {
-                prepared = await restorePlayerCache(signal);
-                if (signal.aborted) {
-                    prepared?.release();
-                    return;
-                }
-                if (prepared) {
-                    manifestRef.current = prepared.manifest;
-                    deadline = performance.now() + Date.parse(prepared.manifest.validUntil) - Date.now();
-                    setManifest(prepared.manifest);
+            async function restore() {
+                const restoreSignal = AbortSignal.any([signal, restorationController.signal]);
+                try {
+                    const cached = await restorePlayerCache(restoreSignal);
+                    if (restoreSignal.aborted || manifestRef.current || stopped) {
+                        cached?.release();
+                        return;
+                    }
+                    if (cached) display(cached);
+                } catch {
+                    if (!restoreSignal.aborted) await clearPlayerCache().catch(() => {});
                 }
             }
-            catch {
-                await clearPlayerCache().catch(() => { });
-            }
-            await Promise.all([poll().catch(() => { }), heartbeat().catch(() => { })]);
+            // A large cached video must not delay fetching a new emergency on startup.
+            await Promise.all([restore(), poll().catch(() => {}), heartbeat().catch(() => {})]);
         }
         if (navigator.locks)
             void navigator.locks.request("easyad-player-runtime", { signal }, run).catch(() => { });
@@ -167,7 +183,7 @@ export default function PlayerRuntime({ enabled }: {
                 const registration = await navigator.serviceWorker.ready;
                 registration.active?.postMessage({ type: "warm-player", urls: [...performance.getEntriesByType("resource").map(entry => entry.name), ...Array.from(document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>("script[src], link[rel=stylesheet], link[as=style]")).map(element=>element instanceof HTMLScriptElement ? element.src : element.href)] });
             }).catch(() => { });
-        return () => { controller.abort(); clearInterval(expiry); prepared?.release(); };
+        return () => { controller.abort(); preparationController?.abort(); clearInterval(expiry); prepared?.release(); };
     }, [enabled, generation]);
     useEffect(() => {
         if (!manifest)
@@ -183,7 +199,7 @@ export default function PlayerRuntime({ enabled }: {
                     return;
                 }
                 catch (error) {
-                    if (signal.aborted || error instanceof PlayerRequestError && [401, 404, 409].includes(error.status))
+                    if (signal.aborted || error instanceof PlayerRequestError && [401, 404].includes(error.status))
                         return;
                     await pausePlayer(3000, signal);
                 }

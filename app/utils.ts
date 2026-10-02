@@ -13,7 +13,6 @@ export const defaultFilters: Filters = {
   audience: "all",
   competitor: "all",
   priceMax: 1000,
-  showCompetitors: true,
   selectedTags: [],
 };
 
@@ -77,7 +76,6 @@ export function discoveryHref(filters: Filters, locationId: string, itemId: stri
     audience: filters.audience,
     competitor: filters.competitor,
     priceMax: String(filters.priceMax),
-    showCompetitors: String(filters.showCompetitors),
   });
   if (filters.selectedTags.length) params.set("tags", filters.selectedTags.join(","));
   if (area && (locationId === CURRENT_LOCATION_ID || locationId === MANUAL_LOCATION_ID)) {
@@ -86,6 +84,17 @@ export function discoveryHref(filters: Filters, locationId: string, itemId: stri
   }
   if (mapZoom) params.set("mapZoom", String(mapZoom));
   return `/?${params.toString()}`;
+}
+
+export function creativeDimensions(format: FormatKey) {
+  const dimensions: Record<FormatKey, [number, number]> = { digital: [1920, 1080], static: [5760, 1440], transit: [3000, 1000] };
+  return { width: dimensions[format][0], height: dimensions[format][1] };
+}
+
+export function creativeDraftForFormat(draft: CreativeDraft, format: FormatKey): CreativeDraft {
+  const { width, height } = creativeDimensions(format);
+  if (draft.format === format && draft.width === width && draft.height === height) return draft;
+  return { ...draft, format, width, height };
 }
 
 export function validateCreative(draft: CreativeDraft) {
@@ -97,7 +106,7 @@ export function validateCreative(draft: CreativeDraft) {
     { label: "Aspect ratio", ok: ratioDelta < 0.025, message: `Expected ${formatRatio(spec.ratio)}, received ${formatRatio(ratio)}.` },
     { label: "Safe zone", ok: draft.safeZone >= spec.safeZone, message: `Requires at least ${spec.safeZone}% margin for this format.` },
     { label: "Distortion", ok: draft.distortion <= 3, message: "Artwork scaling must stay under 3% distortion." },
-    { label: "File size", ok: draft.fileSize <= spec.maxSize, message: `Maximum accepted file size is ${spec.maxSize} MB.` },
+    { label: "File size", ok: draft.fileSize <= 50, message: "Maximum accepted file size is 50 MB." },
     { label: "File type", ok: allowedTypes.includes(draft.fileType), message: `Allowed: ${allowedTypes.map((type) => type.toUpperCase()).join(", ")}.` },
   ];
 }
@@ -174,6 +183,14 @@ export function exceedsLoopCapacity(item: InventoryItem, bookings: Booking[], st
 
 export function isCreativeSubmissionAllowed(booking: Booking, asOf = toDate(new Date())) {
   return ["pending approval", "approved"].includes(booking.status) && booking.end >= asOf;
+}
+
+export function defaultBookingDates() {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 13);
+  return { start: toDate(start), end: toDate(end) };
 }
 
 // --- Revenue sharing (platform vs. screen owner) -------------------------------

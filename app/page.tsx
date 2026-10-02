@@ -21,7 +21,7 @@ type PageProps = {
 
 export const dynamic = "force-dynamic";
 
-const views: View[] = ["portal", "network", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+const views: View[] = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
 const templates: CreativeDraft["template"][] = ["retail", "finance", "event"];
 const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "gif", "pdf", "mp4"];
 const filterFormats: Filters["format"][] = ["all", "digital", "static", "transit"];
@@ -29,10 +29,10 @@ const competitors: Filters["competitor"][] = ["all", "Low", "Medium", "High"];
 const roleAllowedViews: Record<Role, View[]> = {
   advertiser: ["portal", "discover", "booking", "campaigns", "creative", "resources", "reports", "billing"],
   operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing"],
-  institutional: ["portal", "network", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
+  institutional: ["portal", "network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
   admin: views,
 };
-const governmentViews: View[] = ["network", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+const governmentViews: View[] = ["network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
 
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
@@ -51,7 +51,6 @@ export default async function Page({ searchParams }: PageProps) {
   // Platform"), and were shown advertiser marketing before their own portal.
   const starterAudience = !user || user.role === "advertiser";
   const showStarter = !isGovernmentSurface && starterAudience && shouldShowStarter(requestedView, cookieStore.get(INTRO_COOKIE_NAME)?.value);
-
 
   if (!user && (isGovernmentSurface || requestedView !== "portal")) {
     const destination = isGovernmentSurface ? governmentPathFromParams(params) : queryFromParams(params);
@@ -136,7 +135,6 @@ export default async function Page({ searchParams }: PageProps) {
           audience: audience && audience !== "all" ? audience : undefined,
           competitor: isCompetitor(competitor) ? competitor : undefined,
           priceMax: readNumber(params.priceMax, 300, 1000),
-          showCompetitors: readBoolean(params.showCompetitors),
           selectedTags: selectedTags.length ? selectedTags : undefined,
         }}
         initialBookingId={bookingId}
@@ -229,13 +227,6 @@ function isFileType(value: string | undefined): value is CreativeDraft["fileType
 function readNumber(value: string | string[] | undefined, min: number, max: number) {
   const parsed = Number(readOne(value));
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : undefined;
-}
-
-function readBoolean(value: string | string[] | undefined) {
-  if (Array.isArray(value)) return value.includes("true");
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return undefined;
 }
 
 function readTags(value: string | string[] | undefined, inventory: { tags?: string[] }[]) {

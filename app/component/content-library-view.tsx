@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, FileImage, Film, Image as ImageIcon, Layers3, Search, Trash2, X } from "lucide-react";
 import type { Booking, Creative, InventoryItem, MediaResource } from "../data";
 import type { DbUser } from "../lib/db";
-import { capitalize, toDate } from "../utils";
+import { capitalize, isCreativeSubmissionAllowed, toDate } from "../utils";
 import { useMounted } from "./device-widgets";
 import AsyncButton from "./async-button";
 import { PanelHeading } from "./shared-ui";
@@ -94,7 +94,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
             <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={mounted ? formatDate(selected.createdAt) : ""} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
             <div className="cms-detail-actions">
               {selected.publicUrl ? <a className="secondary-button" href={selected.publicUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open")}</a> : null}
-              {selected.booking && (currentUser?.role === "advertiser" || currentUser?.role === "admin") ? <button className="secondary-button" onClick={() => onOpenCreative(selected.booking!)} type="button">{t("Edit creative")}</button> : null}
+              {selected.booking && isCreativeSubmissionAllowed(selected.booking) && (currentUser?.role === "advertiser" || currentUser?.role === "admin") ? <button className="secondary-button" onClick={() => onOpenCreative(selected.booking!)} type="button">{t("Edit creative")}</button> : null}
               {selected.inventoryId && currentUser?.role !== "advertiser" ? <button className="secondary-button" onClick={() => onOpenInventory(selected.inventoryId)} type="button">{t("Manage device")}</button> : null}
               {selected.kind === "media" && canManageDeviceMedia ? <AsyncButton className="danger-button" onClick={async () => { const deleted = await onDeleteMedia(selected.id); if (deleted) setSelectedId(null); return deleted; }} successMessage="Resource deleted." errorMessage="Could not delete this resource."><Trash2 aria-hidden="true" />{t("Delete")}</AsyncButton> : null}
             </div>
@@ -134,7 +134,7 @@ export function buildLibraryItems(inventory: InventoryItem[], bookings: Booking[
     const device = inventoryById.get(resource.inventoryId);
     const approved = device?.approvalStatus === "approved";
     const status = resource.approvalStatus === "pending review" ? "review" : resource.approvalStatus === "rejected" || !approved ? "inactive" : "active";
-    const statusLabel = resource.approvalStatus === "pending review" ? "In review" : resource.approvalStatus === "rejected" ? "Rejected" : approved ? "Published" : capitalize(device?.approvalStatus ?? "Draft");
+    const statusLabel = resource.approvalStatus === "pending review" ? "In review" : resource.approvalStatus === "rejected" ? "Rejected" : approved ? "Published" : "Approved — screen unpublished";
     return { id: resource.id, kind: "media", mediaType: resource.mediaType === "video" ? "video" : "image", title: resource.title, subtitle: resource.originalName, publicUrl: resource.publicUrl, mimeType: resource.mimeType, createdAt: resource.createdAt, inventoryId: resource.inventoryId, inventoryName: device?.name ?? resource.inventoryId, booking: null, status, statusLabel };
   });
   const creativeItems = creatives.flatMap((creative): LibraryItem[] => {

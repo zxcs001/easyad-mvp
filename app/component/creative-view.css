@@ -187,14 +187,14 @@
 
 .creative-html-editor textarea {
   width: 100%;
-  min-height: 210px;
+  min-height: 420px;
   padding: 12px;
-  resize: none;
+  resize: vertical;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfb;
   color: #17202a;
-  font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font: 14px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
 .creative-html-editor textarea:focus-visible {
@@ -396,4 +396,3 @@
   font-size: .78rem;
   font-weight: 750;
 }
-

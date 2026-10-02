@@ -77,7 +77,16 @@ async function hydrate(manifest: PlayerManifest, assets: Asset[], signal: AbortS
                 slides.push({ ...slide, publicUrl: "" });
             }
         }
-        const hydrated = { ...manifest, slides };
+        let activeAlert = manifest.activeAlert;
+        if (activeAlert?.image) {
+            const asset = assets.find(item => item.key === `emergency:${activeAlert!.id}`);
+            if (!asset || asset.invalid || await hash(asset.blob) !== asset.checksum) throw new Error("cache_corrupt");
+            const url = URL.createObjectURL(asset.blob);
+            urls.push(url);
+            activeAlert = { ...activeAlert, image: { ...activeAlert.image, url } };
+            await preparePlayerManifest({ ...manifest, slides: [], activeAlert }, signal);
+        }
+        const hydrated = { ...manifest, slides, activeAlert };
         return { manifest: hydrated, release: () => urls.forEach(url => URL.revokeObjectURL(url)) };
     }
     catch (error) {
@@ -89,7 +98,7 @@ export async function restorePlayerCache(signal: AbortSignal) {
     const { manifest, assets, observedAt } = await stored();
     if ((observedAt && Date.now() < observedAt - 120000) || !manifest || Date.parse(manifest.validUntil) <= Date.now() || Date.parse(manifest.generatedAt) > Date.now() + 120000)
         return null;
-    return hydrate(manifest, assets, signal);
+    return hydrate(manifest.activeAlert ? { ...manifest, slides: [] } : manifest, assets, signal);
 }
 async function download(url: string, signal: AbortSignal, budget: number) {
     const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal });
@@ -121,9 +130,19 @@ async function download(url: string, signal: AbortSignal, budget: number) {
     return new Blob(chunks, { type: response.headers.get("content-type") ?? "application/octet-stream" });
 }
 export async function cachePlayerManifest(manifest: PlayerManifest, signal: AbortSignal): Promise<PreparedPlayer> {
+    // An emergency only caches its own photo. Ordinary media must never delay it.
+    if (manifest.activeAlert) manifest = { ...manifest, slides: [] };
     const old = await stored();
     const assets: Asset[] = [];
     let bytes = 0;
+    if (manifest.activeAlert?.image) {
+        const key = `emergency:${manifest.activeAlert.id}`;
+        const cached = old.assets.find(asset => asset.key === key);
+        const blob = cached && !cached.invalid && await hash(cached.blob) === cached.checksum ? cached.blob : await download(manifest.activeAlert.image.url, AbortSignal.any([signal, AbortSignal.timeout(12000)]), 5 * 1024 * 1024);
+        if (!blob.size) throw new Error("media_unavailable");
+        bytes = blob.size;
+        assets.push({ key, blob, checksum: await hash(blob) });
+    }
     for (const slide of manifest.slides) {
         if (assets.some(asset => asset.key === slide.assetVersion))
             continue;

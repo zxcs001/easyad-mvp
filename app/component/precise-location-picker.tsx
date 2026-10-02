@@ -54,12 +54,14 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
         markerElement.append(markerIcon);
         markerRef.current = new maplibregl.Marker({ element: markerElement, anchor: "bottom" }).setLngLat(pointToLngLat(pointRef.current)).addTo(map);
       });
-      map.on("contextmenu", (event) => {
+      const choosePoint = (event: maplibregl.MapMouseEvent) => {
         event.originalEvent.preventDefault();
         const nextPoint = lngLatToPoint(event.lngLat.lng, event.lngLat.lat);
         markerRef.current?.setLngLat([event.lngLat.lng, event.lngLat.lat]);
         onChangeRef.current(nextPoint);
-      });
+      };
+      map.on("click", choosePoint);
+      map.on("contextmenu", choosePoint);
       map.on("error", () => {
         if (!map.isStyleLoaded()) setFallback(true);
       });
@@ -98,7 +100,7 @@ export default function PreciseLocationPicker({ point, onChange }: { point: Poin
   return (
     <div className="precise-location-picker">
       <div ref={containerRef} className="precise-location-map" role="application" aria-label={t("Precise device location map")} />
-      {fallback ? <div className="precise-location-fallback" onContextMenu={setFallbackPoint}><i className="precise-location-marker" style={{ left: `${point.x}%`, top: `${point.y}%` }} /></div> : null}
+      {fallback ? <div className="precise-location-fallback" onClick={setFallbackPoint} onContextMenu={setFallbackPoint}><i className="precise-location-marker" style={{ left: `${point.x}%`, top: `${point.y}%` }} /></div> : null}
     </div>
   );
 }

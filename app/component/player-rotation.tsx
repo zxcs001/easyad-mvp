@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { PlaybackEvent, PlayerManifest } from "../player-types";
-import { rotationSlides } from "../lib/playback-validation";
+import { rotationPlan } from "../lib/playback-validation";
 import { queuePlayback } from "../lib/player-storage";
 import { useI18n } from "../i18n/client";
 import "./device-media-carousel.css";
@@ -20,7 +20,7 @@ export default function PlayerRotation({ manifest, onError }: {
     const sequence = useRef(0);
     const image = useRef<HTMLImageElement>(null);
     const video = useRef<HTMLVideoElement>(null);
-    const eligible = rotationSlides(manifest, clock);
+    const { slides: eligible, issue: scheduleIssue } = rotationPlan(manifest, clock);
     const slide = eligible[turn % Math.max(1, eligible.length)];
     const current = useRef<{
         start: () => void;
@@ -89,7 +89,7 @@ export default function PlayerRotation({ manifest, onError }: {
         // clock only filters schedule boundaries; ticking must never restart an active play.
     }, [slide?.id, turn, hidden, halted, manifest, onError, eligible.length]);
     if (!slide || hidden || halted || blank)
-        return <div className="media-stage empty"><p>{t(halted ? "Player storage is unavailable. Playback is paused." : "Waiting for eligible content.")}</p></div>;
+        return <div className="media-stage empty"><p>{t(halted ? "Player storage is unavailable. Playback is paused." : hidden ? "Playback paused while this tab is hidden." : scheduleIssue ?? (blank && slide ? "Waiting for the next playback loop." : "Waiting for eligible content."))}</p></div>;
     return <div className="media-stage device-carousel-slide" data-player-slide={slide.id}>
     {slide.mediaType === "image" ? <img key={`${slide.id}:${turn}`} ref={image} src={slide.publicUrl || undefined} alt="" onLoad={() => current.current?.start()} onError={() => current.current?.finish("failed")}/> : slide.mediaType === "html" ?
             <iframe key={`${slide.id}:${turn}`} src={slide.publicUrl || undefined} title={slide.title} sandbox="" referrerPolicy="no-referrer" onLoad={() => current.current?.start()} onError={() => current.current?.finish("failed")}/> :

@@ -2,7 +2,7 @@
 
 import "./discover-view.css";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Booking, InventoryItem, businesses, formats } from "../data";
+import { Booking, InventoryItem, formats } from "../data";
 import type { Filters, MapPoint } from "../types";
 import { defaultFilters, formatRatio, mapDistanceKm, money, number } from "../utils";
 import FiltersPanel from "./filters-panel";
@@ -47,7 +47,6 @@ export default function DiscoverView(props: {
           selectedInventoryId={props.selectedInventoryId}
           selectedLocation={props.selectedLocation}
           radius={props.filters.radius}
-          showCompetitors={props.filters.showCompetitors}
           onAreaChange={props.onAreaChange}
           initialZoom={props.mapZoom}
           onSelect={props.setSelectedInventoryId}
@@ -107,7 +106,7 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
 function InventoryDetail({ item, bookings, onBook, canComment }: { item: InventoryItem; bookings: Booking[]; onBook: () => void; canComment: boolean }) {
   const { locale, formatNumber, t } = useI18n();
   const spec = formats[item.format];
-  const campaigns = bookings.filter((booking) => booking.inventoryId === item.id);
+  const campaigns = bookings.filter((booking) => booking.inventoryId === item.id && !["cancelled", "rejected"].includes(booking.status));
   const availability = inventoryAvailabilityLabel(item);
   return (
     <>
@@ -139,7 +138,7 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
         <Metric label="Traffic" value={formatNumber(item.traffic)} />
         {isStaticInventory(item) ? <Metric label="Status" value={t(availability)} /> : null}
       </div>
-      {/* Income index, audience, competitor presence and nearby-business counts
+      {/* Income index, audience and competitor presence
           are planning figures for a media buyer, not the four numbers a person
           decides a booking on. The full profile still carries every one of
           them, so this defers detail without removing capability. */}
@@ -175,4 +174,3 @@ function InventoryDetail({ item, bookings, onBook, canComment }: { item: Invento
     </>
   );
 }
-

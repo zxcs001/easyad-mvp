@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Booking, Creative, FormatKey, formats } from "../../data";
 import { canBuyAds, getCurrentUser, getInstitutionScope } from "../../lib/auth";
 import { createBookingRecord, createBookingWithCreativeRecord, getInventory, listBookings, listBookingsCreatedBy, listBookingsForInstitution } from "../../lib/db";
-import { estimateSpend, exceedsLoopCapacity, truncateFileName } from "../../utils";
-import { isInventoryAvailableForDates } from "../../lib/inventory-availability";
+import { estimateSpend, exceedsLoopCapacity, toDate, truncateFileName } from "../../utils";
+import { isInventoryAvailableForDates, isValidAvailabilityDate } from "../../lib/inventory-availability";
 import { isDigitalInventory, isStaticInventory } from "../../lib/inventory-delivery";
 import { deleteStoredMedia, storeMedia } from "../../lib/media-storage";
 import { inspectMediaUpload } from "../../lib/uploads";
@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
   const start = String(body.start ?? "");
   const end = String(body.end ?? "");
   if (!start || !end) return NextResponse.json({ error: "Start and end dates are required" }, { status: 400 });
+  if (!isValidAvailabilityDate(start) || !isValidAvailabilityDate(end) || start > end) {
+    return NextResponse.json({ error: "Choose a valid date range with the end date on or after the start date." }, { status: 400 });
+  }
+  if (start < toDate(new Date())) {
+    return NextResponse.json({ error: "Choose a start date today or later. Campaigns cannot start in the past." }, { status: 422 });
+  }
   const adSlots = cleanAdSlots(body.adSlots);
 
   if (isStaticInventory(item) && !isInventoryAvailableForDates(item, start, end)) {

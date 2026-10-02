@@ -16,11 +16,12 @@ import AccountManagementView from "./component/account-management-view";
 import InstitutionTeamView from "./component/institution-team-view";
 import FleetOperations from "./component/fleet-operations";
 import InstitutionNetworkView, { type EmergencyOverrideDraft } from "./component/institution-network-view";
+import EmergencyUpdatesView from "./component/emergency-updates-view";
 import Portal from "./component/portal";
 import { EmptyState } from "./component/shared-ui";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
 import type { BookingDraft, CreativeDraft, Filters, MapPoint } from "./types";
-import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
+import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, creativeDraftForFormat, defaultBookingDates, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
 import type { DbUser } from "./lib/db";
 import { canAccessInstitutionWorkspace } from "./roles";
 import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME, readBrowserPreference, writeBrowserPreference } from "./lib/preferences";
@@ -28,7 +29,7 @@ import { useI18n } from "./i18n/client";
 import type { FeatureFlags } from "./lib/feature-flags";
 import { isInventoryAvailableForDates } from "./lib/inventory-availability";
 import { isStaticInventory } from "./lib/inventory-delivery";
-import { isVerifiedCreativeSubmission, resolveCampaignView, type CampaignCreationStep } from "./lib/campaign-creation-flow";
+import { readCampaignCancellationResponse, readCreativeSubmissionResponse, resolveCampaignView, type CampaignCreationStep } from "./lib/campaign-creation-flow";
 
 export default function OohApp({
   currentUser,
@@ -222,8 +223,7 @@ export default function OohApp({
   });
   const [bookingDraft, setBookingDraft] = useState<BookingDraft>({
     campaign: "Launch Campaign",
-    start: "2026-07-15",
-    end: "2026-07-28",
+    ...defaultBookingDates(),
     advertiser: currentUser?.name ?? "New Advertiser",
     adSlots: 1,
   });
@@ -360,13 +360,27 @@ export default function OohApp({
   function cancelCampaignCreation() {
     setBookingDraft({
       campaign: "Launch Campaign",
-      start: "2026-07-15",
-      end: "2026-07-28",
+      ...defaultBookingDates(),
       advertiser: currentUser?.name ?? "New Advertiser",
       adSlots: 1,
     });
     setCampaignCreationState(null);
     setView("discover");
+  }
+
+  async function cancelCreative(bookingId: string) {
+    const creating = campaignCreationStepRef.current === "creative";
+    if (creating) {
+      if (bookingId !== selectedBookingId) throw new Error("Select the campaign being created before cancelling.");
+      const response = await fetch(`/api/bookings/${bookingId}/cancel`, { method: "POST" })
+        .catch(() => { throw new Error("Could not connect to the server. Your campaign has not been confirmed cancelled; please retry."); });
+      const booking = await readCampaignCancellationResponse(response, bookingId);
+      setBookings((current) => current.map((entry) => entry.id === bookingId ? booking : entry));
+    }
+    setCreativeDraft({ template: "retail", format: "digital", width: 1920, height: 1080, fileType: "png", fileSize: 1, safeZone: 10, distortion: 1 });
+    if (creating) cancelCampaignCreation();
+    else setView("campaigns");
+    return true;
   }
 
   async function addInventory(draft: InventoryItem) {
@@ -442,26 +456,28 @@ export default function OohApp({
   }
 
   async function submitCreative(bookingId: string, source: Creative["source"], file?: File | null) {
-    if (!canBuyAds) return false;
-    const { htmlByTopic, ...creativeFields } = creativeDraft;
-    const body = source === "upload" && file ? creativeUploadForm(creativeDraft, file) : JSON.stringify({
+    if (!canBuyAds) throw new Error("Sign in as an advertiser to submit campaign creative.");
+    const booking = bookings.find((entry) => entry.id === bookingId);
+    const item = inventory.find((entry) => entry.id === booking?.inventoryId);
+    if (!item) throw new Error("The booked placement is no longer available. Refresh your campaign before submitting artwork.");
+    if (isStaticInventory(item) && source !== "upload") throw new Error("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.");
+    if (source === "upload" && !file) throw new Error("Choose a media file before submitting your creative.");
+    const draft = creativeDraftForFormat(creativeDraft, item.format);
+    const { htmlByTopic, ...creativeFields } = draft;
+    const body = source === "upload" && file ? creativeUploadForm(draft, file) : JSON.stringify({
       ...creativeFields,
-      html: htmlByTopic?.[creativeDraft.template] ?? defaultCreativeHtml[creativeDraft.template],
+      html: htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template],
     });
     const response = await fetch(`/api/bookings/${bookingId}/creative`, {
       method: "POST",
       headers: source === "upload" && file ? undefined : { "Content-Type": "application/json" },
       body,
-    });
-    if (!response.ok) return false;
-    const payload = await response.json() as { booking: Booking; creative: Creative };
-    if (!isVerifiedCreativeSubmission(payload, bookingId)) return false;
+    }).catch(() => { throw new Error("Could not connect to the server. Check your connection and retry; your artwork is still selected."); });
+    const payload = await readCreativeSubmissionResponse(response, bookingId);
     setBookings((current) => current.map((booking) => (booking.id === bookingId ? payload.booking : booking)));
     setCreatives((current) => [payload.creative, ...current]);
-    if (campaignCreationStepRef.current === "creative" && selectedBookingId === bookingId) {
-      setCampaignCreationState(null);
-      setView("campaigns");
-    }
+    setCampaignCreationState(null);
+    setView("campaigns");
     return true;
   }
 
@@ -562,10 +578,13 @@ export default function OohApp({
   async function createEmergencyOverride(draft: EmergencyOverrideDraft) {
     if (!canAccessInstitutionWorkspace(currentUser?.role)) return { error: "Institution account or Super Admin access required" };
     try {
+      const { imageFile, ...details } = draft;
+      const form = imageFile ? new FormData() : null;
+      if (form && imageFile) { form.set("draft", JSON.stringify(details)); form.set("image", imageFile); }
       const response = await fetch("/api/institution/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        headers: form ? undefined : { "Content-Type": "application/json" },
+        body: form ?? JSON.stringify(details),
       });
       const payload = await response.json().catch(() => ({})) as { alert?: DeviceAlert; error?: string };
       if (!response.ok || !payload.alert) return { error: payload.error ?? "Unable to publish the emergency override" };
@@ -655,6 +674,9 @@ export default function OohApp({
 
   function renderDashboardView() {
     switch (view) {
+      case "emergency":
+        if (!canAccessInstitutionWorkspace(currentUser?.role)) return <EmptyInventoryPanel canManage={false} />;
+        return <EmergencyUpdatesView institutionId={currentUser?.role === "institutional" ? currentUser.id : ""} institutionName={currentUser?.name ?? ""} institutions={currentUser?.role === "admin" ? managedUsers.filter(user => user.role === "institutional").map(({ id, name }) => ({ id, name })) : []} onCreate={createEmergencyOverride} onEnd={endEmergencyOverride} />;
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
         return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
@@ -718,7 +740,7 @@ export default function OohApp({
           />
         );
       case "creative":
-        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} lockBookingSelection={campaignCreationStep === "creative"} />;
+        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} onCancel={cancelCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} lockBookingSelection={campaignCreationStep === "creative"} />;
       case "resources":
         return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
@@ -777,7 +799,7 @@ export default function OohApp({
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
       <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} />
       <main className="workspace">
-        <Topbar view={view} visibleCount={visibleInventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
+        <Topbar view={view} visibleCount={role === "advertiser" ? visibleInventory.length : inventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
         {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
@@ -841,6 +863,7 @@ function compactFilters(filters: Partial<Filters> | undefined) {
 const documentTitleByView: Record<View, string> = {
   portal: "Outdoor media portal",
   network: "Public screen network control",
+  emergency: "Emergency updates",
   discover: "Inventory discovery",
   booking: "Booking request",
   campaigns: "Campaign spaces",

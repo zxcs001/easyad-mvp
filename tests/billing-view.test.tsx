@@ -36,4 +36,11 @@ describe("commercial ledger payment boundary", () => {
     expect(screen.getByRole("note")).toHaveTextContent("Demo only");
     expect(screen.getByRole("button", { name: "Demo charge" })).toBeInTheDocument();
   });
+
+  test("cancelled campaigns do not create invoices or payment actions", () => {
+    render(<BillingView bookings={[{ ...booking, status: "cancelled" }]} transactions={[]} onSettle={vi.fn()} canManage paymentsEnabled />);
+    expect(screen.getByText("No invoices yet.")).toBeInTheDocument();
+    expect(screen.queryByText(booking.campaign)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Demo charge" })).not.toBeInTheDocument();
+  });
 });

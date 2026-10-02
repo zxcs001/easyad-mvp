@@ -1,4 +1,5 @@
 import {frFleet} from "./fr-fleet";
+import { frEmergency } from "./fr-emergency";
 import { frPilot } from "./fr-pilot";
 import type { Locale } from "./config";
 import { frAdditional } from "./fr-additional";
@@ -57,6 +58,7 @@ const fr: Messages = {
   "Images display for 2–60 seconds. Videos keep their own duration.": "Les images s’affichent pendant 2 à 60 secondes. Les vidéos conservent leur durée.",
   "Discard your unsaved display settings?": "Abandonner les paramètres d’affichage non enregistrés ?",
   ...frFleet,
+  ...frEmergency,
   ...frPilot,
   ...frPlayer,
   "Language": "Langue",

@@ -9,8 +9,8 @@ import type { DbUser } from "../app/lib/db";
 import { defaultFilters } from "../app/utils";
 
 vi.mock("../app/component/maplibre-inventory-map", () => ({
-  default: (props: { inventory: InventoryItem[]; showCompetitors: boolean; variant?: string }) => (
-    <div data-inventory-count={props.inventory.length} data-show-competitors={String(props.showCompetitors)} data-testid="inventory-map" data-variant={props.variant} />
+  default: (props: { inventory: InventoryItem[]; variant?: string }) => (
+    <div data-inventory-count={props.inventory.length} data-testid="inventory-map" data-variant={props.variant} />
   ),
 }));
 
@@ -112,7 +112,6 @@ describe("portal availability map", () => {
     renderPortal(null);
 
     expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-variant", "portal");
-    expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-show-competitors", "false");
     expect(screen.getByTestId("inventory-map")).toHaveAttribute("data-inventory-count", "1");
     expect(screen.queryByText("Audience match")).not.toBeInTheDocument();
     expect(screen.queryByText("Creative status")).not.toBeInTheDocument();

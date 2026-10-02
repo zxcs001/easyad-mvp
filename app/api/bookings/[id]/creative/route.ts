@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { Creative, FormatKey, formats } from "../../../../data";
+import { Creative, formats } from "../../../../data";
 import { canSubmitCreative, getCurrentUser } from "../../../../lib/auth";
-import { createCreative, getBooking, getBookingOwnerId, listCreatives, updateBookingRecord } from "../../../../lib/db";
+import { createCreative, getBooking, getBookingOwnerId, getInventory, listCreatives, updateBookingRecord } from "../../../../lib/db";
 import { deleteStoredMedia, storeMedia } from "../../../../lib/media-storage";
-import { inspectMediaUpload } from "../../../../lib/uploads";
-import { isCreativeSubmissionAllowed, truncateFileName, validateCreative } from "../../../../utils";
+import { inspectCreativeUpload, inspectMediaUpload } from "../../../../lib/uploads";
+import { isStaticInventory } from "../../../../lib/inventory-delivery";
+import { creativeDimensions, isCreativeSubmissionAllowed, truncateFileName, validateCreative } from "../../../../utils";
 import { defaultCreativeHtml } from "../../../../creative-templates";
 import { renderCreativeDocument, sanitizeCreativeHtml } from "../../../../lib/creative-template";
 
@@ -40,17 +41,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Creative can only be submitted for active pending-approval or approved campaigns" }, { status: 409 });
   }
 
+  const inventory = await getInventory(booking.inventoryId);
+  if (!inventory) return NextResponse.json({ error: "The booked placement is no longer available. Refresh your campaign before submitting artwork." }, { status: 404 });
+  const requiresUpload = isStaticInventory(inventory);
+
   const contentType = request.headers.get("content-type") ?? "";
-  const upload = contentType.includes("multipart/form-data") ? await readUploadSubmission(request) : null;
+  if (requiresUpload && !contentType.includes("multipart/form-data")) {
+    return NextResponse.json({ error: "Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file." }, { status: 422 });
+  }
+  const upload = contentType.includes("multipart/form-data") ? await readUploadSubmission(request, requiresUpload) : null;
   if (upload && "error" in upload) return NextResponse.json({ error: upload.error }, { status: upload.status });
 
   const body = upload ? upload.fields : await request.json().catch(() => ({}));
+  if (body.format !== inventory.format) {
+    return NextResponse.json({ error: `This campaign requires ${formats[inventory.format].label} artwork. Submit artwork in the booked placement's format.` }, { status: 422 });
+  }
   const template = ["retail", "finance", "event"].includes(body.template) ? (body.template as Creative["template"]) : "retail";
   const draft = {
     template,
-    format: isFormat(body.format) ? body.format : "digital",
-    width: cleanNumber(body.width, 1920),
-    height: cleanNumber(body.height, 1080),
+    format: inventory.format,
+    ...creativeDimensions(inventory.format),
     fileType: upload ? upload.fileType as Creative["fileType"] : "html" as const,
     fileSize: upload ? upload.fileSize : 1,
     safeZone: cleanNumber(body.safeZone, 10),
@@ -59,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const checks = validateCreative(draft);
   if (!checks.every((check) => check.ok)) {
-    return NextResponse.json({ error: "Creative failed validation", checks }, { status: 422 });
+    return NextResponse.json({ error: checks.filter((check) => !check.ok).map((check) => `${check.label}: ${check.message}`).join("\n"), checks }, { status: 422 });
   }
 
   let templateDocument: string | null = null;
@@ -112,21 +122,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
   return NextResponse.json({ creative, booking: updated }, { status: 201 });
 }
 
-function isFormat(value: unknown): value is FormatKey {
-  return typeof value === "string" && Object.keys(formats).includes(value);
-}
-
 function cleanNumber(value: unknown, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function readUploadSubmission(request: NextRequest) {
+async function readUploadSubmission(request: NextRequest, requiresUpload: boolean) {
   const form = await request.formData();
   const file = form.get("file");
-  if (!(file instanceof File)) return { error: "A creative image or video file is required", status: 400 as const };
-  const upload = await inspectMediaUpload(file, ["png", "jpg", "gif", "mp4"]);
-  if (!upload) return { error: "Creative uploads support valid PNG, JPEG, GIF, or MP4 files up to 50 MB", status: 400 as const };
+  if (!(file instanceof File) || !file.size) return { error: "Choose a media file before submitting your creative.", status: 400 as const };
+  if (file.size > 50 * 1024 * 1024) return { error: "The upload is too large. Choose a file up to 50 MB.", status: 400 as const };
+  const upload = requiresUpload
+    ? await inspectCreativeUpload(file, ["png", "jpg", "pdf"])
+    : await inspectMediaUpload(file, ["png", "jpg", "gif", "mp4"]);
+  if (!upload) return {
+    error: requiresUpload
+      ? "Static billboard artwork must be a valid PNG, JPG, or PDF file. The file contents and MIME type must match."
+      : "Creative uploads support valid PNG, JPEG, GIF, or MP4 files up to 50 MB",
+    status: 400 as const,
+  };
   return {
     ...upload,
     originalName: file.name,
@@ -135,8 +149,6 @@ async function readUploadSubmission(request: NextRequest) {
     fields: {
       template: String(form.get("template") ?? "retail"),
       format: String(form.get("format") ?? "digital"),
-      width: String(form.get("width") ?? ""),
-      height: String(form.get("height") ?? ""),
       safeZone: String(form.get("safeZone") ?? ""),
       distortion: String(form.get("distortion") ?? ""),
     },

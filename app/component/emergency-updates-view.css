@@ -1,0 +1,26 @@
+.emergency-updates { display: grid; gap: 20px; }
+.emergency-delivery-note { margin: 0; line-height: 1.6; max-width: 1000px; }
+.emergency-update-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.emergency-compose-fields { border: 0; padding: 0; margin: 0 0 18px; display: grid; gap: 16px; min-width: 0; }
+.emergency-compose-fields label { display: grid; gap: 7px; font-weight: 600; }
+.emergency-compose-fields input:not([type="checkbox"]), .emergency-compose-fields select, .emergency-compose-fields textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line, #cdd8d4); border-radius: 8px; background: #fff; color: #182c28; font: inherit; }
+.emergency-compose-fields textarea { resize: vertical; min-height: 160px; }
+.emergency-compose-fields .emergency-confirm { display: flex; align-items: flex-start; line-height: 1.5; }
+.emergency-confirm input { margin-top: 5px; }
+.emergency-template-prompts { display: grid; gap: 7px; padding: 12px 14px; background: #fff7e2; border: 1px solid #e2c47c; border-radius: 8px; line-height: 1.5; }
+.emergency-template-prompts span { font-size: .9rem; color: #665522; }
+.emergency-photo-hint { margin: 0; color: #526963; line-height: 1.5; }
+.emergency-matched-screens ul { max-height: 240px; overflow: auto; list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.emergency-matched-screens li, .emergency-delivery-list > div { display: grid; gap: 5px; }
+.emergency-matched-screens small, .emergency-update-record small { color: #526963; }
+.emergency-preview-frame { border: 1px solid #cdd8d4; border-radius: 10px; overflow: hidden; }
+.emergency-update-preview p { line-height: 1.6; }
+.emergency-update-record { margin-top: 20px; border: 1px solid #cdd8d4; border-radius: 10px; padding: 18px; }
+.emergency-record-photo { display: block; width: 160px; max-width: 100%; max-height: 200px; object-fit: contain; margin-bottom: 16px; background: #edf2ef; border-radius: 8px; }
+.emergency-record-head { display: flex; gap: 16px; align-items: start; justify-content: space-between; }
+.emergency-record-head h3 { margin: 0 0 6px; }
+.emergency-delivery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.emergency-delivery-list > div { background: #f3f7f5; border-radius: 8px; padding: 12px; }
+.emergency-delivery-list .status { width: fit-content; }
+@media (max-width: 1000px) { .emergency-update-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .emergency-delivery-list { grid-template-columns: 1fr; } .emergency-record-head { flex-direction: column; } }

@@ -2,7 +2,7 @@ import type { Role, View } from "./data";
 
 export const roleValues = ["advertiser", "operator", "institutional", "admin"] as const satisfies readonly Role[];
 
-export const viewValues = ["portal", "network", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"] as const satisfies readonly View[];
+export const viewValues = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"] as const satisfies readonly View[];
 
 export function isRoleValue(value: string | null | undefined): value is Role {
   return (roleValues as readonly string[]).includes(value ?? "");
