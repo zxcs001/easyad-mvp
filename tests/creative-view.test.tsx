@@ -102,7 +102,7 @@ describe("CreativeView", () => {
     const campaignSelect = screen.getByRole("combobox", { name: "Campaign" });
     expect(within(campaignSelect).getAllByRole("option")).toHaveLength(1);
     expect(within(campaignSelect).queryByRole("option", { name: "Rejected Creative - Former Advertiser" })).not.toBeInTheDocument();
-    expect(screen.getByText("Rejected Creative")).toBeInTheDocument();
+    expect(screen.queryByText("Rejected Creative")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Upload media" }));
 

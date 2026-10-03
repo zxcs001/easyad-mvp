@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import BookingView from "../app/component/booking-view";
 import type { InventoryItem } from "../app/data";
 import type { BookingDraft } from "../app/types";
@@ -36,6 +36,13 @@ const draft: BookingDraft = {
   end: "2026-07-12",
   adSlots: 1,
 };
+
+// Keep the fixture dates future-facing without freezing async UI timers.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-07-01T12:00:00.000Z"));
+});
+afterEach(() => vi.useRealTimers());
 
 function renderBooking(item: InventoryItem, onSubmit = vi.fn().mockResolvedValue(true), onCancel = vi.fn()) {
   render(
@@ -129,7 +136,7 @@ test("a date request can be sent before artwork and keeps loop settings optional
   expect(screen.queryByLabelText("Showings per cycle")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Create campaign" }));
 
-  expect(onSubmit).toHaveBeenCalledWith(null);
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(null));
   fireEvent.click(screen.getByRole("button", { name: "More options" }));
   expect(screen.getByRole("spinbutton", { name: /Showings per cycle/ })).toHaveValue(1);
 });
@@ -176,6 +183,26 @@ test("cancel is unavailable while campaign creation is being committed", async (
 
   finishCreation?.(true);
   await waitFor(() => expect(screen.getByRole("button", { name: "Cancel campaign" })).toBeEnabled());
+});
+
+test("campaign dates in the past block submission and explain how to continue", () => {
+  vi.setSystemTime(new Date("2026-07-11T12:00:00.000Z"));
+  const onSubmit = vi.fn();
+  renderBooking(baseItem, onSubmit);
+
+  const submit = screen.getByRole("button", { name: "Create campaign" });
+  expect(submit).toBeDisabled();
+  expect(submit).toHaveAccessibleDescription("Choose a start date today or later. Campaigns cannot start in the past.");
+  fireEvent.click(submit);
+  expect(onSubmit).not.toHaveBeenCalled();
+});
+
+test("campaign dates starting today allow submission", () => {
+  vi.setSystemTime(new Date("2026-07-10T12:00:00.000Z"));
+  renderBooking(baseItem);
+
+  expect(screen.getByLabelText("Start date")).toHaveAttribute("min", draft.start);
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeEnabled();
 });
 
 test("legacy static-format inventory also omits loop-time metrics", () => {

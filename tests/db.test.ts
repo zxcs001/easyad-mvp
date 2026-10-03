@@ -37,6 +37,7 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       name: "Database Test Screen",
       operator: "Database Operator",
       format: "digital",
+      advertisingOptIn: true,
       x: 45,
       y: 55,
       address: "1 Database Way",
@@ -53,8 +54,9 @@ test.skipIf(!postgresUrl)("PostgreSQL database layer persists users, sessions, i
       availableTo: "2026-08-01",
     };
 
-    assert.equal((await db.createInventory({ ...inventory, displayLanguage: "fr" }, user.id))?.id, inventory.id);
+    assert.equal((await db.createInventory({ ...inventory, displayLanguage: "fr" }, user.id, user.id))?.id, inventory.id);
     assert.equal((await db.getInventory(inventory.id))?.displayLanguage, "fr");
+    assert.equal((await db.getInventory(inventory.id))?.institutionId, user.id);
     assert.equal((await db.listInventory()).length, 1);
     assert.ok((await db.getInventory(inventory.id))?.tags?.includes("digital"));
     const pendingInventory: InventoryItem = { ...inventory, id: "INV-DB-PENDING", approvalStatus: "pending approval" };
