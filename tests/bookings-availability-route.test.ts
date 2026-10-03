@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { beforeEach, test, vi } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 import type { InventoryItem } from "../app/data";
 
 const mocks = vi.hoisted(() => ({
@@ -57,11 +57,16 @@ const staticBillboard: InventoryItem = {
 };
 
 beforeEach(() => {
+  // These availability fixtures must not expire as the CI calendar advances.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-01T12:00:00.000Z"));
   vi.clearAllMocks();
   mocks.getInventory.mockResolvedValue(staticBillboard);
   mocks.createBookingWithCreativeRecord.mockImplementation(async (booking: unknown, _userId: string, creative: unknown) => ({ booking, creative }));
   mocks.storeMedia.mockResolvedValue("/tmp/booking-creative.png");
 });
+
+afterEach(() => vi.useRealTimers());
 
 test("static booking is rejected when its dates fall outside the owner-defined availability window", async () => {
   const response = await POST(bookingRequest("2026-08-20", "2026-09-01"));
@@ -131,6 +136,25 @@ test("animated GIF is rejected for physical billboard inventory", async () => {
   assert.equal(response.status, 422);
   assert.equal(mocks.storeMedia.mock.calls.length, 0);
   assert.equal(mocks.createBookingWithCreativeRecord.mock.calls.length, 0);
+});
+
+test("booking dates in the past are rejected before creating a record or storing media", async () => {
+  vi.setSystemTime(new Date("2026-08-11T12:00:00.000Z"));
+  const response = await POST(bookingRequest("2026-08-10", "2026-08-20"));
+
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error, "Choose a start date today or later. Campaigns cannot start in the past.");
+  assert.equal(mocks.createBookingRecord.mock.calls.length, 0);
+  assert.equal(mocks.createBookingWithCreativeRecord.mock.calls.length, 0);
+  assert.equal(mocks.storeMedia.mock.calls.length, 0);
+});
+
+test("a booking can start today", async () => {
+  const response = await POST(bookingRequestWithoutCreative("2026-08-01", "2026-08-20"));
+
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).booking.start, "2026-08-01");
+  assert.equal(mocks.createBookingRecord.mock.calls.length, 1);
 });
 
 function bookingRequest(start: string, end: string, creative?: File) {

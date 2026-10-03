@@ -46,9 +46,9 @@ beforeEach(() => {
   state.role = "institutional";
   state.userId = "INST-CIVIC";
   state.devices = {
-    "INV-OWNED": { id: "INV-OWNED", institutionId: "INST-CIVIC", approvalStatus: "approved" },
-    "INV-OTHER": { id: "INV-OTHER", institutionId: "INST-OTHER", approvalStatus: "approved" },
-    "INV-DRAFT": { id: "INV-DRAFT", institutionId: "INST-CIVIC", approvalStatus: "pending approval" },
+    "INV-OWNED": { id: "INV-OWNED", institutionId: "INST-CIVIC", approvalStatus: "approved", format: "digital", deliveryMode: "digital" },
+    "INV-OTHER": { id: "INV-OTHER", institutionId: "INST-OTHER", approvalStatus: "approved", format: "digital", deliveryMode: "digital" },
+    "INV-DRAFT": { id: "INV-DRAFT", institutionId: "INST-CIVIC", approvalStatus: "pending approval", format: "digital", deliveryMode: "digital" },
   };
   state.alerts = [];
   state.createdInput = null;
@@ -86,6 +86,15 @@ test("an unpublished screen cannot receive an emergency override", async () => {
   const response = await POST(alertRequest(["INV-DRAFT"]));
 
   assert.equal(response.status, 409);
+  assert.equal(state.createdInput, null);
+});
+
+test("a published static billboard cannot receive an emergency override", async () => {
+  state.devices["INV-OWNED"] = { ...state.devices["INV-OWNED"], format: "static", deliveryMode: "static" };
+  const response = await POST(alertRequest(["INV-OWNED"]));
+
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error, "Emergency updates can only play on digital screens. Static billboards cannot receive alerts.");
   assert.equal(state.createdInput, null);
 });
 

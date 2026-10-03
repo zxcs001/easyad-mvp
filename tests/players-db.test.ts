@@ -84,10 +84,15 @@ test.skipIf(!available)("shared approval eligibility, deletion, alert cancellati
   expect(Date.parse(content.validUntil) - Date.parse(content.generatedAt)).toBe(86_400_000);
   await createDeviceAlert({ institutionId: fixture.institution.id, alertType: "public-safety", title: "Pilot alert", message: "Test only", area: "Lobby", targetDeviceIds: [fixture.screen.id], issuedBy: "Pilot", createdBy: fixture.institution.id, expiresAt: new Date(Date.now() + 60_000).toISOString() });
   const alert = await fetchPlayerManifest(paired.token);
-  expect(alert.activeAlert?.title).toBe("Pilot alert"); expect(alert.slides).toHaveLength(1); // Cached ordinary content resumes after offline alert expiry.
+  expect(alert.activeAlert?.title).toBe("Pilot alert");
+  // An active override suppresses ordinary slides until the server ends it.
+  expect(alert.slides).toEqual([]);
+  expect(alert.revision).toBeGreaterThan(content.revision);
   await getDb().query("UPDATE device_alerts SET status='ended' WHERE id=$1", [alert.activeAlert!.id]);
   const resumed = await fetchPlayerManifest(paired.token);
-  expect(resumed.activeAlert).toBeNull(); expect(resumed.slides).toHaveLength(1);
+  expect(resumed.activeAlert).toBeNull();
+  expect(resumed.slides.map((slide) => slide.id)).toEqual(["MED-PLAYER-APPROVED"]);
+  expect(resumed.revision).toBeGreaterThan(alert.revision);
   await getDb().query("DELETE FROM media_resources WHERE id='MED-PLAYER-APPROVED'");
   expect((await fetchPlayerManifest(paired.token)).slides).toEqual([]);
   await getDb().query("UPDATE inventory SET institution_id=$2 WHERE id=$1", [fixture.screen.id, fixture.otherInstitution.id]);

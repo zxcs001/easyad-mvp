@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Booking, InventoryItem } from "../app/data";
 import CampaignSpacesView from "../app/component/campaign-spaces-view";
 
@@ -43,6 +43,12 @@ const booking: Booking = {
   pop: 0,
 };
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-07-01T12:00:00.000Z"));
+});
+afterEach(() => vi.useRealTimers());
+
 test("campaign spaces offers an indicative edit action and a separate inventory action", async () => {
   const user = userEvent.setup();
   const onOpenCreative = vi.fn();
@@ -65,6 +71,16 @@ test("static campaign spaces omit playback metrics and the public inventory link
   expect(screen.getByText("No playback loop")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Inventory" })).not.toBeInTheDocument();
   expect(screen.queryByText(/s of 120s/)).not.toBeInTheDocument();
+});
+
+test("ended campaigns remain visible but cannot be edited", () => {
+  vi.setSystemTime(new Date("2026-07-21T12:00:00.000Z"));
+  render(<CampaignSpacesView bookings={[booking]} inventory={inventory} onOpenCreative={vi.fn()} />);
+
+  expect(screen.getByText(booking.campaign)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  expect(screen.getByText("Creative editing is unavailable for this campaign.")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Inventory" })).toBeInTheDocument();
 });
 
 test("cancelled campaigns are removed from active campaign spaces", () => {

@@ -167,11 +167,11 @@ describe("dashboard shell", () => {
     expect(screen.getByText("Finish creating this campaign, or cancel to return to screen selection.")).toBeInTheDocument();
   });
 
-  test("creative step explains that submission completes the locked flow", () => {
+  test("creative step explains both submission and cancellation in the locked flow", () => {
     render(<Topbar view="creative" visibleCount={2} inventory={inventory} bookings={bookings} role="advertiser" campaignCreationLocked />);
 
     expect(screen.getByText("Make an ad").parentElement).toHaveAttribute("aria-current", "step");
-    expect(screen.getByText("Submit your ad for review to finish creating this campaign.")).toBeInTheDocument();
+    expect(screen.getByText("Submit your ad for review, or cancel this campaign to return to screen selection.")).toBeInTheDocument();
   });
 
   test("government surface uses a dedicated civic shell while preserving shared navigation actions", () => {
