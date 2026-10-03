@@ -36,7 +36,7 @@
   border: 0;
   padding: 0;
   font-size: .78rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .helper-text {
@@ -45,19 +45,19 @@
 }
 
 .tag-chip {
-  color: #4b5b58;
+  color: var(--muted);
   background: #fff;
-  border: 1px solid #cad5d1;
+  border: 1px solid var(--control-edge);
   border-radius: 999px;
   padding: 5px 8px;
   font-size: .72rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .tag-chip.selected {
   background: var(--soft-green);
   color: var(--green-dark);
-  border-color: #98c8b7;
+  border-color: var(--green);
 }
 
 .tag-custom-input {
@@ -113,7 +113,7 @@
 
 .filter-stack>label,
 .tag-filter-field {
-  border-top: 1px solid #edf0f2;
+  border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 
@@ -124,16 +124,20 @@
 
 .filter-stack label,
 .tag-filter-heading .field-label {
-  color: #4b5962;
+  color: var(--muted);
   font-size: .72rem;
-  font-weight: 750;
+  font-weight: 560;
 }
 
+/* 40px, the one control height; the 36px select sat 4px short of the
+   "More filters" button and the map search beside it. */
 .filter-stack .select {
-  border-radius: 6px;
-  min-height: 36px;
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  min-height: 40px;
   margin-top: 1px;
-  font-size: .78rem;
+  font-size: .8rem;
+  font-weight: 500;
 }
 
 .filter-stack input[type=range] {
@@ -149,10 +153,11 @@
 }
 
 .tag-chip {
-  border-radius: 5px;
+  border-radius: 6px;
   min-height: 26px;
-  padding: 3px 7px;
-  font-size: .65rem;
+  padding: 3px 8px;
+  font-size: .7rem;
+  font-weight: 500;
 }
 
 .tag-expand-button {
@@ -172,7 +177,7 @@
 }
 
 .filter-stack>label:nth-child(2) {
-  border-top: 1px solid #edf0f2;
+  border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 }
@@ -188,24 +193,27 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 38px;
+  min-height: 40px;
   padding: 0 12px;
-  font-size: .85rem;
+  font-size: .8rem;
   font-weight: 600;
+  transition: border-color .14s, background .14s;
   display: flex;
 }
 
 .filter-disclosure:hover {
-  border-color: var(--green);
+  background: var(--bg);
+  border-color: var(--ink);
 }
 
 .filter-disclosure-count {
   background: var(--soft-green);
   color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
   border-radius: 999px;
-  padding: 1px 8px;
-  font-size: .74rem;
-  font-weight: 700;
+  padding: 1px 7px;
+  font-size: .7rem;
+  font-weight: 600;
 }
 
 .filter-disclosure-chevron {

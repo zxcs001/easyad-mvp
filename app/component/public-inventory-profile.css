@@ -4,57 +4,89 @@
    or 9px below 720px) and this page reserved no room for it. At 701-1200px it
    covered the "Device URL" action. The top padding keeps the hero below it. */
 .public-device-page {
-  background: #f5f7f6;
+  background: var(--bg);
   align-content: start;
-  gap: 22px;
+  gap: 20px;
   min-height: 100vh;
   padding: clamp(18px,4vw,56px);
   padding-top: max(clamp(18px,4vw,56px), 64px);
   display: grid;
 }
 
+/* A page header, not a poster: title, address, and the action row sharing
+   the title block's bottom edge. */
 .public-device-hero {
   border-bottom: 1px solid var(--line);
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
-  padding-bottom: 20px;
+  align-items: flex-end;
+  gap: 24px;
+  padding-bottom: 18px;
   display: flex;
 }
 
+.public-device-hero > div:first-child {
+  min-width: 0;
+}
+
 .public-device-hero h1 {
-  letter-spacing: 0;
+  letter-spacing: -.035em;
   max-width: 920px;
-  margin: 6px 0 8px;
-  font-size: clamp(2.4rem,6vw,5.8rem);
-  line-height: .92;
+  margin: 8px 0 6px;
+  font-size: clamp(1.75rem,3vw,2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
 .public-device-hero p {
   color: var(--muted);
   margin: 0;
-  font-size: 1rem;
+  font-size: .9rem;
+}
+
+/* shared-ui.css is not loaded on this route, so the eyebrow carries the mono
+   label treatment here. */
+.public-device-page .eyebrow {
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+  display: block;
 }
 
 .public-device-actions {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: none;
   justify-content: flex-end;
   gap: 8px;
   display: flex;
 }
 
 .public-device-actions a,
-.public-media-body a {
-  border: 1px solid var(--line);
-  min-height: 38px;
+.public-media-body a,
+.public-section-heading > a {
+  border: 1px solid var(--control-edge);
+  min-height: 36px;
   color: var(--ink);
   background: #fff;
   border-radius: 7px;
   justify-content: center;
   align-items: center;
-  padding: 0 14px;
-  font-weight: 850;
+  padding: 0 13px;
+  font-size: .8rem;
+  font-weight: 600;
+  white-space: nowrap;
   display: inline-flex;
+  transition: background .14s,border-color .14s;
+}
+
+.public-device-actions a:hover,
+.public-media-body a:hover,
+.public-section-heading > a:hover {
+  background: var(--bg);
+  border-color: var(--line-strong);
 }
 
 .public-device-summary {
@@ -67,25 +99,38 @@
 .public-empty,
 .public-media-card {
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 12px 28px #17202a14;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .public-metric {
-  gap: 5px;
-  padding: 14px;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 16px;
   display: grid;
 }
 
-.public-metric span,
+.public-metric span {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 500;
+}
+
 .public-media-body small {
   color: var(--muted);
-  font-size: .78rem;
+  font-size: .76rem;
 }
 
 .public-metric strong {
-  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .public-device-section {
@@ -97,16 +142,32 @@
 .public-device-preview {
   border-radius: var(--radius-sm);
   background: #050708;
-  border: 1px solid #1c2c35;
+  border: 1px solid #1c242d;
   width: 100%;
   overflow: hidden;
-  box-shadow: 0 16px 36px #18293029;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Eyebrow and title on the left, an optional action link on the right. */
+.public-section-heading {
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  display: flex;
+}
+
+.public-section-heading:has(> span.eyebrow) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
 }
 
 .public-section-heading h2 {
-  letter-spacing: 0;
-  margin: 4px 0 0;
-  font-size: clamp(1.8rem,3vw,3rem);
+  letter-spacing: -.03em;
+  margin: 6px 0 0;
+  font-size: clamp(1.25rem,2vw,1.6rem);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .public-media-grid {
@@ -121,7 +182,7 @@
 
 .public-media-preview {
   aspect-ratio: 16/9;
-  background: #17202a;
+  background: #0e141b;
   place-items: center;
   display: grid;
 }
@@ -150,8 +211,15 @@
   margin: 0;
 }
 
+.public-media-body h3 {
+  letter-spacing: -.01em;
+  font-size: .95rem;
+  font-weight: 600;
+}
+
 .public-media-body p {
-  color: #394650;
+  color: var(--muted);
+  font-size: .86rem;
   line-height: 1.45;
 }
 
@@ -167,6 +235,7 @@
 
 .public-empty span {
   color: var(--muted);
+  font-size: .86rem;
 }
 
 .public-device-tags {
@@ -180,13 +249,18 @@
 }
 
 .public-device-tags .device-tag-list span {
-  color: var(--green-dark);
-  background: var(--soft-green);
-  border: 1px solid #98c8b7;
+  color: #3c4652;
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 5px 8px;
-  font-size: .72rem;
-  font-weight: 750;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 500;
+}
+
+.public-device-tags {
+  gap: 10px;
 }
 
 .public-section-heading .eyebrow {
@@ -215,11 +289,21 @@
   padding-bottom: 16px;
 }
 
+.public-device-hero {
+  align-items: stretch;
+}
+
 .public-device-hero h1 {
-  margin-top: 4px;
-  font-size: 2.15rem;
-  line-height: 1.05;
+  margin-top: 6px;
+  font-size: 1.6rem;
+  line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.public-section-heading {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .public-device-actions {
@@ -237,6 +321,10 @@
   padding: 12px;
 }
 
+.public-metric strong {
+  font-size: .9rem;
+}
+
 .public-device-preview {
   min-height: 0;
 }
@@ -246,7 +334,7 @@
 }
 
 .public-section-heading h2 {
-  font-size: 1.65rem;
+  font-size: 1.3rem;
 }
 }
 

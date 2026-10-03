@@ -19,11 +19,11 @@
   box-shadow: var(--shadow-lg);
   color: var(--ink);
   background: #fff;
-  border-left-width: 4px;
+  border-left-width: 3px;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   animation: .26s cubic-bezier(.16,1,.3,1) toast-in;
   display: grid;
 }
@@ -47,8 +47,8 @@
 .toast-icon {
   border-radius: 50%;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: grid;
 }
 
@@ -58,29 +58,29 @@
   stroke-width: 2.4px;
   stroke-linecap: round;
   stroke-linejoin: round;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .toast-success .toast-icon {
-  background: var(--soft-green);
-  color: var(--green-dark);
+  background: var(--state-success-surface);
+  color: var(--state-success-ink);
 }
 
 .toast-error .toast-icon {
-  color: #a23b22;
-  background: #fdece7;
+  color: var(--state-danger-ink);
+  background: var(--state-danger-surface);
 }
 
 .toast-info .toast-icon {
-  background: var(--soft-blue);
-  color: var(--blue);
+  background: var(--state-info-surface);
+  color: var(--state-info-ink);
 }
 
 .toast-msg {
-  font-size: .9rem;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: .84rem;
+  font-weight: 560;
+  line-height: 1.4;
 }
 
 .toast-close {
@@ -95,33 +95,28 @@
 
 .toast-close:hover {
   color: var(--ink);
-  background: #0000000f;
+  background: var(--bg);
 }
 
-@keyframes toast-in{
-
-0% {
-  opacity: 0;
-  transform: translateY(12px)scale(.98);
+.toast-close:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
 }
 
-@keyframes toast-out{
-
-to {
-  opacity: 0;
-  transform: translateY(8px) scale(.98);
-}
+/* These two were nested inside each other, which made toast-out invalid. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to { opacity: 1; transform: none; }
 }
 
-to {
-  opacity: 1;
-  transform: none;
-}
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(8px) scale(.98); }
 }
 
 @media (prefers-reduced-motion:reduce) {
 
-.toast {
+.toast,
+.toast.is-leaving {
   animation: none;
 }
 }

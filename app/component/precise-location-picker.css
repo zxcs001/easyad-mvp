@@ -10,7 +10,8 @@
 
 .inventory-location-picker>.field-label {
   border-bottom: 1px solid var(--line);
-  background: #f7faf9;
+  background: #fafbfc;
+  font-size: .78rem;
   margin-bottom: 0;
   padding: 11px 13px;
   display: block;
@@ -30,7 +31,7 @@
 }
 
 .precise-location-fallback {
-  background: #dfe9e5;
+  background: #e9edf0;
   overflow: hidden;
 }
 

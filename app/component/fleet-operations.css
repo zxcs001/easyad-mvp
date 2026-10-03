@@ -1,1 +1,322 @@
-.fleet-operations{margin-top:20px;display:grid;gap:14px;min-width:0}.fleet-operations h2,.fleet-operations h3,.fleet-operations p{margin:0}.fleet-operations form{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:16px}.fleet-operations label{display:grid;gap:6px}.fleet-operations button{min-height:44px}.fleet-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.fleet-operations input:not([type=checkbox]),.fleet-operations select{width:100%;min-width:0;min-height:44px;box-sizing:border-box}.fleet-screen-list{max-height:260px;overflow:auto;display:grid;gap:8px}.fleet-screen-list label,.fleet-operations .fleet-checkbox{display:flex;gap:10px;align-items:center}.fleet-screen-list small,.fleet-table-scroll small{display:block;color:var(--muted)}.fleet-operations input[type=checkbox]{width:20px;height:20px}.fleet-table-scroll{overflow:auto}.fleet-table-scroll th,.fleet-table-scroll td{padding:8px;text-align:left;border-bottom:1px solid var(--line)}@media(max-width:700px){.fleet-form-grid{grid-template-columns:1fr}.fleet-operations{padding:12px}}@media(forced-colors:active){.fleet-operations input,.fleet-operations select,.fleet-operations button{border:1px solid ButtonText}}
+/* Fleet operations panel. The markup is one flat run of headings, fields,
+   buttons and forms, so the layout is a wrapping flex row: every child takes a
+   full line except buttons, which sit side by side as a toolbar, and the
+   filter field, which shares its line with the selection buttons. */
+.fleet-operations {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 8px;
+  min-width: 0;
+  margin-top: 20px;
+  font-size: .82rem;
+  display: flex;
+}
+
+.fleet-operations > *,
+.fleet-operations form > * {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.fleet-operations > button,
+.fleet-operations form > button {
+  flex: none;
+}
+
+.fleet-operations > label {
+  flex: 1 1 260px;
+}
+
+.fleet-operations h2,
+.fleet-operations h3,
+.fleet-operations p {
+  margin: 0;
+}
+
+.fleet-operations h2 {
+  letter-spacing: -.01em;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fleet-operations > h2 + p {
+  margin-top: -6px;
+}
+
+.fleet-operations h3 {
+  letter-spacing: -.01em;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.fleet-operations p {
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.fleet-operations form {
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  display: flex;
+}
+
+.fleet-operations label {
+  color: var(--ink);
+  gap: 6px;
+  font-size: .78rem;
+  font-weight: 560;
+  display: grid;
+}
+
+.fleet-form-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+  display: grid;
+}
+
+.fleet-operations input:not([type=checkbox]),
+.fleet-operations select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  font-size: .82rem;
+  font-weight: 400;
+}
+
+/* Class-less buttons are the routine actions: compact outline buttons. The
+   one primary action in each form keeps .primary-button. */
+.fleet-operations button {
+  white-space: nowrap;
+  border-radius: 7px;
+  justify-content: center;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: .8rem;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.fleet-operations button:not([class]) {
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--control-edge);
+  transition: background .14s, border-color .14s;
+}
+
+.fleet-operations button:not([class]):hover:not(:disabled) {
+  background: var(--bg);
+  border-color: var(--line-strong);
+}
+
+.fleet-operations button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.fleet-operations button:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
+}
+
+/* Screen scope: one framed, scrollable list of selectable rows. */
+.fleet-operations fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin: 4px 0 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fleet-operations legend {
+  color: var(--muted);
+  float: left;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+}
+
+.fleet-screen-list {
+  clear: both;
+  max-height: 264px;
+  display: grid;
+  overflow: auto;
+}
+
+.fleet-screen-list label,
+.fleet-operations .fleet-checkbox {
+  align-items: center;
+  gap: 10px;
+  display: flex;
+}
+
+.fleet-screen-list label {
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  transition: background .14s;
+}
+
+.fleet-screen-list label:last-child {
+  border-bottom: 0;
+}
+
+.fleet-screen-list label:hover {
+  background: #fafbfc;
+}
+
+.fleet-screen-list label:has(input:checked) {
+  background: #f2faf6;
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.fleet-screen-list strong {
+  font-size: .8rem;
+  font-weight: 600;
+  display: block;
+}
+
+.fleet-screen-list small,
+.fleet-table-scroll small {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 400;
+  display: block;
+}
+
+.fleet-operations input[type=checkbox] {
+  accent-color: var(--green);
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.fleet-operations .fleet-checkbox {
+  align-self: end;
+  min-height: 40px;
+}
+
+/* The alert-delivery heading opens a new section after the last form. */
+.fleet-operations > h3 {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+.fleet-operations > h3 + p {
+  margin-top: -6px;
+}
+
+/* Per-screen results */
+.fleet-operations ul {
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  list-style: none;
+  display: grid;
+}
+
+.fleet-operations > ul:empty {
+  display: none;
+}
+
+.fleet-table-scroll {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+
+.fleet-table-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet-table-scroll th,
+.fleet-table-scroll td {
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+}
+
+.fleet-table-scroll tbody tr:last-child td,
+.fleet-table-scroll thead:has(+ tbody:empty) th {
+  border-bottom: 0;
+}
+
+.fleet-table-scroll th {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+}
+
+.fleet-operations details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.fleet-operations summary {
+  cursor: pointer;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.fleet-operations details ul {
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+@media (max-width:700px) {
+
+.fleet-form-grid {
+  grid-template-columns: 1fr;
+}
+
+.fleet-operations {
+  padding: 12px;
+}
+
+.fleet-operations > button,
+.fleet-operations form > button {
+  white-space: normal;
+  flex: 1 1 auto;
+}
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.fleet-operations button:not([class]),
+.fleet-screen-list label {
+  transition: none;
+}
+}
+
+@media (forced-colors:active) {
+
+.fleet-operations input,
+.fleet-operations select,
+.fleet-operations button {
+  border: 1px solid ButtonText;
+}
+}

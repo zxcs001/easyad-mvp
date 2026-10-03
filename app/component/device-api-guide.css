@@ -4,12 +4,12 @@
   width: 100%;
   display: grid;
   gap: 7px;
-  padding: 14px 16px;
-  border: 1px solid #2d443c;
-  border-radius: var(--radius-sm);
-  color: #f5faf7;
-  background: #07100d;
-  box-shadow: 0 12px 28px #17202a24;
+  padding: 12px 14px 14px;
+  border: 1px solid #ffffff14;
+  border-radius: var(--radius);
+  color: #e8edf2;
+  background: var(--workspace-nav);
+  box-shadow: var(--shadow-sm);
 }
 
 .device-api-heading {
@@ -19,32 +19,41 @@
   gap: 10px;
 }
 
+.device-api-heading {
+  padding-bottom: 6px;
+}
+
 .device-api-heading span {
-  color: #6ee0b4;
-  font-size: .68rem;
-  font-weight: 850;
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 500;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
 .device-api-heading strong {
   min-width: 0;
   overflow: hidden;
-  font-size: .84rem;
+  font-size: .82rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .device-api-heading small {
-  color: #b8c8c1;
-  font-size: .72rem;
+  color: #96a3b0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .66rem;
 }
 
 .device-api-guide code {
   display: block;
   overflow: hidden;
-  color: #dce9e4;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: clamp(.7rem,1vw,.8rem);
+  color: #c4cdd6;
+  font-family: var(--font-mono);
+  font-size: clamp(.7rem,1vw,.76rem);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -52,15 +61,23 @@
 
 .device-api-guide a {
   padding: 7px 9px;
-  border: 1px solid #ffffff1f;
-  border-radius: 5px;
-  background: #ffffff0d;
+  border: 1px solid #ffffff1a;
+  border-radius: 6px;
+  color: #e8edf2;
+  background: #ffffff08;
+  transition: background .14s,border-color .14s;
 }
 
-.device-api-guide a:hover,
+.device-api-guide a:hover {
+  border-color: #34d39966;
+  background: #34d39912;
+}
+
+/* The ring replaces the outline, so focus stays visible on the dark surface. */
 .device-api-guide a:focus-visible {
-  border-color: #6ee0b480;
-  background: #6ee0b414;
+  border-color: var(--signal);
+  background: #34d39912;
+  box-shadow: 0 0 0 2px #34d39966;
   outline: none;
 }
 
@@ -76,4 +93,11 @@
   .device-api-heading small {
     display: none;
   }
+}
+
+/* The second route is plain text beside a linked one; matching the link's
+   inset keeps both paths on one left edge. */
+.device-api-guide > code {
+  color: #96a3b0;
+  padding: 0 10px;
 }

@@ -170,7 +170,7 @@ export function BillingView({
                     >
                       {paid ? "Paid" : status === "refunded" ? "Refunded" : status === "failed" ? "Retry" : "Demo charge"}
                     </AsyncButton>
-                  ) : <span className="commercial-status">{t(status)}</span>}
+                  ) : <span className={`commercial-status is-${status}`}>{t(status)}</span>}
                 </span>
               </div>
             );

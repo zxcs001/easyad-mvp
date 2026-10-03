@@ -129,7 +129,7 @@
   color: #ffffffb8;
   margin-left: auto;
   font-size: clamp(.55rem,1.1cqw,1rem);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .emergency-beacon {
@@ -163,7 +163,7 @@
   text-transform: uppercase;
   letter-spacing: .08em;
   font-size: clamp(.7rem,1.4cqw,1.35rem);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .emergency-message h1 {
@@ -177,14 +177,14 @@
   max-width: 48ch;
   margin: 0;
   font-size: clamp(.95rem,2.2cqw,2.2rem);
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .emergency-screen > footer {
   justify-content: space-between;
   font-size: clamp(.55rem,1.1cqw,1rem);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .device-player-preview .emergency-screen > header,

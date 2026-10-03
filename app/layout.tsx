@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { Toaster } from "./component/toast";
@@ -21,7 +23,7 @@ export default async function RootLayout({
 }>) {
   const { locale } = await getServerI18n();
   return (
-    <html lang={locale}>
+    <html lang={locale} className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body><I18nProvider initialLocale={locale}><WebsiteLanguageSelector />{children}<Chatbot /><Toaster /><CookieConsentBanner /></I18nProvider></body>
     </html>
   );

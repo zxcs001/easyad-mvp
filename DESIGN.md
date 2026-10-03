@@ -3,40 +3,42 @@ version: alpha
 name: "EasyAD Platform"
 description: "A civic-infrastructure-inspired outdoor-media marketplace and operations console for advertisers, screen operators, institutions, and local government."
 colors:
-  background: "#F3F5F7"
+  background: "#F6F7F9"
   panel: "#FFFFFF"
-  ink: "#131B24"
-  muted: "#5B6770"
-  line: "#E4E8EA"
-  line-strong: "#767F86"
-  primary: "#1F7A5A"
-  primary-dark: "#14503C"
-  info: "#2F5F9F"
-  info-dark: "#1F497A"
-  state-idle-surface: "#EEF1F3"
-  state-idle-ink: "#5B6770"
-  state-success-surface: "#E3F2EA"
-  state-success-ink: "#14503C"
+  ink: "#0E141B"
+  muted: "#5A6472"
+  line: "#E5E8EC"
+  line-strong: "#7A8391"
+  control-edge: "#8A93A0"
+  primary: "#0C7A56"
+  primary-dark: "#08573D"
+  info: "#2459B3"
+  info-dark: "#1A428A"
+  state-idle-surface: "#EFF1F4"
+  state-idle-ink: "#5A6472"
+  state-success-surface: "#E4F3EC"
+  state-success-ink: "#08573D"
   state-warning-surface: "#FBEAB4"
   state-warning-ink: "#7A5510"
   state-danger: "#B3192E"
   state-danger-surface: "#FBE9EC"
   state-danger-ink: "#A11228"
-  state-info-surface: "#E8EEF6"
-  state-info-ink: "#1F497A"
+  state-info-surface: "#EAF0FA"
+  state-info-ink: "#1A428A"
   state-emergency-surface: "#1A1206"
   state-emergency-ink: "#FFC845"
-  navigation: "#111B22"
+  navigation: "#0A0E13"
+  signal: "#34D399"
 typography:
   sans:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: "Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
   mono:
-    fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace"
+    fontFamily: "Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace"
 rounded:
-  DEFAULT: "12px"
-  sm: "9px"
-  workspace-control: "6px"
-  workspace-panel: "8px"
+  DEFAULT: "10px"
+  sm: "8px"
+  workspace-control: "7px"
+  workspace-panel: "10px"
 spacing:
   workspace-gap: "16px"
   section-gap: "28px"
@@ -107,8 +109,8 @@ Status is encoded by visual weight, not by hue. A colour-vision deficiency remov
 
 | Weight | State | Surface | Ink | Contrast |
 |---|---|---|---|---|
-| 0 | Idle, unpublished | `#EEF1F3` | `#5B6770` | 5.12:1 |
-| 1 | Published, healthy | `#E3F2EA` | `#14503C` | 8.10:1 |
+| 0 | Idle, unpublished | `#EFF1F4` | `#5A6472` | 5.30:1 |
+| 1 | Published, healthy | `#E4F3EC` | `#08573D` | 7.51:1 |
 | 2 | Reversible caution | `#FBEAB4` | `#7A5510` | 5.59:1 |
 | 3 | Destructive or failed | `#B3192E` | `#FFFFFF` | 6.78:1 |
 | 4 | Active screen override | `#1A1206` | `#FFC845` | 12.00:1 |
@@ -119,11 +121,20 @@ Weight 4 is reserved. Use it for an active screen override only. A routine card 
 
 `line` is a decorative hairline at 1.23:1. It must never bound a control. Use `line-strong` for the edge of an input or a control, because it meets the 3:1 that WCAG 2.2 SC 1.4.11 requires.
 
+`control-edge` is the resting edge of a text field, select, file input or outline button. It gives 3.11:1 on white, so it meets SC 1.4.11 by itself; `line-strong` stays the heavier edge. `signal` is decorative: it marks live lamps and glows on the dark navigation and the dark public heroes only, and never carries text.
+
 The application is light-theme only today. Focus, text, and controls target WCAG 2.2 AA. Forced-colors mode must retain system-operable outlines and scrollbars. The measured basis for these tokens is in [ADR 0007](docs/adr/0007-status-colour-encoding.md).
 
 ## Typography
 
-Inter with system fallbacks is the canonical product face. It is used at normal tracking in authenticated workspaces; the public hero may use scale and weight for expression. Monospace is reserved for API paths and machine identifiers. Labels use sentence case except established short uppercase eyebrows. Numerical status values use tabular alignment where comparison matters.
+Geist is the canonical product face. Geist Mono is the technical face. Both ship in the `geist` package and load through `next/font/local` in `app/layout.tsx`, so no request goes to a font service. The CSS variables are `--font-sans` and `--font-mono`.
+
+- Weights stay between 400 and 700. Headings use 600. Body text uses 400 to 500. Labels use 500 to 560. A weight of 800 or more is not used, because heavy Geist reads as loud, not precise.
+- Display type tightens as it grows: `h1` uses -0.025em, `h2` and `h3` use -0.015em. The public hero may use scale for expression, at weight 600 to 700.
+- Uppercase eyebrows, table headers, navigation group labels and stat-tile labels use Geist Mono at weight 500, 0.6rem to 0.68rem, with 0.08em tracking.
+- Monospace also carries API paths, machine identifiers, codes, timestamps and tags.
+- Numerical values use tabular figures where comparison matters.
+- Labels use sentence case except the short uppercase eyebrows.
 
 ## Layout
 
@@ -133,11 +144,11 @@ The authenticated shell uses a 244px desktop sidebar and a natural-height docume
 
 A section heading stacks its eyebrow above its title on one left edge, so every heading on a page starts at the same x. An eyebrow and a title must never be split to opposite ends of a band; titles differ in width, so the result reads as inconsistent alignment.
 
-Hierarchy comes from tonal layers, borders, and restrained shadows. Workspace panels use the existing small shadow; overlays use the large shared shadow. Maps and screen previews may sit one elevation above supporting controls. Static status blocks do not receive decorative floating shadows. Layers follow the shared z-index tokens in `globals.css`. The site assistant sits above page chrome and below every dialog backdrop and toast, so it never covers a decision or an acknowledgement. The assistant reports its own failures inside its panel.
+Hierarchy comes from tonal layers and hairline borders first, and from shadows last. Workspace panels use the faint `--workspace-shadow`; overlays use the large shared shadow. Maps and screen previews may sit one elevation above supporting controls. Static status blocks do not receive decorative floating shadows. Layers follow the shared z-index tokens in `globals.css`. The site assistant sits above page chrome and below every dialog backdrop and toast, so it never covers a decision or an acknowledgement. The assistant reports its own failures inside its panel.
 
 ## Shapes
 
-Public surfaces use 9–12px radii. Dense workspace controls use 6px and panels use 8px. Status pills may be fully rounded when they encode state; ordinary buttons do not become pills. Device previews preserve their physical screen aspect and use a modest frame radius.
+Public surfaces use 8–12px radii. Dense workspace controls use 7px, fields use 8px and panels use 10px. Status pills may be fully rounded when they encode state; ordinary buttons do not become pills. Device previews preserve their physical screen aspect and use a modest frame radius.
 
 ## Components
 
@@ -157,7 +168,7 @@ A disabled control always states why it is disabled and what to do next, in the 
 
 ### Buttons and actions
 
-Primary green is for the main safe action. Neutral dark/outline buttons handle secondary work. The weight-2 amber pair identifies reversible caution. The weight-3 solid `state-danger` fill is reserved for destructive or high-impact final confirmation; its solid fill is what separates it from a routine action for a colour-blind operator. Busy labels retain control dimensions and block duplicate activation.
+Primary green is for the main safe action. The ghost button is a white outline with ink text and handles secondary work. The secondary button is near-black and handles a neutral action that needs weight. Hover changes the surface or the edge; a button does not lift or cast a shadow. The weight-2 amber pair identifies reversible caution. The weight-3 solid `state-danger` fill is reserved for destructive or high-impact final confirmation; its solid fill is what separates it from a routine action for a colour-blind operator. Busy labels retain control dimensions and block duplicate activation.
 
 ### Navigation and data display
 

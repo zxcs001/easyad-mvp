@@ -32,7 +32,7 @@
   text-transform: uppercase;
   color: #ffffff80;
   font-size: .7rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .device-widget-source {
@@ -211,7 +211,7 @@
   min-width: 34px;
   height: 34px;
   padding: 0 8px;
-  font-weight: 850;
+  font-weight: 650;
   display: inline-grid;
 }
 
@@ -227,14 +227,14 @@
   align-items: baseline;
   gap: 3px;
   font-size: 1.2rem;
-  font-weight: 850;
+  font-weight: 650;
   display: inline-flex;
 }
 
 .transit-eta small {
   color: #ffffff8c;
   font-size: .7rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .transit-ticker {
@@ -253,7 +253,7 @@
   flex: none;
   padding: 5px 10px;
   font-size: .72rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .transit-ticker-track {
@@ -272,6 +272,6 @@
 .transit-ticker-item em {
   color: var(--green);
   font-style: normal;
-  font-weight: 800;
+  font-weight: 600;
 }
 

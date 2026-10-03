@@ -3,50 +3,46 @@
 .portal {
   min-height: 100vh;
   color: var(--ink);
-  background: #f5f7f6;
+  background: var(--bg);
 }
 
 .portal-nav {
   z-index: 5;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  background: #f5f7f6eb;
-  border-bottom: 1px solid #d8ddd8e0;
+  background: #f6f7f9eb;
+  border-bottom: 1px solid var(--line);
   justify-content: space-between;
   align-items: center;
   gap: 18px;
-  min-height: 76px;
-  padding: 16px clamp(18px,4vw,56px);
+  min-height: 64px;
+  padding: 12px clamp(18px,4vw,56px);
   display: flex;
   position: sticky;
   top: 0;
-}
-
-.portal-brand .brand-mark {
-  color: #fff;
-  background: #17202a;
 }
 
 .portal-nav-actions,
 .portal-actions {
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   display: flex;
 }
 
 .portal-nav-actions button:not(.primary-button):not(.language-trigger):not(.language-option),
 .portal-nav-actions a:not(.primary-button),
 .portal-path button,
-.portal-path a,
-.format-tile {
-  border: 1px solid var(--line);
-  min-height: 38px;
+.portal-path a {
+  border: 1px solid var(--control-edge);
+  min-height: 36px;
   color: var(--ink);
   background: #fff;
   border-radius: 7px;
-  padding: 0 14px;
-  font-weight: 850;
+  padding: 0 13px;
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: -.005em;
 }
 
 .portal-nav-actions a,
@@ -77,19 +73,24 @@
   display: grid;
 }
 
+/* Display type: confident, not heavy. 600 weight with tight tracking reads as
+   engineered; the old .88 line height and 6.8rem size made four stacked
+   words a poster. */
 .portal-copy h1 {
-  letter-spacing: 0;
+  letter-spacing: -.04em;
   margin: 0;
-  font-size: clamp(3rem,7vw,6.8rem);
-  line-height: .88;
+  font-size: clamp(2.6rem,5.4vw,4.75rem);
+  font-weight: 600;
+  line-height: 1;
+  text-wrap: balance;
 }
 
 .portal-copy>p:not(.eyebrow) {
-  color: #43515c;
-  max-width: 620px;
+  color: var(--muted);
+  max-width: 58ch;
   margin: 0;
-  font-size: clamp(1rem,1.6vw,1.22rem);
-  line-height: 1.55;
+  font-size: clamp(1rem,1.3vw,1.1rem);
+  line-height: 1.6;
 }
 
 .portal-stats {
@@ -104,36 +105,54 @@
 }
 
 .portal-visual {
-  background: linear-gradient(130deg,#2f5f9f29,#26735b1a),#eef4f0;
-  border: 1px solid #cfd9d1;
-  border-radius: 8px;
-  min-height: 620px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 606px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 26px 70px #17202a2e;
+  box-shadow: var(--shadow-sm);
 }
 
 .preview-toolbar {
-  background: #ffffffdb;
-  border-bottom: 1px solid #d8ddd8e6;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  min-height: 62px;
-  padding: 0 18px;
+  min-height: 48px;
+  padding: 0 16px;
   display: flex;
 }
 
+/* The label carries a live dot so the card reads as a running console widget. */
 .preview-toolbar span {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .08em;
-  font-size: .78rem;
-  font-weight: 850;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  font-weight: 500;
+  display: inline-flex;
+}
+
+.preview-toolbar span:before {
+  content: "";
+  background: var(--green);
+  border-radius: 50%;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 3px #0c7a5626;
 }
 
 .preview-toolbar strong {
-  font-size: .95rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .74rem;
+  font-weight: 500;
 }
 
 .portal-map-wrap {
@@ -151,10 +170,10 @@
 }
 
 .portal-institution-gateway {
-  color: #eef6f2;
-  background: linear-gradient(110deg,#14232b,#172f2b 64%,#1d3547);
-  border-top: 1px solid #243c42;
-  border-bottom: 1px solid #243c42;
+  color: #eef2f6;
+  background: radial-gradient(700px 260px at 92% 0%,#0c7a5633,#0000 70%),radial-gradient(600px 240px at 6% 120%,#2459b32e,#0000 70%),var(--workspace-nav);
+  border-top: 1px solid var(--workspace-nav-line);
+  border-bottom: 1px solid var(--workspace-nav-line);
   grid-template-columns: minmax(280px,1fr) auto;
   align-items: center;
   gap: clamp(20px,4vw,52px);
@@ -172,7 +191,7 @@
 .portal-institution-gateway:after {
   content: "";
   pointer-events: none;
-  background-image: linear-gradient(#ffffff0b 1px,#0000 1px),linear-gradient(90deg,#ffffff0b 1px,#0000 1px);
+  background-image: linear-gradient(#ffffff0a 1px,#0000 1px),linear-gradient(90deg,#ffffff0a 1px,#0000 1px);
   background-size: 28px 28px;
   width: 36%;
   position: absolute;
@@ -190,16 +209,15 @@
 .institution-gateway-copy { align-content: center; gap: 7px; display: grid; }
 .institution-gateway-copy h2,
 .institution-gateway-copy p { margin: 0; }
-.institution-gateway-copy .eyebrow { color: #6ee0b4; line-height: 1.35; }
-.institution-gateway-copy h2 { max-width: 30ch; font-size: clamp(1.18rem,2vw,1.6rem); line-height: 1.15; text-wrap: balance; }
-.institution-gateway-copy p { color: #d7e5dfc9; max-width: 64ch; font-size: .82rem; line-height: 1.55; text-wrap: pretty; }
+.institution-gateway-copy .eyebrow { color: var(--signal); font-size: .64rem; line-height: 1.35; }
+.institution-gateway-copy h2 { max-width: 30ch; font-size: clamp(1.15rem,1.8vw,1.45rem); font-weight: 600; letter-spacing: -.02em; line-height: 1.15; text-wrap: balance; }
+.institution-gateway-copy p { color: #c4cdd6; max-width: 64ch; font-size: .82rem; line-height: 1.55; text-wrap: pretty; }
 
-.institution-gateway-action { justify-items: end; gap: 5px; min-width: 208px; display: grid; }
-.institution-gateway-link { color: #f3f8f5; border: 1px solid #ffffff36; border-radius: 7px; align-items: center; gap: 8px; min-height: 40px; padding: 0 13px; font-size: .78rem; font-weight: 850; display: inline-flex; transition: background .16s,border-color .16s,transform .16s; }
+.institution-gateway-action { justify-items: end; gap: 6px; min-width: 208px; display: grid; }
+.institution-gateway-link { color: #f3f6f9; background: #ffffff08; border: 1px solid #ffffff2e; border-radius: 7px; align-items: center; gap: 8px; min-height: 36px; padding: 0 13px; font-size: .8rem; font-weight: 600; display: inline-flex; transition: background .16s,border-color .16s; }
 .institution-gateway-link svg { width: 15px; height: 15px; }
-.institution-gateway-link:hover { background: #ffffff12; border-color: #79c6a7; transform: translateY(-1px); }
-.institution-gateway-link:active { transform: translateY(0); }
-.institution-gateway-action small { color: #aebeb7; text-align: right; font-size: .66rem; }
+.institution-gateway-link:hover { background: #ffffff12; border-color: #ffffff5c; }
+.institution-gateway-action small { color: #9aa6b2; text-align: right; font-family: var(--font-mono); font-size: .64rem; letter-spacing: .02em; }
 
 /* The eyebrow and the title stack on one left edge. They were previously split
    with space-between, which pinned the eyebrow left and the title right. Because
@@ -209,43 +227,49 @@
 .portal-section-heading {
   flex-direction: column;
   align-items: start;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 18px;
   display: flex;
 }
 
 .portal-section-heading h2 {
-  letter-spacing: 0;
+  letter-spacing: -.03em;
   max-width: 700px;
   margin: 0;
-  font-size: clamp(1.6rem,3vw,3rem);
-  line-height: 1;
+  font-size: clamp(1.45rem,2.4vw,2.15rem);
+  font-weight: 600;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
 .portal-paths,
 .portal-feature-grid {
-  gap: 14px;
+  gap: 12px;
   display: grid;
 }
 
 .portal-paths {
   grid-template-columns: repeat(3,minmax(0,1fr));
+  counter-reset: path;
 }
 
+/* Marketing cards: hairline, no drop shadow, no hover lift. Hover changes the
+   edge only. */
 .portal-path,
 .portal-feature,
 .format-tile {
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 14px 38px #1d2a3214;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: none;
 }
 
 .portal-path {
+  counter-increment: path;
   align-content: space-between;
-  gap: 16px;
-  min-height: 210px;
-  padding: 18px;
+  gap: 14px;
+  min-height: 184px;
+  padding: 20px;
   display: grid;
 }
 
@@ -254,15 +278,19 @@
 .format-tile small {
   color: var(--muted);
   margin: 0;
-  line-height: 1.45;
+  font-size: .86rem;
+  line-height: 1.5;
 }
 
 .portal-path button,
 .portal-path a {
-  color: #fff;
-  background: #17202a;
-  border-color: #17202a;
   justify-self: start;
+}
+
+.portal-path a:hover,
+.portal-path button:hover {
+  background: var(--bg);
+  border-color: var(--line-strong);
 }
 
 .portal-feature-grid {
@@ -271,36 +299,43 @@
 
 .portal-feature {
   align-content: start;
-  gap: 8px;
-  min-height: 150px;
+  gap: 6px;
+  min-height: 140px;
   padding: 18px;
   display: grid;
 }
 
 .portal-feature strong {
-  font-size: 1.05rem;
+  letter-spacing: -.01em;
+  font-size: .95rem;
+  font-weight: 600;
 }
 
 .format-tile {
   text-align: left;
   align-content: start;
   gap: 8px;
-  min-height: 170px;
+  min-height: 160px;
   padding: 18px;
   display: grid;
 }
 
-.format-tile span {
+.format-tile span:not(.format-tile-cta) {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .08em;
-  font-size: .78rem;
-  font-weight: 850;
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  font-weight: 500;
 }
 
 .format-tile strong {
-  font-size: 1.8rem;
-  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.05;
 }
 
 .portal-path,
@@ -308,25 +343,10 @@
 .format-tile,
 .portal-nav-actions a,
 .portal-nav-actions button,
+.portal-path a,
 .portal .primary-button,
 .portal .ghost-button {
-  transition: transform .16s,box-shadow .16s,border-color .16s,background .16s,scale .11s ease;
-}
-
-.portal-nav {
-  min-height: 72px;
-}
-
-.portal-brand .brand-mark {
-  background: var(--accent-grad);
-  color: #fff;
-}
-
-.portal-nav-actions .primary-button,
-.portal-actions .primary-button {
-  background: var(--accent-grad);
-  border: 0;
-  box-shadow: 0 10px 24px #26735b47;
+  transition: border-color .16s,background .16s,scale .11s ease;
 }
 
 .portal-nav-actions .language-selector {
@@ -334,7 +354,7 @@
 }
 
 .portal-nav-actions .language-trigger {
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .portal-nav-actions .language-menu button {
@@ -343,15 +363,18 @@
 
 .portal-nav-actions a:not(.primary-button):hover,
 .portal-nav-actions button:not(.primary-button):not(.language-trigger):not(.language-option):hover {
-  border-color: #9fb3a9;
-  transform: translateY(-1px);
+  background: var(--bg);
+  border-color: var(--line-strong);
 }
 
+/* Marketing hero: near-black surface, faint grid, one emerald and one cobalt
+   glow. The map card inside it is styled as a console widget. */
 .portal-hero {
-  color: #eaf2ed;
-  background: radial-gradient(1100px 520px at 82% -15%,#35a87c6b,#0000 58%),radial-gradient(820px 480px at 6% 118%,#2f5f9f66,#0000 55%),linear-gradient(158deg,#0b1310,#131d25 52%,#182430);
-  border-radius: 26px;
-  margin: 8px clamp(12px,2.5vw,22px) 0;
+  color: #e8edf2;
+  background: radial-gradient(900px 480px at 86% -12%,#0c7a5647,#0000 62%),radial-gradient(760px 420px at 4% 116%,#2459b33d,#0000 60%),var(--workspace-nav);
+  border: 1px solid var(--workspace-nav-line);
+  border-radius: 16px;
+  margin: 12px clamp(12px,2.5vw,22px) 0;
   position: relative;
   overflow: hidden;
 }
@@ -359,12 +382,12 @@
 .portal-hero:before {
   content: "";
   pointer-events: none;
-  background-image: linear-gradient(#ffffff0b 1px,#0000 1px),linear-gradient(90deg,#ffffff0b 1px,#0000 1px);
-  background-size: 46px 46px;
+  background-image: linear-gradient(#ffffff09 1px,#0000 1px),linear-gradient(90deg,#ffffff09 1px,#0000 1px);
+  background-size: 44px 44px;
   position: absolute;
   inset: 0;
-  -webkit-mask-image: radial-gradient(circle at 28% 18%,#000,#0000 72%);
-  mask-image: radial-gradient(circle at 28% 18%,#000,#0000 72%);
+  -webkit-mask-image: radial-gradient(circle at 28% 22%,#000,#0000 72%);
+  mask-image: radial-gradient(circle at 28% 22%,#000,#0000 72%);
 }
 
 .portal-hero>* {
@@ -373,103 +396,173 @@
 }
 
 .portal-hero .eyebrow.pill {
-  color: #bfe6d4;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  background: #ffffff0f;
-  border: 1px solid #ffffff29;
-  border-radius: 999px;
+  color: #b9c7d3;
+  background: #ffffff08;
+  border: 1px solid #ffffff1f;
+  border-radius: 6px;
   align-items: center;
   gap: 8px;
   width: fit-content;
-  padding: 7px 14px;
-  font-size: .72rem;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: .64rem;
+  line-height: 1.3;
   display: inline-flex;
 }
 
 .pill-dot {
-  background: #46d39a;
+  background: var(--signal);
   border-radius: 50%;
-  width: 8px;
-  height: 8px;
-  box-shadow: 0 0 0 4px #46d39a38;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 3px #34d39929;
 }
 
 .portal-hero .portal-copy h1 {
-  color: #f4f9f6;
+  color: #f5f8fa;
 }
 
 .portal-copy .hl {
-  background: linear-gradient(120deg,#5fe0ac,#6ea8ff);
+  background: linear-gradient(120deg,var(--signal),var(--signal-cyan));
   color: #0000;
   -webkit-background-clip: text;
   background-clip: text;
 }
 
 .portal-hero .portal-copy>p:not(.eyebrow) {
-  color: #e1ece7d1;
+  color: #aeb9c4;
+}
+
+/* Stats read as one instrument strip: shared hairline frame, dividers between
+   cells, mono labels, tabular figures. */
+.portal-hero .portal-stats {
+  background: #ffffff05;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--radius);
+  gap: 0;
+  overflow: hidden;
 }
 
 .portal-hero .portal-stats .metric {
-  background: #ffffff0d;
-  border-color: #ffffff1f;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 12px 14px;
+  display: flex;
+}
+
+.portal-hero .portal-stats .metric + .metric {
+  border-left: 1px solid #ffffff14;
 }
 
 .portal-hero .portal-stats .metric strong {
-  color: #f4f9f6;
+  color: #f5f8fa;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .portal-hero .portal-stats .metric span {
-  color: #d0ded7cc;
+  color: #96a3b0;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .portal-hero .ghost-button {
-  color: #eaf2ed;
-  background: #ffffff14;
+  color: #e8edf2;
+  background: #ffffff08;
   border: 1px solid #ffffff2e;
 }
 
-.portal-hero .primary-button {
-  background: var(--accent-grad);
-  border: 0;
-  box-shadow: 0 14px 30px #26735b57;
+.portal-hero .ghost-button:hover:not(:disabled) {
+  background: #ffffff12;
+  border-color: #ffffff5c;
 }
 
-.portal-visual {
-  border-color: #ffffff24;
-  box-shadow: 0 30px 80px #00000073;
+.portal-hero .portal-visual {
+  background: #0e141b;
+  border-color: #ffffff1f;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px #00000059, 0 0 0 1px #00000040;
 }
 
-.portal-visual .preview-toolbar strong {
-  color: var(--ink);
+.portal-hero .preview-toolbar {
+  background: #ffffff05;
+  border-bottom-color: #ffffff14;
 }
 
-.portal-visual .preview-toolbar span {
-  color: #51606a;
+.portal-hero .preview-toolbar span {
+  color: #96a3b0;
+}
+
+.portal-hero .preview-toolbar span:before {
+  background: var(--signal);
+  box-shadow: 0 0 0 3px #34d39929;
+}
+
+.portal-hero .preview-toolbar strong {
+  color: #e8edf2;
+}
+
+/* A role-locked link renders as span.disabled-action plus the link's own class.
+   With .primary-button it kept the emerald fill under grey text (1.3:1). Locked
+   actions get a neutral surface instead; on the dark hero, a quiet outline. */
+.portal .disabled-action.primary-button,
+.portal .disabled-action.ghost-button {
+  color: var(--muted);
+  background: #f1f3f5;
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.portal-hero .disabled-action.primary-button,
+.portal-hero .disabled-action.ghost-button {
+  color: #8d9aa6;
+  background: #ffffff05;
+  border-color: #ffffff1a;
+}
+
+.portal-path .disabled-action {
+  justify-self: start;
 }
 
 .portal-trust {
   gap: 10px;
-  padding: 4px clamp(18px,4vw,56px) 0;
+  padding: 6px clamp(18px,4vw,56px) 0;
   display: grid;
+}
+
+.portal-trust .eyebrow {
+  font-size: .62rem;
 }
 
 .trust-logos {
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 26px;
+  gap: 8px 24px;
   display: flex;
 }
 
 .trust-logos span {
-  color: #5d6b63;
-  opacity: .82;
-  font-size: .98rem;
-  font-weight: 850;
+  color: var(--muted);
+  letter-spacing: -.01em;
+  font-size: .9rem;
+  font-weight: 500;
 }
 
 .portal-section-heading .eyebrow {
   color: var(--green);
+  font-size: .62rem;
 }
 
 .portal-path {
@@ -477,30 +570,32 @@
   overflow: hidden;
 }
 
+/* Index in the corner, mono, so the three paths read as a sequence. */
 .portal-path:before {
-  content: "";
-  background: var(--accent-grad);
-  opacity: 0;
-  height: 4px;
-  transition: opacity .16s;
+  content: counter(path, decimal-leading-zero);
+  color: var(--muted);
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .62rem;
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 21px;
+  right: 20px;
 }
 
-.portal-path:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 22px 50px #1d2a3224;
+.portal-path:hover,
+.portal-feature:hover {
+  border-color: var(--control-edge);
 }
 
-.portal-path:hover:before {
-  opacity: 1;
-}
-
+/* The title is an .eyebrow in the markup; on a card it reads as the card's
+   name, so it gets sans type in ink rather than shouting in green caps. */
 .portal-path .eyebrow {
-  color: var(--green-dark);
-  font-size: 1.05rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: -.015em;
+  font-family: var(--font-sans);
+  font-size: 1.02rem;
+  font-weight: 600;
 }
 
 .portal-feature-grid {
@@ -509,7 +604,7 @@
 
 .portal-feature {
   counter-increment: feat;
-  padding-top: 46px;
+  padding-top: 44px;
   position: relative;
 }
 
@@ -517,47 +612,33 @@
   content: counter(feat, decimal-leading-zero);
   letter-spacing: .08em;
   color: var(--green);
-  font-size: .82rem;
-  font-weight: 900;
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  font-weight: 500;
   position: absolute;
-  top: 16px;
+  top: 18px;
   left: 18px;
 }
 
 .portal-feature:after {
   content: "";
   background: var(--line);
-  width: 26px;
-  height: 2px;
+  width: 24px;
+  height: 1px;
   position: absolute;
-  top: 22px;
-  left: 50px;
-}
-
-.portal-feature:hover {
-  border-color: #cfe0d8;
-  transform: translateY(-4px);
-  box-shadow: 0 22px 50px #1d2a3224;
+  top: 24px;
+  left: 44px;
 }
 
 .format-tile:not(.locked):hover {
-  border-color: var(--green);
-  transform: translateY(-4px);
-  box-shadow: 0 22px 50px #1d2a3224;
-}
-
-.format-tile strong {
-  background: var(--accent-grad);
-  color: #0000;
-  -webkit-background-clip: text;
-  background-clip: text;
+  border-color: var(--line-strong);
 }
 
 .format-tile-cta {
-  color: var(--green);
+  color: var(--green-dark);
   margin-top: 6px;
   font-size: .8rem;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .format-tile.locked .format-tile-cta {
@@ -579,7 +660,7 @@
 }
 
 .portal-visual {
-  min-height: 520px;
+  min-height: 506px;
 }
 
 .portal-map-wrap .city-map {
@@ -623,6 +704,12 @@
   grid-template-columns: 1fr;
 }
 
+/* Stacked stat cells divide with a top hairline instead of a left one. */
+.portal-hero .portal-stats .metric + .metric {
+  border-top: 1px solid #ffffff14;
+  border-left: 0;
+}
+
 /* The base rule now stacks at every width, so this narrow override is redundant. */
 
 .portal-institution-gateway { grid-template-columns: 1fr; }
@@ -637,8 +724,9 @@
 @media (max-width:560px) {
 
 .portal-copy h1 {
-  font-size: 3rem;
-  line-height: .96;
+  letter-spacing: -.035em;
+  font-size: 2.35rem;
+  line-height: 1.04;
 }
 
 .portal-map-wrap .city-map {
@@ -648,8 +736,12 @@
 @media (max-width:380px) {
 
 .portal-copy h1 {
-  font-size: 2.55rem;
+  font-size: 2.1rem;
 }
+}
+
+.portal-hero {
+  border-radius: 12px;
 }
 
 .portal-nav,
@@ -688,12 +780,14 @@
 
 .advertiser-home-copy .eyebrow {
   color: var(--green);
+  font-size: .64rem;
   margin-bottom: 8px;
   display: block;
 }
 
 .advertiser-home-copy h1 {
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
+  font-weight: 600;
   margin: 0 0 10px;
   font-size: clamp(1.75rem, 3.2vw, 2.6rem);
   line-height: 1.08;
@@ -791,16 +885,19 @@
   color: var(--green-dark);
   border-radius: 50%;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  font-size: .82rem;
-  font-weight: 700;
+  width: 26px;
+  height: 26px;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 500;
   display: grid;
 }
 
 .advertiser-step strong {
+  letter-spacing: -.01em;
   margin-bottom: 5px;
-  font-size: .98rem;
+  font-size: .95rem;
+  font-weight: 600;
   display: block;
 }
 
@@ -845,17 +942,20 @@
 }
 
 .advertiser-booking-list strong {
-  font-size: .92rem;
+  font-size: .86rem;
+  font-weight: 600;
   display: block;
 }
 
 .advertiser-booking-list small {
   color: var(--muted);
-  font-size: .78rem;
+  font-family: var(--font-mono);
+  font-size: .72rem;
 }
 
 .advertiser-booking-spend {
   font-variant-numeric: tabular-nums;
+  font-size: .86rem;
   font-weight: 600;
 }
 

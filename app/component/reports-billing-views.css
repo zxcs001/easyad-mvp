@@ -1,38 +1,80 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
 .gateway-ref {
-  font-family: ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size: .72rem;
+  font-family: var(--font-mono);
+  font-size: .7rem;
 }
 
 .commercial-policy {
-  color: var(--muted);
-  background: var(--soft-blue);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--blue);
+  color: var(--state-info-ink);
+  background: var(--state-info-surface);
+  border: 1px solid #c9d7ef;
   border-radius: var(--radius-sm);
-  margin: 0 0 18px;
-  padding: 12px 14px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  font-size: .8rem;
+  line-height: 1.45;
 }
 
+/* Invoice state as a pill on the state ladder. The text label stays; the
+   is-<status> class only picks the surface. */
 .commercial-status {
-  color: var(--muted);
-  font-weight: 750;
+  color: var(--state-idle-ink);
+  background: var(--state-idle-surface);
   text-transform: capitalize;
+  white-space: nowrap;
+  border: 1px solid #dfe3e8;
+  border-radius: 999px;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 9px;
+  font-size: .72rem;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.commercial-status.is-paid {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: #b9dccb;
+}
+
+.commercial-status.is-failed {
+  color: var(--state-danger-ink);
+  background: var(--state-danger-surface);
+  border-color: #f2c6cd;
+}
+
+.commercial-status.is-refunded {
+  color: var(--state-info-ink);
+  background: var(--state-info-surface);
+  border-color: #c9d7ef;
 }
 
 @media (min-width:901px) {
 
 .billing-table .table-head,
 .billing-table .table-row {
-  grid-template-columns: 1.2fr 1fr .8fr .8fr .8fr 1.1fr .8fr;
+  grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,.8fr);
+  column-gap: 20px;
 }
 
 /* A buyer's invoices have no platform or operator columns. */
 .billing-table.is-advertiser .table-head,
 .billing-table.is-advertiser .table-row {
-  grid-template-columns: 1.2fr 1fr .8fr 1.1fr .8fr;
+  grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.8fr) minmax(0,1.1fr) minmax(0,.8fr);
 }
+
+}
+
+/* Money columns right-aligned with their headers, so the figures line up. */
+.billing-table .table-head > span:nth-child(3),
+.billing-table .table-row > span:nth-child(3),
+.billing-table:not(.is-advertiser) .table-head > span:nth-child(4),
+.billing-table:not(.is-advertiser) .table-row > span:nth-child(4),
+.billing-table:not(.is-advertiser) .table-head > span:nth-child(5),
+.billing-table:not(.is-advertiser) .table-row > span:nth-child(5) {
+  text-align: right;
 }
 
 /* auto-fit: an advertiser has two tiles and repeat(3) left a blank column.
@@ -40,13 +82,43 @@
 .report-metrics {
   grid-template-columns: repeat(auto-fit,minmax(120px,1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   display: grid;
+}
+
+/* KPI tiles: a mono label over a tabular figure. */
+.report-metrics .metric {
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px 14px;
+  display: flex;
+}
+
+.report-metrics .metric span {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.report-metrics .metric strong {
+  color: var(--ink);
+  letter-spacing: -.02em;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .report-empty-note {
   color: var(--muted);
   margin: 4px 0 0;
+  font-size: .82rem;
 }
 
 .billing-grid {
@@ -58,42 +130,75 @@
   border-radius: 7px;
   justify-content: center;
   align-items: center;
-  min-height: 38px;
-  padding: 0 14px;
-  font-weight: 800;
+  min-height: 32px;
+  padding: 0 12px;
+  font-weight: 600;
   display: inline-flex;
 }
 
 .pop-list {
-  gap: 10px;
-  margin-top: 14px;
+  gap: 0;
+  margin-top: 6px;
   display: grid;
 }
 
+/* Delivery log: flush rows divided by hairlines, not a boxed card per booking. */
 .pop-list>div {
-  border: 1px solid var(--line);
-  background: #fbfcfb;
-  border-radius: 8px;
-  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  border-radius: 0;
+  grid-template-columns: minmax(0,1fr) minmax(90px,.45fr);
+  align-items: center;
+  gap: 2px 14px;
+  padding: 10px 2px;
+  display: grid;
+}
+
+.pop-list>div:last-child {
+  border-bottom: 0;
+}
+
+.pop-list strong {
+  font-family: var(--font-mono);
+  font-size: .74rem;
+  font-weight: 500;
+  letter-spacing: .01em;
 }
 
 .pop-list span,
 .pop-list small {
   color: var(--muted);
-  font-size: .82rem;
+  font-size: .76rem;
   display: block;
 }
 
+.pop-list span {
+  color: var(--ink);
+  grid-column: 1;
+  font-size: .8rem;
+}
+
+.pop-list meter {
+  grid-area: 1 / 2 / 3 / 3;
+}
+
+.pop-list small {
+  grid-column: 1 / -1;
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .billing-table .table-row button {
-  color: #8f301f;
-  background: #fff0ec;
-  border-color: #efc2b8;
+  color: var(--state-danger-ink);
+  background: #fff;
+  border-color: #eab3bc;
 }
 
 .billing-table .table-row button.paid {
-  background: var(--soft-green);
-  color: var(--green-dark);
-  border-color: #b7d2c7;
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: #b9dccb;
 }
 
 /* This later rule is the one that applies above 900px. auto-fit: with four
@@ -103,36 +208,142 @@
   grid-template-columns: repeat(auto-fit,minmax(130px,1fr));
 }
 
+/* Single-series bar chart: one emerald hue, thin bars with 4px rounded data
+   ends on a hairline baseline. Visually the value sits over its bar and the
+   screen name under the axis (CSS order only; the DOM still reads name, bar,
+   value). Columns have no gap so the axis line under the names is unbroken. */
 .bar-chart {
   border-top: 1px solid var(--line);
-  grid-template-columns: repeat(6,1fr);
+  grid-template-columns: repeat(6,minmax(0,1fr));
   align-items: end;
-  gap: 14px;
-  height: 260px;
-  margin-top: 24px;
-  padding-top: 16px;
+  column-gap: 0;
+  min-height: 250px;
+  margin-top: 18px;
+  padding-top: 18px;
   display: grid;
 }
 
 .bar-chart div {
   text-align: center;
   color: var(--muted);
+  justify-items: center;
   align-items: end;
-  gap: 7px;
-  font-size: .76rem;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: .72rem;
   display: grid;
 }
 
-.bar-chart i {
-  background: var(--blue);
-  border-radius: 7px 7px 0 0;
-  width: 100%;
-  display: block;
+.bar-chart small {
+  color: var(--ink);
+  order: -1;
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
 }
 
+.bar-chart i {
+  background: var(--green);
+  border-radius: 4px 4px 0 0;
+  width: min(100%,56px);
+  display: block;
+  transition: background .14s;
+}
+
+.bar-chart div:hover i {
+  background: var(--green-dark);
+}
+
+.bar-chart span {
+  border-top: 1px solid var(--control-edge);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  align-self: stretch;
+  order: 1;
+  min-height: calc(2.7em + 8px);
+  margin: -6px -10px 0;
+  padding: 8px 6px 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+}
+
+/* Native meter: thin track, emerald fill. */
 .pop-list meter {
+  appearance: none;
+  background: none;
+  border: 0;
   width: 100%;
-  height: 12px;
+  height: 6px;
+}
+
+.pop-list meter::-webkit-meter-bar {
+  background: var(--state-idle-surface);
+  border: 0;
+  border-radius: 999px;
+  height: 6px;
+}
+
+.pop-list meter::-webkit-meter-optimum-value,
+.pop-list meter::-webkit-meter-suboptimum-value,
+.pop-list meter::-webkit-meter-even-less-good-value {
+  background: var(--green);
+  border-radius: 999px;
+}
+
+.pop-list meter::-moz-meter-bar {
+  background: var(--green);
+  border-radius: 999px;
+}
+
+/* Console tables: flush rows on hairlines with one text size in every cell.
+   The Advertiser and money cells were plain text at the body size (1rem)
+   beside .78rem secondary lines. */
+.billing-table.inventory-table,
+.reports-grid .inventory-table {
+  gap: 0;
+}
+
+.billing-table .table-head,
+.reports-grid .inventory-table .table-head {
+  padding: 8px 12px;
+}
+
+.billing-table .table-row,
+.reports-grid .inventory-table .table-row {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 10px 12px;
+  font-size: .8rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-table .table-row:last-child,
+.reports-grid .inventory-table .table-row:last-child {
+  border-bottom: 0;
+}
+
+.billing-table .table-row strong,
+.reports-grid .inventory-table .table-row strong {
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.billing-table .table-row > span:first-child strong {
+  font-family: var(--font-mono);
+  font-size: .76rem;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+
+.billing-table .table-row small,
+.reports-grid .inventory-table .table-row small {
+  margin-top: 2px;
+  font-size: .74rem;
+  line-height: 1.4;
 }
 
 @media (max-width:900px) {
@@ -145,6 +356,50 @@
   grid-template-columns: 1fr;
   grid-template-areas: none;
 }
+
+}
+
+/* The invoice and reporting cells carry no labels, so these tables do not
+   stack when narrow: they keep their header and scroll sideways inside the
+   panel (DESIGN.md, data lists). Stacked, a row read as a bare run of figures
+   such as "$0 $0 $0 -". The min-width gives the scroll. */
+@media (max-width:900px) {
+
+.billing-table,
+.reports-grid .inventory-table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.billing-table .table-head,
+.reports-grid .inventory-table .table-head {
+  display: grid;
+}
+
+.billing-table .table-head,
+.billing-table .table-row {
+  grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,.8fr);
+  column-gap: 16px;
+  min-width: 760px;
+}
+
+.billing-table.is-advertiser .table-head,
+.billing-table.is-advertiser .table-row {
+  grid-template-columns: minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.8fr) minmax(0,1.1fr) minmax(0,.8fr);
+  min-width: 600px;
+}
+
+.reports-grid .inventory-table .table-head,
+.reports-grid .inventory-table .table-row {
+  grid-template-columns: minmax(0,1.35fr) minmax(0,1fr) minmax(0,.82fr) minmax(0,.7fr) minmax(0,.85fr) minmax(0,.9fr);
+  min-width: 720px;
+}
+
+.billing-table .table-row > span,
+.reports-grid .inventory-table .table-row > span {
+  min-width: 0;
+}
 }
 
 @media (max-width:560px) {
@@ -154,21 +409,12 @@
 }
 }
 
-.pop-list>div {
-  border-radius: var(--radius-sm);
-  border-color: var(--line);
-}
-
 .billing-table button {
   letter-spacing: 0;
-  border-radius: 6px;
-  min-height: 36px;
-  font-size: .78rem;
-  font-weight: 750;
-}
-
-.billing-table {
-  gap: 4px;
+  border-radius: 7px;
+  min-height: 32px;
+  font-size: .76rem;
+  font-weight: 600;
 }
 
 @media (max-width:560px) {
@@ -178,16 +424,32 @@
 }
 
 .bar-chart {
-  gap: 6px;
-  height: 220px;
-  margin-top: 18px;
+  min-height: 210px;
+  margin-top: 16px;
 }
 
 .bar-chart div {
-  font-size: .64rem;
+  padding: 0 2px;
+  font-size: .62rem;
 }
 
-.billing-table button {
-  width: 100%;
+.bar-chart span {
+  margin: -6px -2px 0;
+  padding: 6px 2px 0;
+}
+
+/* Sans, not mono, so a seven-digit figure fits its narrow column. */
+.bar-chart small {
+  letter-spacing: -.01em;
+  font-family: var(--font-sans);
+  font-size: .6rem;
+}
+
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.bar-chart i {
+  transition: none;
 }
 }

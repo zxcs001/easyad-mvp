@@ -1,7 +1,7 @@
 /* Component-owned styles. Keep selectors beside the component that renders them. */
 
 .google-map-page {
-  background: #f4f7f6;
+  background: var(--bg);
   grid-template-rows: auto minmax(520px,1fr);
   gap: 18px;
   min-height: 100vh;
@@ -18,8 +18,9 @@
 
 .google-map-header h1 {
   margin: 4px 0 8px;
-  font-size: clamp(2rem,4vw,4rem);
-  line-height: 1;
+  font-size: clamp(2rem,4vw,3.25rem);
+  font-weight: 600;
+  line-height: 1.02;
 }
 
 .google-map-header p:not(.eyebrow) {
@@ -31,10 +32,10 @@
 
 .google-map-frame {
   min-height: 620px;
-  box-shadow: var(--shadow);
-  background: #dfe8e4;
-  border: 1px solid #d8e0dc;
-  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  background: var(--state-idle-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   position: relative;
   overflow: hidden;
 }
@@ -42,9 +43,9 @@
 .google-map-toolbar {
   z-index: 2;
   box-shadow: var(--shadow-sm);
-  background: #fffffff0;
-  border: 1px solid #d6e0dceb;
-  border-radius: 8px;
+  background: #fffffff2;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
@@ -60,23 +61,24 @@
   color: var(--muted);
   align-items: center;
   gap: 8px;
-  font-size: .84rem;
-  font-weight: 800;
+  font-size: .78rem;
+  font-weight: 560;
   display: flex;
 }
 
 .google-map-toolbar select,
 .google-map-toolbar input[type=range] {
-  min-height: 34px;
+  min-height: 36px;
 }
 
 .google-map-toolbar select {
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-edge);
   max-width: min(42vw,280px);
   color: var(--ink);
-  background: #fff;
-  border-radius: 7px;
-  padding: 0 10px;
+  background-color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0 32px 0 10px;
+  font-size: .8rem;
 }
 
 .google-map-canvas {
@@ -90,15 +92,17 @@
   z-index: 2;
   box-shadow: var(--shadow-sm);
   background: #fffffff2;
-  border: 1px solid #d6e0dceb;
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   position: absolute;
 }
 
 .google-map-status {
   color: var(--muted);
-  padding: 10px 12px;
-  font-weight: 800;
+  padding: 8px 11px;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 500;
   inset: auto 14px 14px auto;
 }
 
@@ -113,7 +117,7 @@
 
 .google-map-summary span {
   color: var(--muted);
-  font-size: .9rem;
+  font-size: .78rem;
 }
 
 .google-map-empty {
@@ -121,8 +125,8 @@
   color: var(--muted);
   text-align: center;
   background: #fff;
-  border: 1px dashed #c9d4cf;
-  border-radius: 8px;
+  border: 1px dashed var(--control-edge);
+  border-radius: var(--radius);
   place-items: center;
   gap: 8px;
   padding: 24px;
@@ -131,7 +135,8 @@
 
 .google-map-empty strong {
   color: var(--ink);
-  font-size: 1.2rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 @media (max-width:760px) {

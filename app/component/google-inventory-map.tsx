@@ -130,10 +130,10 @@ export default function GoogleInventoryMap({ apiKey, inventory, center = default
       map,
       center: selectedPosition,
       radius: radiusKm * 1000,
-      strokeColor: "#1f7a5a",
+      strokeColor: "#0c7a56",
       strokeOpacity: 0.9,
       strokeWeight: 2,
-      fillColor: "#1f7a5a",
+      fillColor: "#0c7a56",
       fillOpacity: 0.12,
     });
 
@@ -265,7 +265,7 @@ function percentToLatLng(point: { x: number; y: number }): LatLngLiteral {
 function popupHtml(item: InventoryItem) {
   const tags = item.tags?.length ? `<p>${item.tags.slice(0, 5).map(escapeHtml).join(", ")}</p>` : "";
   return `
-    <div style="font-family:Inter,system-ui,sans-serif;max-width:240px">
+    <div style="font-family:var(--font-sans),system-ui,sans-serif;max-width:240px">
       <strong style="display:block;margin-bottom:4px">${escapeHtml(item.name)}</strong>
       <span style="display:block;color:#5b6770">${escapeHtml(item.address)}</span>
       <span style="display:block;margin-top:8px">${formats[item.format].label}</span>

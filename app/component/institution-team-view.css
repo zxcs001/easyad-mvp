@@ -8,8 +8,15 @@
   display: flex;
 }
 
+.institution-seat-summary {
+  font-size: .8rem;
+}
+
 .institution-seat-summary strong {
   color: var(--ink);
-  font-size: 1.35rem;
+  letter-spacing: -.02em;
+  font-size: 1.3rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
