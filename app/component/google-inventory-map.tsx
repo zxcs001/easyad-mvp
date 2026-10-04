@@ -94,7 +94,8 @@ export default function GoogleInventoryMap({ apiKey, inventory, center = default
           fullscreenControl: true,
           mapTypeControl: false,
           streetViewControl: true,
-          clickableIcons: true,
+          clickableIcons: false,
+          styles: [{ featureType: "poi.business", stylers: [{ visibility: "off" }] }],
           gestureHandling: "greedy",
         });
 
