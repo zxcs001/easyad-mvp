@@ -12,6 +12,8 @@ The paired browser player at `/player` automatically retrieves approved screen c
 
 Public device views and media APIs retain their existing behavior. Player acknowledgments do not claim completed playback or physical screen visibility; P2 adds bounded offline caching, scheduling and authenticated playback reports, which remain distinct from measured audience views.
 
+For Android and Windows display testing, open `/player?kiosk=1` or choose **Open kiosk player** in Screen control. Kiosk mode adds fullscreen controls and a screen wake lock to the same paired player. Use persistent Chrome/Chromium on Windows and Chrome with app pinning for supervised Android tests. [Chromium kiosk setup](docs/CHROMIUM_KIOSK.md) includes a Windows launcher, local Android USB testing, and physical-device acceptance checks.
+
 See [P2 recovery setup and release checks](docs/PLAYER_RECOVERY_BASELINE.md), [P0/P1 pilot setup and verification](docs/PLAYER_PILOT_BASELINE.md) and [the player protocol decision](docs/adr/0004-authenticated-browser-player.md). Use Node.js 24 and `npm ci` for the verified local runtime. `npm run test:pilot` runs tests in an isolated local test schema; after `npm run build`, `npm run test:pilot:e2e` exercises Chrome against a dedicated local server.
 
 ## Local PostgreSQL Database

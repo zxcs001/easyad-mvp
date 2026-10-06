@@ -3,19 +3,21 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import TorontoStarter from '../app/component/toronto-starter';
-const mock = vi.hoisted(() => ({ loaded: false, events: {} as Record<string, () => void>, easeTo: vi.fn(), options: {} as Record<string, unknown> }));
+const mock = vi.hoisted(() => ({ loaded: false, events: {} as Record<string, () => void>, easeTo: vi.fn(), setLayoutProperty: vi.fn(), options: {} as Record<string, unknown> }));
 vi.mock('maplibre-gl', () => ({ default: {
   Map: class {
     constructor(options: Record<string, unknown>) { mock.options = options; }
     addControl() {} on(name: string, callback: () => void) { mock.events[name] = callback; }
     isStyleLoaded() { return mock.loaded; } getLayer() { return true; }
+    getStyle() { return { layers: [{ id: 'poi-labels', 'source-layer': 'poi' }, { id: 'road-labels', 'source-layer': 'transportation_name' }] }; }
+    setLayoutProperty = mock.setLayoutProperty;
     setPaintProperty() {} remove() {} easeTo = mock.easeTo;
   }, NavigationControl: class {}, AttributionControl: class {},
 } }));
 let success: PositionCallback;
 let failure: PositionErrorCallback;
 beforeEach(() => {
-  mock.loaded = false; mock.easeTo.mockClear();
+  mock.loaded = false; mock.easeTo.mockClear(); mock.setLayoutProperty.mockClear();
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
     getCurrentPosition: vi.fn((ok: PositionCallback, fail: PositionErrorCallback) => { success = ok; failure = fail; }),
   } });
@@ -26,6 +28,7 @@ function load() { act(() => { mock.loaded = true; mock.events.load(); }); }
 test.each([true, false])('centers on geolocation whether it resolves before map load: %s', (beforeLoad) => {
   render(<TorontoStarter show><div>Portal</div></TorontoStarter>);
   if (beforeLoad) { locate(); load(); } else { load(); locate(); }
+  expect(mock.setLayoutProperty).toHaveBeenCalledExactlyOnceWith('poi-labels', 'visibility', 'none');
   expect(mock.easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ center: [151.2093, -33.8688], zoom: 15.55 }));
   expect(screen.getByRole('status')).toHaveTextContent('33.8688 S / 151.2093 E');
 });

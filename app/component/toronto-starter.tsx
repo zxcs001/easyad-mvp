@@ -125,6 +125,12 @@ function TorontoThreeDimensionalMap({ location }: { location: [number, number] |
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), "top-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "MapLibre GL JS" }), "bottom-right");
     map.on("load", () => {
+      // Nearby-business discovery is deferred; keep provider POIs out of the intro too.
+      for (const layer of map.getStyle().layers ?? []) {
+        if ("source-layer" in layer && layer["source-layer"] === "poi") {
+          map.setLayoutProperty(layer.id, "visibility", "none");
+        }
+      }
       styleTorontoBuildings(map);
       setStatus("ready");
       if (locationRef.current) {

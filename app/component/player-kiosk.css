@@ -1,0 +1,20 @@
+.player-kiosk { min-height: 100dvh; background: #050708; }
+.player-kiosk:focus { outline: none; }
+.player-kiosk[data-kiosk="on"][data-controls="hidden"],
+.player-kiosk[data-kiosk="on"][data-controls="hidden"] .device-player { cursor: none; }
+.player-kiosk-start { position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; background: var(--panel); }
+.player-kiosk-trigger { position: fixed; z-index: 22; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.player-kiosk[data-controls="hidden"] .player-kiosk-trigger { opacity: 0; cursor: none; }
+.player-kiosk[data-controls="hidden"] .player-kiosk-trigger:is(:hover, :focus-visible) { opacity: 1; cursor: pointer; }
+.player-kiosk-controls { position: fixed; z-index: 21; top: max(64px, calc(env(safe-area-inset-top) + 56px)); right: max(12px, env(safe-area-inset-right)); width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow-y: auto; display: grid; gap: 12px; padding: 20px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--ink); background: var(--panel); box-shadow: 0 12px 32px #0003; }
+.player-kiosk-controls strong { font-size: 1rem; }
+.player-kiosk-controls p { margin: 0; font-size: .84rem; line-height: 1.5; color: var(--muted); }
+.player-kiosk-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.player-kiosk-actions button { min-height: 44px; }
+.player-kiosk button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+@media (max-width: 700px) {
+  /* Setup controls share the page flow so they cannot cover the pairing form. */
+  .player-kiosk:has(.player-setup) { display: grid; align-content: center; gap: 16px; padding: 64px 16px 16px; background: var(--bg); }
+  .player-kiosk:has(.player-setup) .player-setup { min-height: 0; padding: 0; }
+  .player-kiosk:has(.player-setup) .player-kiosk-controls { position: static; justify-self: center; width: min(100%, 440px); max-height: none; box-shadow: var(--shadow-sm); }
+}

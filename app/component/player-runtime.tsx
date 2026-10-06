@@ -41,6 +41,7 @@ export default function PlayerRuntime({ enabled }: {
         function denied(error: unknown) {
             if (error instanceof PlayerRequestError && [401, 404].includes(error.status)) {
                 stopped = true;
+                preparationController?.abort();
                 clear();
                 void clearPlayerCache().catch(() => { });
                 setNeedsPairing(error.status === 401);
@@ -63,18 +64,25 @@ export default function PlayerRuntime({ enabled }: {
             const updateSignal = AbortSignal.any([signal, updateController.signal]);
             const requestSignal = () => AbortSignal.any([updateSignal, AbortSignal.timeout(12000)]);
             let replacement: PreparedPlayer | null = null;
+            let emergencyTextCache: Promise<void> | undefined;
             try {
                 const clearing = mustClearPreviousContent(manifestRef.current, next);
                 if (next.activeAlert && next.published) {
                     // Render the self-contained emergency text immediately. Receipt,
                     // preparation and render evidence are acknowledged separately.
                     display({ manifest: { ...next, slides: [] }, release: () => {} });
-                    await clearPlayerCache().catch(() => {});
+                    // Persist text independently of network acknowledgments or
+                    // photo downloads, retaining the ordinary cache for expiry.
+                    emergencyTextCache = cachePlayerManifest({ ...next, slides: [], activeAlert: { ...next.activeAlert, image: undefined } }, updateSignal)
+                        .then(cached => cached.release()).catch(() => {});
                 } else if (clearing) {
                     clear();
                     await clearPlayerCache();
                 }
                 await playerPost("/api/player/acknowledgments", { revision: next.revision, stage: "received" }, requestSignal());
+                // Serialize the text/photo snapshots so a late text write cannot
+                // overwrite a completed emergency photo cache.
+                await emergencyTextCache;
                 replacement = next.activeAlert?.image
                     ? await cachePlayerManifest({ ...next, slides: [] }, updateSignal)
                     : next.activeAlert
@@ -88,9 +96,6 @@ export default function PlayerRuntime({ enabled }: {
                 etag = applied.slides.some(slide => !slide.publicUrl) ? "" : nextEtag;
                 health = applied.slides.some(slide => !slide.publicUrl) ? "media_unavailable" : null;
                 setError("");
-                // Persist emergency text only after rendering, and tolerate storage
-                // failure: it must never prevent a connected screen showing an alert.
-                if (next.activeAlert && !next.activeAlert.image) void cachePlayerManifest({ ...next, slides: [] }, updateSignal).then(cached => cached.release()).catch(() => {});
             } catch (error) {
                 if (updateSignal.aborted || stopped || denied(error)) return;
                 health = next.activeAlert && !next.activeAlert.image ? "connection_lost" : "media_unavailable";
@@ -149,7 +154,23 @@ export default function PlayerRuntime({ enabled }: {
                 await pausePlayer(timing.heartbeatMs, signal);
             }
         }
+        let resumingRevision: number | null = null;
         const expiry = setInterval(() => {
+            const current = manifestRef.current;
+            if (current?.activeAlert && Date.parse(current.activeAlert.expiresAt) <= Date.now() && resumingRevision !== current.revision) {
+                resumingRevision = current.revision;
+                preparationController?.abort();
+                // Restore the ordinary snapshot using its original lease and
+                // revision, so queued evidence still refers to its authorization.
+                void restorePlayerCache(signal).then(cached => {
+                    if (!cached) return;
+                    if (signal.aborted || stopped || manifestRef.current !== current || cached.manifest.activeAlert) { cached.release(); return; }
+                    display(cached);
+                    etag = "";
+                    health = null;
+                    setError("");
+                }).catch(() => {});
+            }
             if (manifestRef.current && (Date.parse(manifestRef.current.validUntil) <= Date.now() || performance.now() >= deadline)) {
                 health = "manifest_expired";
                 clear();

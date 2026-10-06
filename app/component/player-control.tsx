@@ -70,11 +70,12 @@ export default function PlayerControl({ inventoryId, screenName }: { inventoryId
       </dl>
       <button className="ghost-button" type="button" disabled={busy} onClick={() => { setError(""); setDisconnect(true); }}>{t("Disconnect player")}</button>
     </> : status ? <div className="player-pairing">
-      <p>{t("Open /player on the display computer and enter a one-time pairing code.")}</p>
+      <p>{t("Open /player?kiosk=1 on the Android or Windows display and enter a one-time pairing code.")}</p>
       <button className="primary-button" disabled={busy} type="button" onClick={() => void mutate("POST")}>{t(busy ? "Creating code…" : "Create pairing code")}</button>
       {pairing ? <div className="player-code"><SecretInput label="Pairing code" secretName="pairing code" readOnly value={pairing.code} /><p>{t("Code expires at {time}. Creating another code invalidates this one.", { time: date(pairing.expiresAt) })}</p></div> : null}
       <a className="ghost-button" href="/player" target="_blank" rel="noreferrer">{t("Open screen player")}</a>
     </div> : null}
+    {status?.enabled ? <a className="ghost-button" href="/player?kiosk=1" target="_blank" rel="noreferrer">{t("Open kiosk player")}</a> : null}
     {(error || loadError) && !disconnect ? <p role="alert" className="form-error">{t(error || loadError)}</p> : null}
     <button className="ghost-button" type="button" disabled={busy} onClick={() => { setError(""); setRefresh((value) => value + 1); }}>{t("Refresh player status")}</button>
     <AppDialog open={disconnect} title="Disconnect player" description={t("Disconnect the player for {name}. Online content stops on its next check; disconnected content stops when its configured offline lease expires.", { name: screenName })} onClose={() => { if (!busy) setDisconnect(false); }} initialFocusRef={cancelRef} dismissible={!busy}>
