@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { createPlayerFixtures } from "../tests/helpers/player-fixtures";
-import { closeDb, createDeviceAlert, createMediaResource, getDb } from "../app/lib/db";
+import { closeDb, createDeviceAlert, createDeviceAlertIfNoConflict, createMediaResource, getDb } from "../app/lib/db";
 import { createPairingCode } from "../app/lib/players";
 import { storeMedia } from "../app/lib/media-storage";
 test.afterAll(() => closeDb());
@@ -73,6 +73,45 @@ test("P2 mixed media persists offline across renderer restart, then drains evide
         await context.close();
     }
 });
+test("emergency photo and ordinary fallback survive offline restart without fetching ordinary media", async ({ browser }) => {
+    test.setTimeout(90_000);
+    const fixture = await createPlayerFixtures("P2-ALERT-PHOTO");
+    await getDb().query("UPDATE players SET revoked_at=NOW() WHERE inventory_id=$1", [fixture.screen.id]);
+    await getDb().query("DELETE FROM media_resources WHERE inventory_id=$1", [fixture.screen.id]);
+    await getDb().query("UPDATE device_alerts SET status='ended' WHERE institution_id=$1", [fixture.institution.id]);
+    const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+    const storagePath = await storeMedia("pilot/P2-ALERT-PHOTO.png", bytes, "image/png");
+    await createMediaResource({ id: "P2-ALERT-PHOTO-MEDIA", inventoryId: fixture.screen.id, ownerId: fixture.institution.id, title: "Ordinary content", originalName: "image.png", mimeType: "image/png", mediaType: "image", approvalStatus: "approved", sizeBytes: bytes.length, storagePath, publicUrl: "/media/P2-ALERT-PHOTO-MEDIA", createdAt: new Date().toISOString() });
+    const context = await browser.newContext();
+    try {
+        const page = await context.newPage();
+        await page.clock.install();
+        await page.goto("/player");
+        const code = await createPairingCode(fixture.institution, fixture.screen.id);
+        await page.getByLabel("Pairing code", { exact: true }).fill(code.code);
+        await page.getByRole("button", { name: "Pair this screen", exact: true }).click();
+        await expect(page.locator(".device-player img")).toBeVisible();
+        await expect.poll(() => page.evaluate(async () => Boolean(await (await caches.open("easyad-player-shell-v1")).match("/player")))).toBe(true);
+        let ordinaryDownloads = 0;
+        await page.route("**/api/player/assets/**", route => { ordinaryDownloads++; return route.abort(); });
+        const result = await createDeviceAlertIfNoConflict({ institutionId: fixture.institution.id, alertType: "public-safety", title: "Offline photo test", message: "Test instructions", area: "Lobby", targetDeviceIds: [fixture.screen.id], issuedBy: "Pilot", createdBy: fixture.institution.id, expiresAt: new Date(Date.now() + 90_000).toISOString(), image: { url: "", mimeType: "image/png", originalName: "test.png", sizeBytes: bytes.length } }, storagePath);
+        expect(result.alert).not.toBeNull();
+        const photo = page.locator("[data-emergency-photo]");
+        await expect(photo).toBeVisible({ timeout: 30_000 });
+        await expect(photo).toHaveAttribute("src", /^blob:/);
+        await expect.poll(() => photo.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        await context.setOffline(true);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(page.getByRole("heading", { name: "Offline photo test" })).toBeVisible();
+        await expect.poll(() => photo.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        await page.clock.fastForward(91_000);
+        await expect(photo).toHaveCount(0);
+        const ordinary = page.locator('[data-player-slide="P2-ALERT-PHOTO-MEDIA"] img');
+        await expect(ordinary).toBeVisible();
+        await expect.poll(() => ordinary.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        expect(ordinaryDownloads).toBe(0);
+    } finally { await context.close(); }
+});
 test("P2 atomic cache survives quota failure; offline alert and lease expiry survive reload", async ({ browser }, testInfo) => {
     test.setTimeout(180000);
     const fixture = await createPlayerFixtures("P2-LEASE");
@@ -91,11 +130,12 @@ test("P2 atomic cache survives quota failure; offline alert and lease expiry sur
         await page.getByLabel("Pairing code", { exact: true }).fill(code.code);
         await page.getByRole("button", { name: "Pair this screen", exact: true }).click();
         await expect(page.locator(".device-player img")).toBeVisible({ timeout: 30000 });
-        const cached = () => page.evaluate(() => new Promise<{
+        const cached = (key = "active") => page.evaluate(key => new Promise<{
             revision: number;
             validUntil: string;
             generatedAt: string;
-        }>((resolve) => { const open = indexedDB.open("easyad-player-v2", 1); open.onsuccess = () => { const get = open.result.transaction("state").objectStore("state").get("active"); get.onsuccess = () => { open.result.close(); resolve(get.result); }; }; }));
+            activeAlert: { id: string } | null;
+        }>((resolve) => { const open = indexedDB.open("easyad-player-v2", 1); open.onsuccess = () => { const get = open.result.transaction("state").objectStore("state").get(key); get.onsuccess = () => { open.result.close(); resolve(get.result); }; }; }), key);
         const original = await cached();
         await page.evaluate(() => {
             const original = IDBObjectStore.prototype.put;
@@ -116,13 +156,19 @@ test("P2 atomic cache survives quota failure; offline alert and lease expiry sur
             pilotQuota: boolean;
         }).pilotQuota = false; });
         await expect.poll(async () => (await cached()).revision, { timeout: 50000 }).toBeGreaterThan(original.revision);
+        const ordinary = await cached();
         const alert = await createDeviceAlert({ institutionId: fixture.institution.id, alertType: "public-safety", title: "Offline expiry test", message: "Pilot only", area: "Lobby", targetDeviceIds: [fixture.screen.id], issuedBy: "Pilot", createdBy: fixture.institution.id, expiresAt: new Date(Date.now() + 40000).toISOString() });
         await expect(page.getByRole("heading", { name: "Offline expiry test" })).toBeVisible({ timeout: 30000 });
+        await expect.poll(async () => (await cached()).activeAlert?.id).toBe(alert.id);
+        expect(await cached("fallback")).toMatchObject({ revision: ordinary.revision, generatedAt: ordinary.generatedAt, validUntil: ordinary.validUntil, activeAlert: null });
+        await expect.poll(() => page.evaluate(async () => Boolean(await (await caches.open("easyad-player-shell-v1")).match("/player")))).toBe(true);
         await context.setOffline(true);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(page.getByRole("heading", { name: "Offline expiry test" })).toBeVisible();
         await page.clock.fastForward(45000);
         await expect(page.getByRole("heading", { name: "Offline expiry test" })).toHaveCount(0);
         await expect(page.locator(".device-player img")).toBeVisible();
-        const lease = await cached();
+        const lease = await cached("fallback");
         expect(Date.parse(lease.validUntil) - Date.parse(lease.generatedAt)).toBe(86_400_000);
         await page.clock.fastForward(3_600_000);
         await expect(page.locator(".device-player img")).toBeVisible();

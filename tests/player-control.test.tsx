@@ -11,6 +11,7 @@ test("pairing code is masked and duplicate creation is disabled while awaiting t
   let finish: (value: Response) => void = () => {};
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => init?.method === "POST" ? await new Promise<Response>((resolve) => { finish = resolve; }) : Response.json({ enabled: true, player: null })));
   render(<PlayerControl inventoryId="I1" screenName="Lobby" />);
+  expect(await screen.findByRole("link", { name: "Open kiosk player" })).toHaveAttribute("href", "/player?kiosk=1");
   await user.click(await screen.findByRole("button", { name: "Create pairing code" }));
   expect(screen.getByRole("button", { name: "Creating code…" })).toBeDisabled();
   finish(Response.json({ code: "ABCDEF123456", expiresAt: new Date(Date.now() + 60000).toISOString() }));

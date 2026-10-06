@@ -40,9 +40,9 @@ async function stored() {
     try {
         const tx = db.transaction(["state", "assets"]);
         const done = complete(tx);
-        const [manifest, assets, observedAt] = await Promise.all([request(tx.objectStore("state").get("active")) as Promise<PlayerManifest | undefined>, request(tx.objectStore("assets").getAll()) as Promise<Asset[]>, request(tx.objectStore("state").get("observedAt")) as Promise<number | undefined>]);
+        const [manifest, assets, observedAt, fallback] = await Promise.all([request(tx.objectStore("state").get("active")) as Promise<PlayerManifest | undefined>, request(tx.objectStore("assets").getAll()) as Promise<Asset[]>, request(tx.objectStore("state").get("observedAt")) as Promise<number | undefined>, request(tx.objectStore("state").get("fallback")) as Promise<PlayerManifest | undefined>]);
         await done;
-        return { manifest, assets, observedAt };
+        return { manifest, assets, observedAt, fallback };
     }
     finally {
         db.close();
@@ -95,10 +95,30 @@ async function hydrate(manifest: PlayerManifest, assets: Asset[], signal: AbortS
     }
 }
 export async function restorePlayerCache(signal: AbortSignal) {
-    const { manifest, assets, observedAt } = await stored();
-    if ((observedAt && Date.now() < observedAt - 120000) || !manifest || Date.parse(manifest.validUntil) <= Date.now() || Date.parse(manifest.generatedAt) > Date.now() + 120000)
-        return null;
-    return hydrate(manifest.activeAlert ? { ...manifest, slides: [] } : manifest, assets, signal);
+    const state = await stored();
+    const selected = restoredPlayerManifest(state);
+    if (!selected) return null;
+    const { assets } = state;
+    const prepared = await hydrate(selected.activeAlert ? { ...selected, slides: [] } : selected, assets, signal);
+    if (signal.aborted || !validManifest(selected)) { prepared.release(); return null; }
+    return prepared;
+}
+export function restoredPlayerManifest({ manifest, fallback, observedAt }: { manifest?: PlayerManifest; fallback?: PlayerManifest; observedAt?: number }) {
+    if (observedAt && Date.now() < observedAt - 120000) return undefined;
+    const selected = manifest?.activeAlert && Date.parse(manifest.activeAlert.expiresAt) <= Date.now()
+        ? resumableManifest(fallback, manifest)
+        : manifest;
+    return validManifest(selected) ? selected : undefined;
+}
+function validManifest(manifest: PlayerManifest | undefined): manifest is PlayerManifest {
+    return Boolean(manifest && manifest.published && Date.parse(manifest.validUntil) > Date.now() && Date.parse(manifest.generatedAt) <= Date.now() + 120000);
+}
+function resumableManifest(candidate: PlayerManifest | undefined, active: PlayerManifest) {
+    // A new alert never renews the previous content's lease or changes its
+    // player identity, privacy boundary, revision, or playback authorization.
+    return validManifest(candidate) && !candidate.activeAlert && active.published
+        && candidate.playerId === active.playerId && candidate.inventoryId === active.inventoryId
+        && Boolean(candidate.privateContent) === Boolean(active.privateContent) ? candidate : undefined;
 }
 async function download(url: string, signal: AbortSignal, budget: number) {
     const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal });
@@ -133,6 +153,9 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
     // An emergency only caches its own photo. Ordinary media must never delay it.
     if (manifest.activeAlert) manifest = { ...manifest, slides: [] };
     const old = await stored();
+    let fallback = manifest.activeAlert && !(old.observedAt && Date.now() < old.observedAt - 120000)
+        ? resumableManifest(old.manifest?.activeAlert ? old.fallback : old.manifest, manifest)
+        : undefined;
     const assets: Asset[] = [];
     let bytes = 0;
     if (manifest.activeAlert?.image) {
@@ -156,6 +179,17 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
         assets.push({ key: slide.assetVersion, blob, checksum, invalid });
     }
     const prepared = await hydrate(manifest, assets, signal);
+    // Retain only already-cached ordinary assets; no download, hashing, or
+    // decoding of them can hold up an emergency. Verify them when resuming.
+    let retained: Asset[] = [];
+    if (fallback) {
+        const versions = new Set(fallback.slides.map(slide => slide.assetVersion));
+        retained = old.assets.filter(asset => versions.has(asset.key));
+        if (versions.size !== retained.length || bytes + retained.reduce((sum, asset) => sum + asset.blob.size, 0) > PLAYER_STORAGE_BUDGET) {
+            fallback = undefined;
+            retained = [];
+        }
+    }
     const db = await database();
     try {
         if (signal.aborted)
@@ -164,9 +198,11 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
         const done = complete(tx);
         try {
             tx.objectStore("assets").clear();
-            for (const asset of assets)
+            for (const asset of [...assets, ...retained])
                 tx.objectStore("assets").put(asset);
             tx.objectStore("state").put(manifest, "active");
+            if (fallback) tx.objectStore("state").put(fallback, "fallback");
+            else tx.objectStore("state").delete("fallback");
             tx.objectStore("state").put(Date.now(), "observedAt");
         }
         catch (error) {

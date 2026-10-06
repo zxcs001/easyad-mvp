@@ -45,6 +45,8 @@ A completed event is durable before the rotation advances. Crash recovery preser
 
 Alerts retain cached ordinary content, suppress it while active, and let eligible content resume on expiry offline. Campaign date boundaries and manifest expiry produce a neutral fallback, including after reload. Runtime expiry has a monotonic deadline; persisted observations detect backward clock changes beyond two minutes. A managed clock is still required for qualified pilot evidence.
 
+Emergency text renders before acknowledgments or photo downloads. The alert snapshot retains the last complete ordinary snapshot and its cached assets in the same IndexedDB transaction. Alert expiry restores that ordinary snapshot with its original revision and lease; creating or renewing an alert never extends ordinary-content authorization. Restoration checks player, screen, privacy, publication, checksum and clock boundaries. Revocation and unpublishing clear both snapshots. Emergency photos and retained ordinary assets share the 256 MiB budget; if they do not fit, the photo takes priority and expiry waits for fresh content rather than restoring an incomplete cache.
+
 ## Stop and rollback
 
 Disconnected hardware cannot receive immediate cancellation. **The configured lease is the maximum intended offline delay for unpublish, revoke or feature shutdown**, plus browser scheduling latency. The 24-hour public default favors offline ad continuity and can delay those changes for up to a day; private screens retain a 60-second cap.
