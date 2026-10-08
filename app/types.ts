@@ -1,11 +1,8 @@
 import type { FormatKey, InventoryItem } from "./data";
+import type { MapLocation } from "./lib/geo/regions";
 
-export type MapPoint = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-};
+// A point (current location, a map click) or a region (Ontario, a county).
+export type MapPoint = MapLocation;
 
 export type Filters = {
   radius: number;

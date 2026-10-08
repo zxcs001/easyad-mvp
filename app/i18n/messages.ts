@@ -5,6 +5,7 @@ import type { Locale } from "./config";
 import { frAdditional } from "./fr-additional";
 import { frPlayer } from "./fr-player";
 import { frScreenUse } from "./fr-screen-use";
+import { frMapLocation } from "./fr-map-location";
 
 type Variables = Record<string, string | number>;
 type Messages = Record<string, string>;
@@ -63,6 +64,7 @@ const fr: Messages = {
   ...frPilot,
   ...frPlayer,
   ...frScreenUse,
+  ...frMapLocation,
   "Language": "Langue",
   "English": "English",
   "French": "Français",

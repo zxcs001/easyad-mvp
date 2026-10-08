@@ -22,6 +22,8 @@ export default function DiscoverView(props: {
   setSelectedLocationId: (id: string) => void;
   selectedLocation: MapPoint;
   onAreaChange: (point: { x: number; y: number }) => void;
+  onLocationChange?: (location: MapPoint) => void;
+  locating?: boolean;
   mapZoom?: number;
   locationOptions: MapPoint[];
   selectedInventory: InventoryItem;
@@ -48,6 +50,7 @@ export default function DiscoverView(props: {
           selectedLocation={props.selectedLocation}
           radius={props.filters.radius}
           onAreaChange={props.onAreaChange}
+          onLocationChange={props.onLocationChange}
           initialZoom={props.mapZoom}
           onSelect={props.setSelectedInventoryId}
           // A pin click does exactly what a list click does: select the screen
@@ -97,7 +100,7 @@ function InventoryCard({ item, selected, onSelect }: { item: InventoryItem & { d
       <Meter value={item.occupancy} />
       <div className="card-stats">
         <span>{t("{count} impressions", { count: formatNumber(item.impressions) })}</span>
-        <span>{Math.round(item.distance)} km</span>
+        {Number.isFinite(item.distance) ? <span>{Math.round(item.distance)} km</span> : null}
       </div>
     </button>
   );

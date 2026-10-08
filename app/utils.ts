@@ -1,5 +1,7 @@
-import { Booking, FormatKey, InventoryItem, Role, View, formats, locations } from "./data";
+import { Booking, FormatKey, InventoryItem, Role, View, formats } from "./data";
 import type { CreativeDraft, Filters } from "./types";
+import { mapPointToLngLat } from "./lib/geo/projection";
+import { isRegionLocationId } from "./lib/geo/regions";
 
 export const CURRENT_LOCATION_ID = "current";
 export const MANUAL_LOCATION_ID = "manual";
@@ -16,12 +18,7 @@ export const defaultFilters: Filters = {
   selectedTags: [],
 };
 
-export const mapBounds = {
-  west: -170,
-  east: -50,
-  north: 75,
-  south: 10,
-};
+export { mapBounds, geoToMapPoint } from "./lib/geo/projection";
 
 // In-app links keep a real href and switch the view client-side on a plain
 // left click only. A modified click (Cmd, Ctrl, Shift, Alt) or a middle click
@@ -137,15 +134,9 @@ export function mapDistanceKm(a: { x: number; y: number }, b: { x: number; y: nu
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
-export function geoToMapPoint(latitude: number, longitude: number) {
-  return {
-    x: clamp(((longitude - mapBounds.west) / (mapBounds.east - mapBounds.west)) * 100, 0, 100),
-    y: clamp(((mapBounds.north - latitude) / (mapBounds.north - mapBounds.south)) * 100, 0, 100),
-  };
-}
 
 export function isKnownLocationId(value: string) {
-  return value === CURRENT_LOCATION_ID || value === MANUAL_LOCATION_ID || locations.some((location) => location.id === value);
+  return value === CURRENT_LOCATION_ID || value === MANUAL_LOCATION_ID || isRegionLocationId(value);
 }
 
 export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
@@ -266,16 +257,10 @@ export function toDate(date: Date) {
 }
 
 function pointToLngLat(point: { x: number; y: number }): [number, number] {
-  return [
-    mapBounds.west + (mapBounds.east - mapBounds.west) * (point.x / 100),
-    mapBounds.north - (mapBounds.north - mapBounds.south) * (point.y / 100),
-  ];
+  return mapPointToLngLat(point);
 }
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}

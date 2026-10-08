@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isRoleValue, isViewValue } from "./roles";
-import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, locations } from "./data";
+import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View } from "./data";
+import { ONTARIO_LOCATION_ID, isRegionLocationId, loadRegionBoundaries, normalizeLocationId, ontarioLocation, regionContains, regionLocation, regionLocations, type RegionBoundaries } from "./lib/geo/regions";
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
 import CampaignWorkspace from "./component/campaign-workspace";
@@ -190,9 +191,17 @@ export default function OohApp({
     window.addEventListener("beforeunload", protectDraft);
     return () => window.removeEventListener("beforeunload", protectDraft);
   }, [campaignCreationActive]);
-  const [selectedLocationId, setSelectedLocationId] = useState(
-    initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
-  );
+  // No saved location: show Ontario first, then move to the visitor's own
+  // location if the browser shares it.
+  const [selectedLocationId, setSelectedLocationIdState] = useState(() => {
+    const requested = normalizeLocationId(initialLocationId);
+    return requested && isKnownLocationId(requested) ? requested : ONTARIO_LOCATION_ID;
+  });
+  const selectedLocationIdRef = useRef(selectedLocationId);
+  selectedLocationIdRef.current = selectedLocationId;
+  // Once the person picks a location, a late geolocation answer must not replace it.
+  const locationChosenRef = useRef(Boolean(initialLocationId && initialLocationId !== CURRENT_LOCATION_ID) || Boolean(initialArea));
+  const [locating, setLocating] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<MapPoint | null>(
     initialArea && initialLocationId && [CURRENT_LOCATION_ID, MANUAL_LOCATION_ID].includes(initialLocationId)
       ? { id: initialLocationId, label: initialLocationId === MANUAL_LOCATION_ID ? "Selected map area" : "Current location", ...initialArea }
@@ -245,39 +254,90 @@ export default function OohApp({
     document.title = `${t(documentTitleByView[view])} — ${t(surface === "government" ? "Civic Screen Operations" : "EasyAD Platform")}`;
   }, [surface, t, view]);
 
-  useEffect(() => {
-    if (initialArea || initialLocationId !== CURRENT_LOCATION_ID) return;
-    if (!("geolocation" in navigator)) {
-      setSelectedLocationId("thunder-bay");
+  // Ask for the visitor's location the first time a map view opens on the
+  // marketplace. Without it (denied, unsupported, timed out) the map stays on
+  // Ontario. The institution workspace centres on its own fleet instead.
+  const geolocationRequestedRef = useRef(false);
+  const wantsGeolocation = surface === "marketplace" && !initialArea && (!initialLocationId || initialLocationId === CURRENT_LOCATION_ID) && ["portal", "discover", "booking"].includes(view);
+  function requestCurrentLocation({ fromUser = false } = {}) {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      if (selectedLocationIdRef.current === CURRENT_LOCATION_ID) setSelectedLocationIdState(ONTARIO_LOCATION_ID);
       return;
     }
-
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setLocating(false);
+        if (!fromUser && locationChosenRef.current) return;
         setCurrentLocation({
           id: CURRENT_LOCATION_ID,
           label: "Current location",
+          level: "point",
           ...geoToMapPoint(position.coords.latitude, position.coords.longitude),
         });
-        setSelectedLocationId(CURRENT_LOCATION_ID);
+        setSelectedLocationIdState(CURRENT_LOCATION_ID);
       },
       () => {
-        setSelectedLocationId("thunder-bay");
+        setLocating(false);
+        if (selectedLocationIdRef.current === CURRENT_LOCATION_ID) setSelectedLocationIdState(ONTARIO_LOCATION_ID);
       },
-      { enableHighAccuracy: true, maximumAge: 300000, timeout: 8000 },
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
     );
-  }, [initialLocationId]);
+  }
+  useEffect(() => {
+    if (!wantsGeolocation || geolocationRequestedRef.current) return;
+    geolocationRequestedRef.current = true;
+    requestCurrentLocation();
+    // requestCurrentLocation reads refs only; it does not need to re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsGeolocation]);
 
-  const locationOptions = useMemo(() => currentLocation ? [currentLocation, ...locations] : locations, [currentLocation]);
-  const selectedLocation =
+  function setSelectedLocationId(id: string) {
+    locationChosenRef.current = true;
+    if (id === CURRENT_LOCATION_ID && currentLocation?.id !== CURRENT_LOCATION_ID) {
+      setSelectedLocationIdState(CURRENT_LOCATION_ID);
+      requestCurrentLocation({ fromUser: true });
+      return;
+    }
+    setSelectedLocationIdState(id);
+  }
+
+  // A search result: a region is selected by its id; a point (a street result
+  // or a device) becomes the search centre.
+  function selectSearchLocation(location: MapPoint) {
+    locationChosenRef.current = true;
+    if (isRegionLocationId(location.id)) {
+      setSelectedLocationIdState(normalizeLocationId(location.id)!);
+      return;
+    }
+    setCurrentLocation({ ...location, id: MANUAL_LOCATION_ID, level: "point", bounds: undefined });
+    setSelectedLocationIdState(MANUAL_LOCATION_ID);
+  }
+
+  const locationOptions = useMemo(() => currentLocation ? [currentLocation, ...regionLocations] : regionLocations, [currentLocation]);
+  const selectedLocation: MapPoint =
     [CURRENT_LOCATION_ID, MANUAL_LOCATION_ID].includes(selectedLocationId) && currentLocation
       ? currentLocation
-      : locations.find((location) => location.id === selectedLocationId) ?? locations[0];
+      : regionLocation(selectedLocationId) ?? ontarioLocation;
+  const selectedRegion = selectedLocation.bounds ? selectedLocation : null;
+
+  // County boundaries load only once a region filters the list. Until then
+  // the bounding box stands in.
+  const [regionBoundaries, setRegionBoundaries] = useState<RegionBoundaries | null>(null);
+  useEffect(() => {
+    if (!selectedRegion || regionBoundaries) return;
+    let cancelled = false;
+    void loadRegionBoundaries().then((boundaries) => { if (!cancelled) setRegionBoundaries(boundaries); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [regionBoundaries, selectedRegion]);
+
   const visibleInventory = useMemo(
     () =>
       inventory
-        .map((item) => ({ ...item, distance: mapDistanceKm(selectedLocation, item) }))
-        .filter((item) => item.distance <= filters.radius)
+        // A region lists every screen inside it, so the distance (from the
+        // region's centre) only orders the list and is not shown.
+        .map((item) => ({ ...item, distance: mapDistanceKm(selectedLocation, item), withinArea: selectedRegion ? regionContains(selectedRegion, item, regionBoundaries) : undefined }))
+        .filter((item) => item.withinArea ?? item.distance <= filters.radius)
         .filter((item) => filters.format === "all" || item.format === filters.format)
         .filter((item) => item.impressions >= filters.minImpressions)
         .filter((item) => item.traffic >= filters.minTraffic)
@@ -286,8 +346,9 @@ export default function OohApp({
         .filter((item) => filters.competitor === "all" || item.competitor === filters.competitor)
         .filter((item) => !filters.selectedTags.length || filters.selectedTags.every((tag) => item.tags?.includes(tag)))
         .filter((item) => item.price <= filters.priceMax)
-        .sort((a, b) => a.distance - b.distance),
-    [filters, inventory, selectedLocation],
+        .sort((a, b) => a.distance - b.distance)
+        .map(({ withinArea, ...item }) => ({ ...item, distance: withinArea === undefined ? item.distance : Number.NaN })),
+    [filters, inventory, regionBoundaries, selectedLocation, selectedRegion],
   );
   // Only Find screens and Request dates choose from the filtered list. Inventory
   // and the other management views list every device, and used to search the
@@ -692,8 +753,9 @@ export default function OohApp({
   }
 
   function selectMapArea(point: { x: number; y: number }) {
-    setCurrentLocation({ id: MANUAL_LOCATION_ID, label: "Selected map area", x: point.x, y: point.y });
-    setSelectedLocationId(MANUAL_LOCATION_ID);
+    locationChosenRef.current = true;
+    setCurrentLocation({ id: MANUAL_LOCATION_ID, label: "Selected map area", level: "point", x: point.x, y: point.y });
+    setSelectedLocationIdState(MANUAL_LOCATION_ID);
   }
 
   function renderDashboardView() {
@@ -714,6 +776,8 @@ export default function OohApp({
             setSelectedLocationId={setSelectedLocationId}
             selectedLocation={selectedLocation}
             onAreaChange={selectMapArea}
+            onLocationChange={selectSearchLocation}
+            locating={locating}
             mapZoom={initialMapZoom}
             locationOptions={locationOptions}
             selectedInventory={selectedInventory}
@@ -861,8 +925,10 @@ function newInventoryTemplate(): InventoryItem {
     name: "",
     operator: "",
     format: "digital",
-    x: 50,
-    y: 50,
+    // The location picker opens on southern Ontario, not the middle of the
+    // continent. The owner still pins the exact spot.
+    x: ontarioLocation.x,
+    y: ontarioLocation.y,
     // Start blank so the linear setup flow collects real device data instead
     // of carrying placeholder values into the review step or public page.
     address: "",

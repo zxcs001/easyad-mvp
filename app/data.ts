@@ -255,11 +255,4 @@ export const formats = {
   priceMultiplier: number;
 }>;
 
-export const locations = [
-  { id: "thunder-bay", label: "Thunder Bay, ON", x: 67.29, y: 40.95 },
-  { id: "downtown", label: "Downtown Port Arthur", x: 67.29, y: 40.88 },
-  { id: "airport", label: "Thunder Bay Airport", x: 67.17, y: 41.05 },
-  { id: "university", label: "Lakehead University", x: 67.32, y: 40.94 },
-  { id: "retail", label: "Intercity Retail District", x: 67.33, y: 40.99 },
-  { id: "waterfront", label: "Marina Park Waterfront", x: 67.28, y: 40.88 },
-];
+// Map locations (Ontario and its counties) live in app/lib/geo/regions.ts.

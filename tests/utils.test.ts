@@ -117,6 +117,8 @@ test("loop share gives an advertiser its slots, never more than the screen", () 
 test("map and location helpers normalize known spatial values", () => {
   assert.equal(distance({ x: 0, y: 0 }, { x: 3, y: 4 }), 5);
   assert.equal(isKnownLocationId("thunder-bay"), true);
+  assert.equal(isKnownLocationId("on"), true);
+  assert.equal(isKnownLocationId("on-simcoe"), true);
   assert.equal(isKnownLocationId("unknown-place"), false);
 
   const point = geoToMapPoint(48.38, -89.25);

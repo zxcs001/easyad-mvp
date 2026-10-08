@@ -1,5 +1,6 @@
 import OohApp from "./ooh-app";
-import { FormatKey, Role, View, formats, locations } from "./data";
+import { FormatKey, Role, View, formats } from "./data";
+import { isRegionLocationId } from "./lib/geo/regions";
 import { getCurrentUser, getInstitutionScope } from "./lib/auth";
 import { ensureBookingTransactions, listApprovalEvents, listApprovalEventsForInstitution, listBookings, listBookingsCreatedBy, listBookingsForInstitution, listCreatives, listDeviceAlerts, listInventory, listInventoryByInstitution, listInstitutionOperators, listMediaResources, listMediaResourcesForInstitution, listNonAdminUsers, listPublishedInventory, listTransactions, listTransactionsCreatedBy, listTransactionsForInstitution } from "./lib/db";
 import type { CreativeDraft, Filters } from "./types";
@@ -217,7 +218,7 @@ function isCompetitor(value: string | undefined): value is Filters["competitor"]
 }
 
 function isLocation(value: string | undefined) {
-  return Boolean(value === "current" || value === "manual" || (value && locations.some((location) => location.id === value)));
+  return Boolean(value === "current" || value === "manual" || isRegionLocationId(value));
 }
 
 function isInventoryItem(value: string | undefined, inventory: { id: string }[]) {
