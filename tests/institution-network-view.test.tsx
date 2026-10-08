@@ -282,3 +282,37 @@ function alertFromDraft(draft: Parameters<React.ComponentProps<typeof Institutio
     endedAt: null,
   };
 }
+
+test("each institution screen shows its use and the owner can open it to private-sector advertising", async () => {
+  const user = userEvent.setup();
+  const onSetScreenUse = vi.fn(async (id: string, use: "institution" | "advertising") => ({ value: { ...published, id, advertisingOptIn: use === "advertising" } }));
+  renderWorkspace({ onSetScreenUse });
+
+  expect(screen.getByText("All 2 screens are reserved for institution use. No pricing, bookings, or advertiser content apply.")).toBeInTheDocument();
+  expect(screen.getByText("Institution use only")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Change screen use" }));
+  const dialog = screen.getByRole("dialog", { name: "Screen use" });
+  await user.click(within(dialog).getByRole("radio", { name: /Open to private-sector advertising/ }));
+  await user.click(within(dialog).getByRole("button", { name: "Save screen use" }));
+
+  await waitFor(() => expect(onSetScreenUse).toHaveBeenCalledWith(published.id, "advertising"));
+});
+
+test("a private screen cannot be opened to advertising", async () => {
+  const user = userEvent.setup();
+  renderWorkspace({ inventory: [{ ...published, contentVisibility: "private" }], onSetScreenUse: vi.fn() });
+
+  await user.click(screen.getByRole("button", { name: "Change screen use" }));
+  expect(within(screen.getByRole("dialog", { name: "Screen use" })).getByRole("radio", { name: /Open to private-sector advertising/ })).toBeDisabled();
+});
+
+test("the command centre points to Advertising once a screen is opened", async () => {
+  const user = userEvent.setup();
+  const onOpenAdvertising = vi.fn();
+  renderWorkspace({ inventory: [{ ...published, advertisingOptIn: true }, unpublished], onSetScreenUse: vi.fn(), onOpenAdvertising });
+
+  expect(screen.getByText("1 of 2 screens is open to private-sector advertising. Rates, bookings, and billing for it are in Advertising.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Open Advertising" }));
+  expect(onOpenAdvertising).toHaveBeenCalled();
+});

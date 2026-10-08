@@ -29,8 +29,16 @@ describe("site assistant visibility", () => {
     expect(screen.queryByRole("button", { name: "Open assistant" })).not.toBeInTheDocument();
   });
 
-  test("remains available outside public device routes", () => {
-    route.pathname = "/government/about";
+  test.each(["/government", "/government/about", "/government/login"])("does not render in the institution workspace %s", (pathname) => {
+    route.pathname = pathname;
+
+    render(<Chatbot />);
+
+    expect(screen.queryByRole("button", { name: "Open assistant" })).not.toBeInTheDocument();
+  });
+
+  test("remains available on marketplace routes", () => {
+    route.pathname = "/login";
 
     render(<Chatbot />);
 

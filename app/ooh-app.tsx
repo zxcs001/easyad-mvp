@@ -17,6 +17,8 @@ import InstitutionTeamView from "./component/institution-team-view";
 import FleetOperations from "./component/fleet-operations";
 import InstitutionNetworkView, { type EmergencyOverrideDraft } from "./component/institution-network-view";
 import EmergencyUpdatesView from "./component/emergency-updates-view";
+import InstitutionAdvertisingView from "./component/institution-advertising-view";
+import { showsAdvertisingArea, type ScreenUse } from "./lib/screen-use-policy";
 import Portal from "./component/portal";
 import { EmptyState } from "./component/shared-ui";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
@@ -306,6 +308,10 @@ export default function OohApp({
     ? managedUsers.find((user) => user.id === networkSelectedInventory.institutionId && user.role === "institutional")
     : null;
   const networkInstitutionName = currentUser?.role === "admin" ? selectedInstitution?.name ?? "the selected institution" : currentUser?.name ?? "this institution";
+  const isGovernmentSurface = surface === "government";
+  // The institution workspace shows commercial views only once a screen is
+  // open to private-sector advertising, or advertising history remains.
+  const showAdvertising = isGovernmentSurface && showsAdvertisingArea(institutionNetworkInventory, bookings);
 
   function launchPortal(nextRole: Role, nextView: View) {
     if (!currentUser) return;
@@ -558,6 +564,24 @@ export default function OohApp({
     }
   }
 
+  async function setScreenUse(id: string, use: ScreenUse) {
+    if (!canAccessInstitutionWorkspace(currentUser?.role)) return { error: "Institution account or Super Admin access required" };
+    const current = inventory.find((item) => item.id === id);
+    try {
+      const response = await fetch(`/api/institution/screens/${encodeURIComponent(id)}/use`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ use, version: current?.fleetVersion }),
+      });
+      const payload = await response.json().catch(() => ({})) as { item?: InventoryItem; error?: string };
+      if (!response.ok || !payload.item) return { error: payload.error ?? "Screen use could not be changed" };
+      setInventory((items) => items.map((item) => item.id === id ? payload.item! : item));
+      return { value: payload.item };
+    } catch {
+      return { error: "Unable to reach the screen service. Try again." };
+    }
+  }
+
   async function setInventoryPublishState(id: string, published: boolean) {
     if (!canAccessInstitutionWorkspace(currentUser?.role)) return { error: "Institution account or Super Admin access required" };
     try {
@@ -679,7 +703,7 @@ export default function OohApp({
         return <EmergencyUpdatesView institutionId={currentUser?.role === "institutional" ? currentUser.id : ""} institutionName={currentUser?.name ?? ""} institutions={currentUser?.role === "admin" ? managedUsers.filter(user => user.role === "institutional").map(({ id, name }) => ({ id, name })) : []} onCreate={createEmergencyOverride} onEnd={endEmergencyOverride} />;
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
-        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
+        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
       case "discover":
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
@@ -744,7 +768,7 @@ export default function OohApp({
       case "resources":
         return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
-        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} />;
+        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} institutionMode={isGovernmentSurface} />;
         return (
           <InventoryView
             inventory={inventory}
@@ -762,11 +786,13 @@ export default function OohApp({
             canManage={canManageInventory}
             canDelete={canDeleteInventory}
             approvalRequired={currentUser?.role === "operator"}
+            institutionMode={isGovernmentSurface}
           />
         );
       case "calendar":
         return <CalendarView inventory={inventory} bookings={bookings} />;
       case "approvals":
+        if (isGovernmentSurface) return <ApprovalsView mode="content" bookings={[]} inventory={inventory} creatives={[]} mediaResources={mediaResources} canReviewDeviceContent={canAccessInstitutionWorkspace(currentUser?.role)} approvalHistory={[]} hasConflict={() => false} updateBooking={updateBooking} updateMediaApproval={updateMediaApproval} />;
         return <ApprovalsView bookings={bookings} inventory={inventory} creatives={creatives} mediaResources={mediaResources} canReviewDeviceContent={canAccessInstitutionWorkspace(currentUser?.role)} approvalHistory={approvalHistory} hasConflict={(inventoryId, start, end, excludeId) => hasCapacityConflict(inventoryId, start, end, bookings.find((booking) => booking.id === excludeId)?.adSlots ?? 1, excludeId)} updateBooking={updateBooking} updateMediaApproval={updateMediaApproval} />;
       case "accounts":
         if (currentUser?.role === "institutional") return <InstitutionTeamView institution={currentUser} operators={institutionOperators} onCreateOperator={createInstitutionOperator} onDeleteOperator={deleteInstitutionOperator} />;
@@ -776,6 +802,25 @@ export default function OohApp({
         return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} isAdvertiser={role === "advertiser"} />;
       case "billing":
         return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} isAdvertiser={role === "advertiser"} paymentsEnabled={featureFlags.payments} />;
+      case "advertising":
+        if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
+        return (
+          <InstitutionAdvertisingView
+            inventory={institutionNetworkInventory}
+            bookings={bookings}
+            creatives={creatives}
+            transactions={transactions}
+            approvalHistory={approvalHistory}
+            paymentsEnabled={featureFlags.payments}
+            hasConflict={(inventoryId, start, end, excludeId) => hasCapacityConflict(inventoryId, start, end, bookings.find((booking) => booking.id === excludeId)?.adSlots ?? 1, excludeId)}
+            updateBooking={updateBooking}
+            updateMediaApproval={updateMediaApproval}
+            onSettle={settleInvoice}
+            onRunDelivery={runDeliveryTick}
+            onOpenCommandCentre={(id) => { setSelectedInventoryId(id); navigateToView("network"); }}
+            onEditScreen={(id) => { setSelectedInventoryId(id); navigateToView("inventory"); }}
+          />
+        );
       default:
         return null;
     }
@@ -797,7 +842,7 @@ export default function OohApp({
 
   return (
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} />
+      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} showAdvertising={showAdvertising} />
       <main className="workspace">
         <Topbar view={view} visibleCount={role === "advertiser" ? visibleInventory.length : inventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
@@ -875,6 +920,7 @@ const documentTitleByView: Record<View, string> = {
   accounts: "Account management",
   reports: "Campaign analytics",
   billing: "Payments and billing",
+  advertising: "Private-sector advertising",
 };
 
 function EmptyInventoryPanel({ canManage }: { canManage: boolean }) {

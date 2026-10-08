@@ -131,6 +131,16 @@ The public `/government/about` route introduces Civic Screen Operations for loca
 
 The public landing page links to this workspace from the middle of the page; it is intentionally absent from the top navigation. Signed-out visitors are routed to the dedicated government sign-in, while advertiser and operator accounts receive an access boundary. Super Admin can create Institution accounts and can enter the Civic Screen Operations dashboard in addition to the standard admin workspace.
 
+### Screen use: institution only or open to advertising
+
+Each institution screen has a screen use. `Institution use only` is the default for a new screen. Only the institution's content plays, the marketplace does not list the screen, and the workspace shows no rate, occupancy, audience, booking dates, or billing for it. The owner can choose `Open to private-sector advertising` for a screen in the Command centre (`Change screen use`). Then local businesses can book time on it, and the owner reviews each booking.
+
+- The choice uses the existing `inventory.advertising_opt_in` column. No migration is necessary.
+- `PUT /api/institution/screens/{id}/use` with `{ "use": "institution" | "advertising", "version"?: number }` changes it. Only the owning Institution account or a Super Admin can call it. It does not need `FEATURE_FLEET_OPERATIONS`.
+- The API refuses advertising on a private screen, and it refuses any change while advertising bookings or placements are active on the screen. Each change writes a `fleet_audit` row.
+- The `Advertising` entry in the institution navigation holds screens and rates, booking review, booking calendar, performance, and billing. It appears only when a screen is open to advertising or advertising history remains. The old `view=calendar`, `view=reports` and `view=billing` links open it.
+- Institution accounts go to `/government` from every marketplace route, including `/`. The advertising assistant does not show on `/government` routes.
+
 Authorized institutional staff can create time-limited AMBER, evacuation, or public-safety screen overrides for selected published devices. These overrides replace regular content only on the application's owned screens—they do not issue an alert through Alert Ready, wireless emergency alerts, police systems, or another official public-alert network.
 
 Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.

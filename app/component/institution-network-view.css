@@ -320,3 +320,120 @@
   .warning-button { transition: none; }
   .network-device-strip button { transition: none; }
 }
+
+.network-screen-use-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--state-idle-surface);
+  color: var(--state-idle-ink);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.network-screen-use-summary svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.network-screen-use-summary span {
+  flex: 1;
+  min-width: 0;
+}
+
+.network-screen-use {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.network-screen-use > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.network-screen-use small {
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.network-screen-use-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--state-idle-surface);
+  color: var(--state-idle-ink);
+}
+
+.network-screen-use-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.network-screen-use.is-advertising .network-screen-use-icon {
+  background: var(--state-info-surface);
+  color: var(--state-info-ink);
+}
+
+.network-screen-use-form fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.network-screen-use-form label {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.network-screen-use-form label.selected {
+  border-color: var(--green);
+  box-shadow: var(--ring);
+}
+
+.network-screen-use-form label.disabled {
+  cursor: not-allowed;
+  opacity: .7;
+}
+
+.network-screen-use-form label > span {
+  display: grid;
+  gap: 2px;
+}
+
+.network-screen-use-form small {
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 700px) {
+  .network-screen-use {
+    grid-template-columns: auto minmax(0,1fr);
+  }
+
+  .network-screen-use > button {
+    grid-column: 1 / -1;
+  }
+}

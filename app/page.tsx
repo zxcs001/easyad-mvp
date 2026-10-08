@@ -21,7 +21,7 @@ type PageProps = {
 
 export const dynamic = "force-dynamic";
 
-const views: View[] = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+const views: View[] = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing", "advertising"];
 const templates: CreativeDraft["template"][] = ["retail", "finance", "event"];
 const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "gif", "pdf", "mp4"];
 const filterFormats: Filters["format"][] = ["all", "digital", "static", "transit"];
@@ -30,9 +30,13 @@ const roleAllowedViews: Record<Role, View[]> = {
   advertiser: ["portal", "discover", "booking", "campaigns", "creative", "resources", "reports", "billing"],
   operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing"],
   institutional: ["portal", "network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
-  admin: views,
+  admin: views.filter((entry) => entry !== "advertising"),
 };
-const governmentViews: View[] = ["network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"];
+// The institution workspace keeps commercial views in one Advertising area.
+// Schedule, Performance and Billing were separate entries; their old links
+// now open that area, which explains when every screen is reserved.
+const governmentViews: View[] = ["network", "emergency", "resources", "inventory", "approvals", "accounts", "advertising"];
+const governmentCommercialViews: View[] = ["calendar", "reports", "billing"];
 
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
@@ -43,7 +47,8 @@ export default async function Page({ searchParams }: PageProps) {
   const view = readOne(params.view);
   const bookingId = readOne(params.bookingId);
   const requestedRole = isGovernmentSurface ? user?.role : isRole(role) ? role : user?.role;
-  const requestedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
+  const parsedView = isView(view) ? view : isGovernmentSurface ? "network" : "portal";
+  const requestedView: View = isGovernmentSurface && governmentCommercialViews.includes(parsedView) ? "advertising" : parsedView;
   const cookieStore = await cookies();
 
   // The starter is the ad buyer's "Start my campaign" screen. Operators and
@@ -61,15 +66,18 @@ export default async function Page({ searchParams }: PageProps) {
     return <GovernmentAccessDenied currentRole={user.role} />;
   }
 
-  if (!isGovernmentSurface && user?.role === "institutional" && requestedView !== "portal") {
-    redirect(`/government?view=${governmentViews.includes(requestedView) ? requestedView : "network"}`);
+  // Institution accounts stay in their own workspace. The marketplace portal
+  // is advertiser marketing and pricing, so it is not part of their experience.
+  if (!isGovernmentSurface && user?.role === "institutional") {
+    const governmentView = governmentCommercialViews.includes(requestedView) ? "advertising" : requestedView;
+    redirect(`/government?view=${governmentViews.includes(governmentView) ? governmentView : "network"}`);
   }
 
   const effectiveRole = !user ? "advertiser" : user.role === "admin" ? requestedRole ?? "admin" : user.role;
   const allowedViews = isGovernmentSurface ? governmentViews : roleAllowedViews[effectiveRole];
   const effectiveView = allowedViews.includes(requestedView) ? requestedView : isGovernmentSurface ? "network" : roleWorkspaceView[effectiveRole];
 
-  if (user && (requestedRole !== effectiveRole || requestedView !== effectiveView)) {
+  if (user && (requestedRole !== effectiveRole || parsedView !== effectiveView)) {
     redirect(isGovernmentSurface ? `/government?view=${effectiveView}` : `/?role=${effectiveRole}&view=${effectiveView}`);
   }
 

@@ -12,10 +12,16 @@ export function isDevicePage(pathname: string | null) {
   return devicePagePrefixes.some((prefix) => pathname === prefix || pathname?.startsWith(`${prefix}/`));
 }
 
+// The assistant answers questions about buying and booking advertising. The
+// institution workspace is a screen-operations tool, so it does not show it.
+export function isInstitutionPage(pathname: string | null) {
+  return pathname === "/government" || Boolean(pathname?.startsWith("/government/"));
+}
+
 export default function Chatbot() {
   const pathname = usePathname();
 
-  if (isDevicePage(pathname)) return null;
+  if (isDevicePage(pathname) || isInstitutionPage(pathname)) return null;
 
   return <ChatbotWidget />;
 }

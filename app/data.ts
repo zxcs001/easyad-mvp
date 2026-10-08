@@ -20,7 +20,8 @@ export type View =
   | "approvals"
   | "accounts"
   | "reports"
-  | "billing";
+  | "billing"
+  | "advertising";
 
 export type DisplayTemplate = "fullscreen" | "weather" | "public-info" | "transit" | "community";
 

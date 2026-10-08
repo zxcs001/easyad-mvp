@@ -2,7 +2,7 @@
 
 import "./institution-network-view.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ExternalLink, Images, MapPinned, MonitorUp, Radio, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ExternalLink, Images, MapPinned, Megaphone, MonitorUp, Radio, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { Booking, Creative, DeviceAlert, DeviceAlertType, InventoryItem, MediaResource } from "../data";
 import { deviceTemplates, resolveDeviceTemplate } from "./device-templates";
 import type { DeviceMediaSlide } from "./device-media-carousel";
@@ -19,6 +19,7 @@ import PlayerControl from "./player-control";
 import ScreenSettingsDialog, { type ScreenSettings } from "./screen-settings-dialog";
 import type { EmergencyTargeting } from "../lib/emergency-updates";
 import EmergencyPhotoInput, { useEmergencyPhoto } from "./emergency-photo-input";
+import { advertisingScreens, screenUseOf, type ScreenUse } from "../lib/screen-use-policy";
 
 export type EmergencyOverrideDraft = {
   imageFile?: File | null;
@@ -50,6 +51,8 @@ export default function InstitutionNetworkView({
   onCreateAlert,
   onEndAlert,
   onSaveSettings,
+  onSetScreenUse,
+  onOpenAdvertising,
 }: {
   institutionName: string;
   isSuperAdmin?: boolean;
@@ -66,8 +69,11 @@ export default function InstitutionNetworkView({
   onCreateAlert: (draft: EmergencyOverrideDraft) => Promise<MutationResult<DeviceAlert>>;
   onEndAlert: (id: string) => Promise<MutationResult<DeviceAlert>>;
   onSaveSettings?: (id: string, settings: ScreenSettings) => Promise<MutationResult<InventoryItem>>;
+  onSetScreenUse?: (id: string, use: ScreenUse) => Promise<MutationResult<InventoryItem>>;
+  onOpenAdvertising?: () => void;
 }) {
   const { t } = useI18n();
+  const [screenUseOpen, setScreenUseOpen] = useState(false);
   const [publishDialog, setPublishDialog] = useState(false);
   const [alertDialog, setAlertDialog] = useState(false);
   const [uploadDialog, setUploadDialog] = useState(false);
@@ -140,6 +146,9 @@ export default function InstitutionNetworkView({
   const templateLabel = deviceTemplates.find((entry) => entry.id === template)?.label ?? "Full screen";
   const isPublished = selected.approvalStatus === "approved";
   const publishVerb = isPublished ? "Unpublish screen" : "Publish screen";
+  const institutionScreens = inventory.filter((device) => Boolean(device.institutionId));
+  const openedScreens = advertisingScreens(institutionScreens);
+  const selectedUse = screenUseOf(selected);
 
   return (
     <section className="institution-network">
@@ -149,6 +158,16 @@ export default function InstitutionNetworkView({
         <NetworkMetric icon={<Images />} label="Media resources" value={mediaResources.length} />
         <NetworkMetric icon={<ShieldAlert />} label="Active overrides" value={activeAlerts.length} tone={activeAlerts.length ? "warn" : ""} />
       </div>
+
+      {institutionScreens.length ? (
+        <div className="network-screen-use-summary" role="note">
+          {openedScreens.length ? <Megaphone aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
+          <span>{openedScreens.length
+            ? t(openedScreens.length === 1 ? "{count} of {total} screens is open to private-sector advertising. Rates, bookings, and billing for it are in Advertising." : "{count} of {total} screens are open to private-sector advertising. Rates, bookings, and billing for them are in Advertising.", { count: openedScreens.length, total: institutionScreens.length })
+            : t("All {total} screens are reserved for institution use. No pricing, bookings, or advertiser content apply.", { total: institutionScreens.length })}</span>
+          {openedScreens.length && onOpenAdvertising ? <button className="ghost-button" type="button" onClick={onOpenAdvertising}>{t("Open Advertising")}</button> : null}
+        </div>
+      ) : null}
 
       {activeAlerts.length ? (
         <div className="network-active-banner" role="status">
@@ -210,6 +229,17 @@ export default function InstitutionNetworkView({
             <button className={isPublished ? "warning-button" : "primary-button"} onClick={() => { setDialogError(""); setPublishDialog(true); }} type="button">{t(publishVerb)}</button>
           </div>
           <p className="network-delivery-note">{t("Changes are available to connected players on their next refresh. Check Player connection for delivery status.")}</p>
+          {selected.institutionId && onSetScreenUse ? (
+            <div className={`network-screen-use${selectedUse === "advertising" ? " is-advertising" : ""}`}>
+              <span className="network-screen-use-icon">{selectedUse === "advertising" ? <Megaphone aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}</span>
+              <div>
+                <span className="eyebrow">{t("Screen use")}</span>
+                <strong>{t(selectedUse === "advertising" ? "Open to private-sector advertising" : "Institution use only")}</strong>
+                <small>{t(selectedUse === "advertising" ? "Local businesses can book time on this screen between your own content." : "Only your institution's content plays. No pricing, bookings, or advertiser content apply.")}</small>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => setScreenUseOpen(true)}>{t("Change screen use")}</button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -238,6 +268,8 @@ export default function InstitutionNetworkView({
           {isSuperAdmin && !selected.institutionId ? <small>{t("Choose a screen assigned to an institution before creating an override.")}</small> : null}
         </div>
       </div>
+
+      {screenUseOpen && onSetScreenUse ? <ScreenUseDialog key={`use-${selected.id}`} screen={selected} onClose={() => setScreenUseOpen(false)} onSave={onSetScreenUse} /> : null}
 
       <PublishStateDialog busy={busy} error={dialogError} isPublished={isPublished} open={publishDialog} screenName={selected.name} onClose={() => { if (!busy) setPublishDialog(false); }} onConfirm={() => void confirmPublishState()} />
       <ContentUploadDialog isScreenPublished={isPublished} open={uploadDialog} screenName={selected.name} onClose={() => setUploadDialog(false)} onUpload={async (file, title) => {
@@ -307,6 +339,50 @@ function ContentUploadDialog({ open, screenName, isScreenPublished, onClose, onU
         <p className="network-upload-help">{t("PNG, JPEG, WebP, MP4, or WebM · Maximum 50 MB")}</p>
         {error ? <p className="dialog-error" role="alert">{t(error)}</p> : null}
         <div className="dialog-actions"><button className="secondary-button" disabled={busy} onClick={onClose} type="button">{t("Cancel")}</button><button className="primary-button" disabled={busy} type="submit">{t(busy ? "Publishing…" : isScreenPublished ? "Publish content" : "Add approved content")}</button></div>
+      </form>
+    </AppDialog>
+  );
+}
+
+function ScreenUseDialog({ screen, onClose, onSave }: { screen: InventoryItem; onClose: () => void; onSave: (id: string, use: ScreenUse) => Promise<MutationResult<InventoryItem>> }) {
+  const { t } = useI18n();
+  const current = screenUseOf(screen);
+  const [choice, setChoice] = useState<ScreenUse>(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const firstOptionRef = useRef<HTMLInputElement>(null);
+  const privateScreen = screen.contentVisibility === "private";
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    if (choice === current) { onClose(); return; }
+    setBusy(true);
+    setError("");
+    const result = await onSave(screen.id, choice);
+    setBusy(false);
+    if (result.error) { setError(result.error); return; }
+    toast.success(choice === "advertising" ? "Screen opened to private-sector advertising." : "Screen reserved for institution use.");
+    onClose();
+  }
+
+  return (
+    <AppDialog dismissible={!busy} initialFocusRef={firstOptionRef} open title={t("Screen use")} description={t("Choose who can show content on {name}.", { name: screen.name })} onClose={onClose}>
+      <form className="network-screen-use-form" noValidate onSubmit={submit}>
+        <fieldset disabled={busy}>
+          <legend className="sr-only">{t("Screen use")}</legend>
+          <label className={choice === "institution" ? "selected" : ""}>
+            <input checked={choice === "institution"} name="screen-use" onChange={() => setChoice("institution")} ref={firstOptionRef} type="radio" value="institution" />
+            <span><strong>{t("Institution use only")}</strong><small>{t("Only your institution's content plays. The screen is not listed for advertisers, and no pricing, bookings, or billing apply.")}</small></span>
+          </label>
+          <label className={`${choice === "advertising" ? "selected" : ""}${privateScreen ? " disabled" : ""}`}>
+            <input checked={choice === "advertising"} disabled={privateScreen} name="screen-use" onChange={() => setChoice("advertising")} type="radio" value="advertising" />
+            <span><strong>{t("Open to private-sector advertising")}</strong><small>{t(privateScreen ? "Private screens cannot carry advertising. Use a public screen to open it to advertisers." : "Local businesses can find and book time on this screen. You review each booking, and rates, bookings, and billing appear in Advertising.")}</small></span>
+          </label>
+        </fieldset>
+        <p className="network-upload-help">{t("Emergency overrides and your own content keep priority either way. The choice is locked while advertising bookings are active on this screen.")}</p>
+        {error ? <p className="dialog-error" role="alert">{t(error)}</p> : null}
+        <div className="dialog-actions"><button className="secondary-button" disabled={busy} onClick={onClose} type="button">{t("Cancel")}</button><button className="primary-button" disabled={busy} type="submit">{t(busy ? "Saving…" : "Save screen use")}</button></div>
       </form>
     </AppDialog>
   );

@@ -16,6 +16,7 @@ import { useI18n } from "../i18n/client";
 import { localeNames, locales } from "../i18n/config";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 import { inventoryAvailabilityLabel, isValidAvailabilityWindow } from "../lib/inventory-availability";
+import { screenUseOf } from "../lib/screen-use-policy";
 
 export function InventoryView({
   inventory,
@@ -33,6 +34,7 @@ export function InventoryView({
   canManage,
   canDelete,
   approvalRequired = false,
+  institutionMode = false,
 }: {
   inventory: InventoryItem[];
   selectedId: string;
@@ -49,6 +51,8 @@ export function InventoryView({
   canManage: boolean;
   canDelete: boolean;
   approvalRequired?: boolean;
+  /** The institution workspace: screens are reserved for the institution unless opened to advertising. */
+  institutionMode?: boolean;
 }) {
   const { locale, t } = useI18n();
   const [formItem, setFormItem] = useState<InventoryItem>(item);
@@ -62,6 +66,9 @@ export function InventoryView({
   const hasInventory = inventory.length > 0;
   const showDevicePanels = hasInventory || isCreating;
   const pendingInventory = inventory.filter((unit) => unit.approvalStatus === "pending approval");
+  // Rates, audience, occupancy and booking windows describe a screen for sale.
+  // A reserved institution screen is not for sale, so the form leaves them out.
+  const showCommercialFields = !institutionMode || screenUseOf(editorItem) === "advertising";
 
   useEffect(() => {
     if (!isCreating) setFormItem(item);
@@ -88,7 +95,7 @@ export function InventoryView({
       const addressProblem = addressIssue(formItem.address);
       if (addressProblem) return addressProblem;
     }
-    if (step === 2 && (!Number.isFinite(formItem.price) || formItem.price < 0)) return "Enter a valid daily rate.";
+    if (step === 2 && !institutionMode && (!Number.isFinite(formItem.price) || formItem.price < 0)) return "Enter a valid daily rate.";
     if (step === 2 && !isValidAvailabilityWindow(formItem)) return "Choose a valid availability start and end date.";
     return "";
   }
@@ -170,11 +177,25 @@ export function InventoryView({
     <section className="grid inventory-grid">
       <div className="panel span-2">
         <PanelHeading
-          eyebrow="Centralized inventory database"
-          title="Devices and inventory"
-          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setCreationStep(1); setSaveError(""); }}>{t("Add device")}</button> : <a className="primary-button" href="/login">{t("Sign in to manage")}</a>}
+          eyebrow={institutionMode ? "Institution-owned fleet" : "Centralized inventory database"}
+          title={institutionMode ? "Screens" : "Devices and inventory"}
+          action={canManage ? <button className="primary-button" type="button" onClick={() => { setFormItem({ ...newItem }); setIsCreating(true); setCreationStep(1); setSaveError(""); }}>{t(institutionMode ? "Add screen" : "Add device")}</button> : <a className="primary-button" href="/login">{t("Sign in to manage")}</a>}
         />
-        {hasInventory ? <div className="inventory-table inventory-management-table">
+        {hasInventory && institutionMode ? <div className="inventory-table inventory-management-table is-institution">
+          <div className="table-head inventory-management-head"><span>{t("Screen")}</span><span>{t("Building / department")}</span><span>{t("Format")}</span><span>{t("Screen use")}</span><span>{t("Status")}</span></div>
+          {inventory.map((unit) => {
+            const use = screenUseOf(unit);
+            return (
+              <button className={`table-row ${selectedId === unit.id ? "selected" : ""}`} key={unit.id} onClick={() => { setIsCreating(false); setCreationStep(1); setSaveError(""); select(unit.id); }}>
+                <span><strong>{unit.name}</strong><small>{unit.address}</small></span>
+                <span>{unit.building || "—"}<small>{unit.department || ""}</small></span>
+                <span><span className="status">{t(unit.deliveryMode === "static" ? "Static" : unit.deliveryMode === "digital" ? "Digital" : "Delivery mode pending")}</span><small>{t(formats[unit.format].label)}</small></span>
+                <span><span className="status">{t(use === "advertising" ? "Open to advertising" : "Institution use only")}</span></span>
+                <span><span className={`status ${unit.approvalStatus === "approved" ? "good" : unit.approvalStatus === "rejected" ? "bad" : ""}`}>{t(unit.approvalStatus === "approved" ? "Published" : unit.approvalStatus === "rejected" ? "rejected" : "Unpublished")}</span></span>
+              </button>
+            );
+          })}
+        </div> : hasInventory ? <div className="inventory-table inventory-management-table">
           <div className="table-head inventory-management-head"><span>{t("Unit")}</span><span>{t("Operator")}</span><span>{t("Format")}</span><span>{t("Rate")}</span><span>{t("Occupancy")}</span><span>{t("Availability")}</span><span>{t("Status")}</span></div>
           {inventory.map((unit) => {
             const staticInventory = isStaticInventory(unit);
@@ -191,7 +212,7 @@ export function InventoryView({
               </button>
             );
           })}
-        </div> : <div className="empty-state"><strong>{t("No inventory records yet")}</strong><span>{t("Add a device to configure its inventory record and upload public media resources.")}</span></div>}
+        </div> : institutionMode ? <div className="empty-state"><strong>{t("No screens in this institution")}</strong><span>{t("Add a screen to place it on the fleet map and publish your own content.")}</span></div> : <div className="empty-state"><strong>{t("No inventory records yet")}</strong><span>{t("Add a device to configure its inventory record and upload public media resources.")}</span></div>}
       </div>
       {canDelete ? <div className="panel span-2">
         <PanelHeading eyebrow="Publishing workflow" title="Inventory approvals" />
@@ -211,8 +232,8 @@ export function InventoryView({
       {showDevicePanels ? <>
       <div className={`panel${isCreating ? " span-2" : ""}`}>
         <PanelHeading
-          eyebrow={canDelete ? "Super admin controls" : "Inventory record"}
-          title={isCreating ? "New inventory device" : item.name}
+          eyebrow={canDelete ? "Super admin controls" : institutionMode ? "Screen record" : "Inventory record"}
+          title={isCreating ? (institutionMode ? "New screen" : "New inventory device") : item.name}
           action={canManage && !isCreating ? (
             <div className="inventory-draft-actions">
               <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem({ ...item }); setSaveError(""); }}>{t("Cancel")}</button>
@@ -222,21 +243,22 @@ export function InventoryView({
           ) : undefined}
         />
         {!isCreating && isDigitalInventory(item) ? <div className="public-url-box">
-          <span className="eyebrow">{t("Public device URLs")}</span>
+          <span className="eyebrow">{t(institutionMode ? "Device URL" : "Public device URLs")}</span>
           <a href={`/devices/${item.id}`} target="_blank" rel="noreferrer">/devices/{item.id}</a>
-          <a href={`/inventory/${item.id}`} target="_blank" rel="noreferrer">/inventory/{item.id}</a>
+          {institutionMode && screenUseOf(item) === "institution" ? null : <a href={`/inventory/${item.id}`} target="_blank" rel="noreferrer">/inventory/{item.id}</a>}
         </div> : null}
+        {!isCreating && institutionMode ? <ScreenUseNote item={item} /> : null}
         <form id="inventory-device-form" noValidate onSubmit={submitInventory}>
           {isCreating ? <>
             <ol className="device-creation-steps" aria-label={t("Device setup progress")}>
-              {["Basics", "Availability", "Review"].map((label, index) => {
+              {(institutionMode ? ["Basics", "Display", "Review"] : ["Basics", "Availability", "Review"]).map((label, index) => {
                 const step = index + 1;
                 return <li className={step === creationStep ? "is-current" : step < creationStep ? "is-complete" : ""} key={label} aria-current={step === creationStep ? "step" : undefined}><span>{step}</span>{t(label)}</li>;
               })}
             </ol>
             <div className="device-creation-stage">
               {creationStep === 1 ? <>
-                <div className="device-stage-heading"><span className="eyebrow">{t("Step 1 of 3")}</span><h3>{t("Identify the device")}</h3><p>{t("Add the details buyers need to recognize and locate it.")}</p></div>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 1 of 3")}</span><h3>{t(institutionMode ? "Identify the screen" : "Identify the device")}</h3><p>{t(institutionMode ? "Add the details your team needs to recognize and locate it." : "Add the details buyers need to recognize and locate it.")}</p></div>
                 <div className="form-grid compact">
                   <label>{t("Name")}<input ref={nameInputRef} autoFocus disabled={saving} value={editorItem.name} onChange={(event) => updateField("name", event.target.value)} /></label>
                   <AddressFields id="new-device-address" value={editorItem.address} disabled={saving} onChange={(value) => updateField("address", value)} />
@@ -252,7 +274,14 @@ export function InventoryView({
                   </div>
                 </div>
               </> : null}
-              {creationStep === 2 ? <>
+              {creationStep === 2 && institutionMode ? <>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 2 of 3")}</span><h3>{t("Set display options")}</h3><p>{t("New screens are reserved for your institution. No pricing or booking dates apply.")}</p></div>
+                {editorItem.deliveryMode === "digital" ? <div className="form-grid compact">
+                  <EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} />
+                  <EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} />
+                </div> : <div className="decision-banner"><strong>{t("No display options for a physical billboard")}</strong><span>{t("Continue to review the screen.")}</span></div>}
+              </> : null}
+              {creationStep === 2 && !institutionMode ? <>
                 <div className="device-stage-heading"><span className="eyebrow">{t("Step 2 of 3")}</span><h3>{t("Set price and availability")}</h3><p>{t("Use the first and last date buyers can request this device.")}</p></div>
                 <div className="form-grid compact">
                   <EditorInput label="Daily rate" type="number" value={editorItem.price} disabled={saving} onChange={(value) => updateField("price", Number(value))} />
@@ -268,7 +297,15 @@ export function InventoryView({
                 </div>
               </> : null}
               {creationStep === 3 ? <>
-                <div className="device-stage-heading"><span className="eyebrow">{t("Step 3 of 3")}</span><h3>{t("Review the device")}</h3><p>{t(approvalRequired ? "Submitting sends this device to an administrator for approval." : "Creating publishes this device to your inventory.")}</p></div>
+                <div className="device-stage-heading"><span className="eyebrow">{t("Step 3 of 3")}</span><h3>{t(institutionMode ? "Review the screen" : "Review the device")}</h3><p>{t(institutionMode ? "Creating adds this screen to your institution fleet." : approvalRequired ? "Submitting sends this device to an administrator for approval." : "Creating publishes this device to your inventory.")}</p></div>
+                {institutionMode ? <>
+                  <dl className="device-review-list">
+                    <div><dt>{t("Screen")}</dt><dd><strong>{editorItem.name}</strong><span>{editorItem.address}</span></dd></div>
+                    <div><dt>{t("Type")}</dt><dd>{t(editorItem.deliveryMode === "static" ? "Physical billboard" : "Digital screen")}</dd></div>
+                    <div><dt>{t("Screen use")}</dt><dd>{t("Institution use only")}</dd></div>
+                  </dl>
+                  <div className="decision-banner"><strong>{t("Reserved for your institution")}</strong><span>{t("You can open this screen to private-sector advertising later from the Command centre.")}</span></div>
+                </> : <>
                 <dl className="device-review-list">
                   <div><dt>{t("Device")}</dt><dd><strong>{editorItem.name}</strong><span>{editorItem.address}</span></dd></div>
                   <div><dt>{t("Type")}</dt><dd>{t(editorItem.deliveryMode === "static" ? "Physical billboard" : "Digital screen")}</dd></div>
@@ -276,30 +313,36 @@ export function InventoryView({
                   <div><dt>{t("Available")}</dt><dd>{editorItem.availableFrom} {t("to")} {editorItem.availableTo}</dd></div>
                 </dl>
                 <div className="decision-banner"><strong>{t("You can add more details after creation")}</strong><span>{t("Audience data, tags, display settings, and media remain editable from the device record.")}</span></div>
+                </>}
               </> : null}
             </div>
           </> : <>
-          {isStaticInventory(editorItem) ? <div className={`decision-banner ${inventoryAvailabilityLabel(editorItem) === "Available" ? "good" : "bad"}`}>
+          {isStaticInventory(editorItem) && showCommercialFields ? <div className={`decision-banner ${inventoryAvailabilityLabel(editorItem) === "Available" ? "good" : "bad"}`}>
             <strong>{t("Physical billboard status")}: {t(inventoryAvailabilityLabel(editorItem))}</strong>
             <span>{t("This status is calculated from the availability dates below.")}</span>
           </div> : null}
           <div className="form-grid compact">
             <EditorInput label="Name" value={editorItem.name} disabled={!canManage || saving} onChange={(value) => updateField("name", value)} />
-            <EditorInput label="Operator" value={editorItem.operator} disabled={!canManage || saving} onChange={(value) => updateField("operator", value)} />
+            {institutionMode ? null : <EditorInput label="Operator" value={editorItem.operator} disabled={!canManage || saving} onChange={(value) => updateField("operator", value)} />}
             <AddressFields value={editorItem.address} disabled={!canManage || saving} onChange={(value) => updateField("address", value)} />
             <label>{t("Format")}<select className="select" disabled={!canManage || saving} value={editorItem.format} onChange={(event) => updateField("format", event.target.value)}>{(Object.keys(formats) as FormatKey[]).map((key) => <option key={key} value={key}>{t(formats[key].label)}</option>)}</select></label>
             <label>{t("Delivery mode")}<select className="select" disabled={!canManage || saving} value={editorItem.deliveryMode ?? "unknown"} onChange={(event) => updateField("deliveryMode", event.target.value)}><option value="digital">{t("Digital")}</option><option value="static">{t("Static")}</option><option value="unknown">{t("Needs classification")}</option></select></label>
+            {showCommercialFields ? <>
             <EditorInput label="Product type" value={editorItem.productType ?? editorItem.format} disabled={!canManage || saving} onChange={(value) => updateField("productType", value)} />
             <EditorInput label="Production lead time (days)" type="number" value={editorItem.productionLeadDays ?? 0} disabled={!canManage || saving} onChange={(value) => updateField("productionLeadDays", Math.max(0, Number(value)))} />
             <EditorInput label="Installation lead time (days)" type="number" value={editorItem.installationLeadDays ?? 0} disabled={!canManage || saving} onChange={(value) => updateField("installationLeadDays", Math.max(0, Number(value)))} />
-            {editorItem.deliveryMode === "static" && !isCreating ? <a className="secondary-button" href={`/api/inventory/${editorItem.id}/specifications`} target="_blank" rel="noreferrer">{t("Download production specifications")}</a> : null}
+            </> : null}
+            {editorItem.deliveryMode === "static" && !isCreating && showCommercialFields ? <a className="secondary-button" href={`/api/inventory/${editorItem.id}/specifications`} target="_blank" rel="noreferrer">{t("Download production specifications")}</a> : null}
             <label>{t("Display template")}<select className="select" disabled={!canManage || saving} value={editorItem.displayTemplate ?? "fullscreen"} onChange={(event) => updateField("displayTemplate", event.target.value)}>{deviceTemplates.map((template) => <option key={template.id} value={template.id}>{t(template.label)}</option>)}</select></label>
             <label>{t("Device display language")}<select aria-describedby="device-display-language-help" aria-label={t("Device display language")} className="select" disabled={!canManage || saving} value={editorItem.displayLanguage ?? "en"} onChange={(event) => updateField("displayLanguage", event.target.value)}>{locales.map((option) => <option key={option} value={option}>{localeNames[option]}</option>)}</select><small id="device-display-language-help">{t("Controls only the public device display. Website language stays unchanged.")}</small></label>
-            <label className="check-row"><input type="checkbox" checked={editorItem.commentsEnabled !== false} disabled={!canManage || saving} onChange={(event) => updateField("commentsEnabled", event.target.checked)} />{t("Show visitor comments on the map place panel")}</label>
+            {showCommercialFields ? <label className="check-row"><input type="checkbox" checked={editorItem.commentsEnabled !== false} disabled={!canManage || saving} onChange={(event) => updateField("commentsEnabled", event.target.checked)} />{t("Show visitor comments on the map place panel")}</label> : null}
             <div className="inventory-location-picker">
               <span className="field-label">{t("Device location")}</span>
               <PreciseLocationPicker point={{ x: editorItem.x, y: editorItem.y }} onChange={(point) => { updateField("x", roundCoordinate(point.x)); updateField("y", roundCoordinate(point.y)); }} />
             </div>
+            {editorItem.deliveryMode === "digital" && !showCommercialFields ? <><EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={!canManage || saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} /><EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={!canManage || saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} /></> : null}
+            {showCommercialFields ? <>
+            {institutionMode ? <div className="advertising-fields-heading"><span className="eyebrow">{t("Advertising details")}</span><small>{t("Shown because this screen is open to private-sector advertising.")}</small></div> : null}
             <EditorInput label="Daily rate" type="number" value={editorItem.price} disabled={!canManage || saving} onChange={(value) => updateField("price", Number(value))} />
             <EditorInput label="Impressions" type="number" value={editorItem.impressions} disabled={!canManage || saving} onChange={(value) => updateField("impressions", Number(value))} />
             <EditorInput label="Traffic" type="number" value={editorItem.traffic} disabled={!canManage || saving} onChange={(value) => updateField("traffic", Number(value))} />
@@ -310,6 +353,7 @@ export function InventoryView({
             {editorItem.deliveryMode === "digital" ? <><EditorInput label="Image loop interval (seconds)" type="number" value={editorItem.imageInterval} disabled={!canManage || saving} onChange={(value) => updateField("imageInterval", clampImageInterval(Number(value)))} /><EditorInput label="Max loop capacity (seconds)" type="number" value={editorItem.maxLoopSeconds} disabled={!canManage || saving} onChange={(value) => updateField("maxLoopSeconds", clampLoopCapacity(Number(value)))} /></> : null}
             <EditorInput label="Availability start" type="date" value={editorItem.availableFrom} disabled={!canManage || saving} onChange={(value) => updateField("availableFrom", value)} />
             <EditorInput label="Availability end" type="date" value={editorItem.availableTo} disabled={!canManage || saving} onChange={(value) => updateField("availableTo", value)} />
+            </> : null}
           </div>
           </>}
           {saveError ? <span className="form-error">{t(saveError)}</span> : null}
@@ -317,7 +361,7 @@ export function InventoryView({
             <button className="secondary-button" type="button" disabled={saving} onClick={() => { setFormItem({ ...newItem }); setIsCreating(false); setCreationStep(1); setSaveError(""); }}>{t("Cancel")}</button>
             <span />
             {creationStep > 1 ? <button className="secondary-button" type="button" disabled={saving} onClick={() => moveCreationStep(creationStep - 1)}>{t("Back")}</button> : null}
-            <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t(approvalRequired ? "Submitting..." : "Creating...")}</span> : t(creationStep < 3 ? "Continue" : approvalRequired ? "Submit device for approval" : "Create device")}</button>
+            <button className={`primary-button${justSaved ? " is-success-pulse" : ""}`} type="submit" disabled={saving}>{saving ? <span className="inline-pending"><span className="async-spinner" />{t(approvalRequired ? "Submitting..." : "Creating...")}</span> : t(creationStep < 3 ? "Continue" : approvalRequired ? "Submit device for approval" : institutionMode ? "Create screen" : "Create device")}</button>
           </div> : null}
         </form>
       </div>
@@ -483,6 +527,25 @@ export function CalendarView({ inventory, bookings }: { inventory: InventoryItem
   );
 }
 
+// Read-only screen use in the institution screen record. The choice itself is
+// made in the Command centre, where its consequences are explained.
+function ScreenUseNote({ item }: { item: InventoryItem }) {
+  const { t } = useI18n();
+  const advertising = screenUseOf(item) === "advertising";
+  return (
+    <div className={`decision-banner screen-use-note${advertising ? " is-advertising" : ""}`} role="note">
+      <strong>{t(advertising ? "Open to private-sector advertising" : "Institution use only")}</strong>
+      <span>{t(advertising ? "Advertisers can book this screen. Its rate and audience details are below. Change screen use in the Command centre." : "This screen shows only your institution's content. No pricing, bookings, or advertiser content apply. Change screen use in the Command centre.")}</span>
+    </div>
+  );
+}
+
+/**
+ * `content` is the institution Approvals view: delegated operator uploads only.
+ * `advertising` is the advertiser booking review inside the Advertising area.
+ */
+export type ApprovalsMode = "all" | "content" | "advertising";
+
 export function ApprovalsView({
   bookings,
   inventory,
@@ -493,6 +556,7 @@ export function ApprovalsView({
   hasConflict,
   updateBooking,
   updateMediaApproval,
+  mode = "all",
 }: {
   bookings: Booking[];
   inventory: InventoryItem[];
@@ -503,14 +567,17 @@ export function ApprovalsView({
   hasConflict: (inventoryId: string, start: string, end: string, excludeId?: string) => boolean;
   updateBooking: (id: string, updates: Partial<Booking>) => Promise<boolean>;
   updateMediaApproval: (id: string, approvalStatus: Extract<MediaResource["approvalStatus"], "approved" | "rejected">) => Promise<boolean>;
+  mode?: ApprovalsMode;
 }) {
   const { formatDate, t } = useI18n();
-  const pending = bookings.filter((booking) => ["pending approval", "creative review"].includes(booking.status));
-  const pendingDeviceMedia = canReviewDeviceContent ? mediaResources.filter((resource) => resource.approvalStatus === "pending review") : [];
+  const pending = mode === "content" ? [] : bookings.filter((booking) => ["pending approval", "creative review"].includes(booking.status));
+  const pendingDeviceMedia = canReviewDeviceContent && mode !== "advertising" ? mediaResources.filter((resource) => resource.approvalStatus === "pending review") : [];
+  const heading = mode === "content" ? { eyebrow: "Delegated operator content", title: "Content approvals" } : mode === "advertising" ? { eyebrow: "Private-sector advertising", title: "Advertiser booking review" } : { eyebrow: "Operator workflow", title: "Approvals" };
+  const emptyCopy = mode === "content" ? "Uploads from your department editors wait here. Your own uploads publish directly." : mode === "advertising" ? "Advertiser bookings on your opened screens wait here for review." : "Approved or rejected campaigns and delegated device content move out of this queue.";
   return (
     <section className="grid approvals-grid">
       <div className="panel span-2">
-        <PanelHeading eyebrow="Operator workflow" title="Approvals" />
+        <PanelHeading eyebrow={heading.eyebrow} title={heading.title} />
         <div className="approval-list">
           {pending.length || pendingDeviceMedia.length ? <>
           {pending.map((booking) => {
@@ -579,12 +646,12 @@ export function ApprovalsView({
           </> : (
             <div className="empty-state">
               <strong>{t("No approvals waiting")}</strong>
-              <span>{t("Approved or rejected campaigns and delegated device content move out of this queue.")}</span>
+              <span>{t(emptyCopy)}</span>
             </div>
           )}
         </div>
       </div>
-      <div className="panel span-2">
+      {mode === "content" ? null : <div className="panel span-2">
         <PanelHeading eyebrow="Operator audit trail" title="Approval history" />
         <div className="approval-history">
           {approvalHistory.length ? approvalHistory.map((event) => (
@@ -598,8 +665,8 @@ export function ApprovalsView({
             <div className="empty-state"><strong>{t("No approval history yet")}</strong><span>{t("Approved and rejected campaigns will appear here for tracking.")}</span></div>
           )}
         </div>
-      </div>
-      <div className="panel"><PanelHeading eyebrow="Automation" title="Controls" /><div className="automation-list"><div><strong>{t("Capacity prevention")}</strong><span>{t("Blocks reservations only when overlapping loop seconds exceed the device maximum.")}</span></div><div><strong>{t("Creative gate")}</strong><span>{t("Requires approved dimensions, safe zone, file type, and distortion checks.")}</span></div><div><strong>{t("Billing state")}</strong><span>{t("Creates invoice-ready spend and revenue split records.")}</span></div></div></div>
+      </div>}
+      {mode === "content" ? null : <div className="panel"><PanelHeading eyebrow="Automation" title="Controls" /><div className="automation-list"><div><strong>{t("Capacity prevention")}</strong><span>{t("Blocks reservations only when overlapping loop seconds exceed the device maximum.")}</span></div><div><strong>{t("Creative gate")}</strong><span>{t("Requires approved dimensions, safe zone, file type, and distortion checks.")}</span></div><div><strong>{t("Billing state")}</strong><span>{t("Creates invoice-ready spend and revenue split records.")}</span></div></div></div>}
     </section>
   );
 }
