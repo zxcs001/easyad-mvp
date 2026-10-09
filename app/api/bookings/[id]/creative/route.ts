@@ -9,6 +9,7 @@ import { isStaticInventory } from "../../../../lib/inventory-delivery";
 import { creativeDimensions, isCreativeSubmissionAllowed, truncateFileName, validateCreative } from "../../../../utils";
 import { defaultCreativeHtml } from "../../../../creative-templates";
 import { renderCreativeDocument, sanitizeCreativeHtml } from "../../../../lib/creative-template";
+import { ResponseLinkError, responseQrSvg, saveResponseLink, shortUrlFor } from "../../../../lib/responses";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -75,8 +76,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
   let templateDocument: string | null = null;
   if (!upload) {
     try {
-      templateDocument = renderCreativeDocument(template, sanitizeCreativeHtml(body.html === undefined ? defaultCreativeHtml[template] : body.html));
+      const sanitizedHtml = sanitizeCreativeHtml(body.html === undefined ? defaultCreativeHtml[template] : body.html);
+      // An optional QR code: the booking's short link goes on the ad, so scans
+      // count in the advertiser's results. The code stays the same on resubmission.
+      let qrSvg: string | undefined;
+      if (typeof body.responseUrl === "string" && body.responseUrl.trim()) {
+        const code = await saveResponseLink(booking.id, user.id, { destinationUrl: body.responseUrl, onAd: true });
+        qrSvg = await responseQrSvg(shortUrlFor(code, process.env.APP_ORIGIN || request.nextUrl.origin));
+      }
+      templateDocument = renderCreativeDocument(template, sanitizedHtml, { qrSvg });
     } catch (error) {
+      if (error instanceof ResponseLinkError) return NextResponse.json({ error: error.message }, { status: error.status });
       return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid template HTML" }, { status: 422 });
     }
   }

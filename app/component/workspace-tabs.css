@@ -1,0 +1,64 @@
+/* Section tabs on a workspace page. The selected tab is a raised white chip
+   with an edge and heavier text, so selection never rests on colour alone. */
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--state-idle-surface);
+}
+
+.workspace-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #0000;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 560;
+}
+
+.workspace-tabs button:hover:not(.active) {
+  color: var(--ink);
+}
+
+.workspace-tabs button.active {
+  border-color: var(--line-strong);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+.workspace-tabs button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.workspace-tab-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--state-idle-surface);
+  color: var(--ink);
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.workspace-tabs button.active .workspace-tab-badge {
+  background: var(--soft-green);
+  color: var(--green-dark);
+}
+
+@media (forced-colors: active) {
+  .workspace-tabs button.active {
+    border: 2px solid Highlight;
+  }
+}

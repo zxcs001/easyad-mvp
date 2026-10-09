@@ -21,7 +21,8 @@ export type View =
   | "accounts"
   | "reports"
   | "billing"
-  | "advertising";
+  | "advertising"
+  | "fleet";
 
 export type DisplayTemplate = "fullscreen" | "weather" | "public-info" | "transit" | "community";
 
@@ -137,6 +138,9 @@ export type DeviceAlert = {
   expiresAt: string;
   endedAt: string | null;
   image?: { url: string; mimeType: string; originalName: string; sizeBytes: number } | null;
+  /** "alert-ready" when relayed from the official NAAD System feed. */
+  source?: "institution" | "alert-ready";
+  officialAlertKey?: string | null;
 };
 
 export type Booking = {
@@ -147,6 +151,8 @@ export type Booking = {
   start: string;
   end: string;
   adSlots: number;
+  /** Time-of-day slots in Toronto time. Absent or empty means all day. */
+  dayparts?: import("./lib/booking-schedule").DaypartId[];
   creativeStatus: "not submitted" | "approved" | "pending review" | "needs changes";
   status: "pending approval" | "creative review" | "approved" | "scheduled" | "live" | "completed" | "rejected" | "cancelled";
   spend: number;
@@ -219,6 +225,7 @@ export type InventoryAdvertiserResource = Creative & {
   start: string;
   end: string;
   bookingStatus: Booking["status"];
+  dayparts?: Booking["dayparts"];
 };
 
 export const formats = {

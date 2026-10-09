@@ -17,6 +17,7 @@ import { localeNames, locales } from "../i18n/config";
 import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery";
 import { inventoryAvailabilityLabel, isValidAvailabilityWindow } from "../lib/inventory-availability";
 import { screenUseOf } from "../lib/screen-use-policy";
+import { daypartSummary } from "./daypart-summary";
 
 export function InventoryView({
   inventory,
@@ -592,6 +593,7 @@ export function ApprovalsView({
                   <span className="eyebrow">{booking.advertiser}</span>
                   <strong>{booking.campaign}</strong>
                   <small>{item?.name ?? booking.inventoryId} - {booking.start} {t("to")} {booking.end}</small>
+                  {booking.dayparts?.length ? <small>{t("Time of day: {slots} (Toronto time)", { slots: daypartSummary(booking.dayparts, t) })}</small> : null}
                   <small>{t(booking.adSlots === 1 ? "{count} ad slot reserved for this device loop" : "{count} ad slots reserved for this device loop", { count: booking.adSlots })}</small>
                   <small>{creative ? t("Creative: {source} {width}x{height} {type}", { source: creative.source === "upload" ? creative.originalName ?? t("Uploaded media") : t(capitalize(creative.template)), width: creative.width, height: creative.height, type: creative.fileType.toUpperCase() }) : t("Creative: not submitted yet")}</small>
                   {creative?.publicUrl ? <small><a href={creative.publicUrl} target="_blank" rel="noreferrer">{t(creative.source === "template" ? "Open HTML template" : "Open uploaded media")}</a></small> : null}

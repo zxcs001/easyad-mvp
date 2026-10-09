@@ -150,7 +150,7 @@ function EmergencyAlertScreen({ alert }: { alert: DeviceAlert }) {
   useEffect(() => setPhotoFailed(false), [alert.image?.url]);
   return (
     <section className={`emergency-screen emergency-${alert.alertType}`} role="alert" aria-label={`${typeLabel}: ${alert.title}`}>
-      <header><span className="emergency-beacon" aria-hidden="true" /><strong>{t(typeLabel)}</strong><span>{t("Screen emergency override")}</span></header>
+      <header><span className="emergency-beacon" aria-hidden="true" /><strong>{t(typeLabel)}</strong><span>{t(alert.source === "alert-ready" ? "Official alert · Alert Ready" : "Screen emergency override")}</span></header>
       <div className={`emergency-body${alert.image ? " with-photo" : ""}`}>
       {alert.image ? <div className="emergency-photo">{photoFailed ? <p>{t("Photo unavailable. Emergency instructions remain active.")}</p> : <img data-emergency-photo src={alert.image.url} alt={t("Emergency photo: {title}", { title: alert.title })} onLoad={() => setPhotoFailed(false)} onError={() => setPhotoFailed(true)} />}</div> : null}
       <div className={`emergency-message${alert.title.length + alert.message.length > 400 ? " emergency-copy-dense" : ""}`}>

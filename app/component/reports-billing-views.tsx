@@ -6,6 +6,7 @@ import { deliveredImpressions, money, number, splitRevenue } from "../utils";
 import { BookingsTable, EmptyState, Metric, PanelHeading } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
+import ResponsesPanel from "./responses-panel";
 
 export function ReportsView({
   bookings,
@@ -80,6 +81,7 @@ export function ReportsView({
           />
         )}
       </div>
+      <ResponsesPanel bookings={bookings} inventory={inventory} canEdit={isAdvertiser} />
       {canRunDelivery ? (
       <div className="panel">
         <PanelHeading

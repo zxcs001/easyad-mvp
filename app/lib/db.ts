@@ -1,4 +1,5 @@
-import { allocation, checkDigitalCapacity, ScheduleError } from "./digital-schedule";
+import { allocation, checkDigitalCapacity, listDigitalCommitments, ScheduleError } from "./digital-schedule";
+import { addDays, parseDayparts } from "./booking-schedule";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -82,6 +83,7 @@ type BookingRow = {
   paid: boolean;
   pop: number;
   created_by: string | null;
+  dayparts?: string[] | null;
 };
 
 type ApprovalEventRow = {
@@ -127,6 +129,8 @@ type DeviceAlertRow = {
   expires_at: string;
   ended_at: string | null;
   image: DeviceAlert["image"];
+  source?: string | null;
+  official_alert_key?: string | null;
 };
 
 type TransactionRow = {
@@ -180,6 +184,7 @@ type InventoryAdvertiserResourceRow = CreativeRow & {
   start_date: string;
   end_date: string;
   booking_status: Booking["status"];
+  dayparts?: string[] | null;
 };
 
 type PublicMediaRow = {
@@ -300,7 +305,7 @@ export async function resetDatabaseForTests() {
   if (process.env.NODE_ENV !== "test") throw new Error("resetDatabaseForTests is only available during tests");
   await ensureSchema();
   await getPool().query(`
-    TRUNCATE fleet_audit, fleet_announcements, player_alert_state, player_pairing_limits, idempotency_records, notifications, activity_events, placement_issues, digital_delivery_events, proof_records, work_order_evidence,
+    TRUNCATE response_events, response_links, official_alert_matches, official_alerts, alert_ready_settings, alert_ready_feed, fleet_audit, fleet_announcements, player_alert_state, player_pairing_limits, idempotency_records, notifications, activity_events, placement_issues, digital_delivery_events, proof_records, work_order_evidence,
       installation_work_orders, production_jobs, creative_assignments, creative_reviews, creative_versions, creative_assets,
       design_requests, commercial_acceptances, quote_line_items, quotes, placements, campaigns, client_authorizations,
       brands, agency_clients, inventory_specifications, organization_memberships, inventory_comments, approval_events,
@@ -369,6 +374,20 @@ export async function createInventorySpecification(inventoryId: string, specific
 
 export async function listPublishedInventory() {
   return (await rows<InventoryRow>("SELECT * FROM inventory WHERE approval_status = 'approved' AND content_visibility='public' AND advertising_opt_in=TRUE ORDER BY id")).map(mapInventory);
+}
+
+// Loop time confirmed on a screen from `from` on, without advertiser names.
+// The booking calendar reads it; the capacity check reads the same rows.
+export async function listInventoryCommitments(inventoryId: string, from: string) {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    return (await listDigitalCommitments(client, inventoryId))
+      .filter((row) => row.end_date >= from)
+      .map((row) => ({ start: row.start_date, end: row.end_date, seconds: row.seconds, dayparts: row.dayparts }));
+  } finally {
+    client.release();
+  }
 }
 
 export async function getPublishedInventory(id: string, client?: PoolClient) {
@@ -448,13 +467,14 @@ export async function createBookingRecord(booking: Booking, userId: string) {
   try {
   await database.query("BEGIN");
   const unit=(await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE",[booking.inventoryId])).rows[0];
+  const dayparts = unit?.delivery_mode==="digital" ? bookingDayparts(booking.dayparts) : [];
   let snapshot = null;
-  if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)) { snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(booking.adSlots));await checkDigitalCapacity(database,booking.inventoryId,snapshot); }
+  if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)) { snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(booking.adSlots),dayparts);await checkDigitalCapacity(database,booking.inventoryId,snapshot); }
   const now = new Date().toISOString();
   await database.query(`
-    INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-  `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, clampAdSlots(booking.adSlots), booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, now, now]);
+    INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at, dayparts)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+  `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, clampAdSlots(booking.adSlots), booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, now, now, dayparts]);
   await database.query(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
     SELECT 'CMP-LEGACY-' || $1,'ORG-' || $2,$3,'Legacy booking compatibility',inventory.address,$4,$5,'upload',$6,$2,$7,$7 FROM inventory WHERE inventory.id=$8
     ON CONFLICT(id) DO NOTHING`, [booking.id,userId,booking.campaign,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "planning",now,booking.inventoryId]);
@@ -463,7 +483,7 @@ export async function createBookingRecord(booking: Booking, userId: string) {
     ON CONFLICT(id) DO NOTHING`, [booking.id,booking.start,booking.end,booking.status === "approved" ? "confirmed" : "requested",booking.spend,JSON.stringify({legacyBookingId:booking.id,amount:booking.spend,currency:"CAD",capturedAt:now}),now,booking.inventoryId]);
   if(snapshot){await database.query("UPDATE bookings SET schedule_snapshot=$2::jsonb WHERE id=$1",[booking.id,JSON.stringify(snapshot)]);await database.query("UPDATE placements SET schedule_snapshot=$2::jsonb WHERE id='PLC-LEGACY-' || $1",[booking.id,JSON.stringify(snapshot)]);}
   await database.query("COMMIT");
-  return { ...booking, adSlots: clampAdSlots(booking.adSlots), createdBy: userId };
+  return withDayparts({ ...booking, adSlots: clampAdSlots(booking.adSlots), createdBy: userId }, dayparts);
   } catch(error) { await database.query("ROLLBACK");throw error; } finally { database.release(); }
 }
 
@@ -479,12 +499,13 @@ export async function createBookingWithCreativeRecord(
   try {
     await database.query("BEGIN");
     const unit=(await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE",[booking.inventoryId])).rows[0];
+    const dayparts = unit?.delivery_mode==="digital" ? bookingDayparts(booking.dayparts) : [];
     let snapshot=null;
-    if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)){snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,adSlots);await checkDigitalCapacity(database,booking.inventoryId,snapshot);}
+    if(unit?.delivery_mode==="digital" && ["approved","scheduled","live"].includes(booking.status)){snapshot=allocation(booking.start,booking.end,unit.image_interval,unit.max_loop_seconds,adSlots,dayparts);await checkDigitalCapacity(database,booking.inventoryId,snapshot);}
     await database.query(`
-      INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-    `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, adSlots, booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, createdAt, createdAt]);
+      INSERT INTO bookings (id, advertiser, inventory_id, campaign, start_date, end_date, ad_slots, creative_status, status, spend, paid, pop, created_by, created_at, updated_at, dayparts)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `, [booking.id, booking.advertiser, booking.inventoryId, booking.campaign, booking.start, booking.end, adSlots, booking.creativeStatus, booking.status, booking.spend, booking.paid, booking.pop, userId, createdAt, createdAt, dayparts]);
     await database.query(`INSERT INTO campaigns (id,organization_id,name,objective,geography,start_date,end_date,creative_path,status,created_by,created_at,updated_at)
       SELECT 'CMP-LEGACY-' || $1,'ORG-' || $2,$3,'Legacy booking compatibility',inventory.address,$4,$5,'upload','planning',$2,$6,$6 FROM inventory WHERE inventory.id=$7
       ON CONFLICT(id) DO NOTHING`, [booking.id, userId, booking.campaign, booking.start, booking.end, createdAt, booking.inventoryId]);
@@ -499,7 +520,7 @@ export async function createBookingWithCreativeRecord(
     await database.query("COMMIT");
     const { storagePath: _storagePath, ...storedCreative } = creative;
     return {
-      booking: { ...booking, adSlots, createdBy: userId },
+      booking: withDayparts({ ...booking, adSlots, createdBy: userId }, dayparts),
       creative: { ...storedCreative, createdAt } satisfies Creative,
     };
   } catch (error) {
@@ -526,12 +547,13 @@ export async function updateBookingRecord(id: string, updates: Partial<Booking>)
   if (updates.status === "cancelled" && (current.paid || !["pending approval", "creative review"].includes(current.status))) {
     throw new ScheduleError("Only unpaid pending campaigns can be cancelled.");
   }
-  const next = { ...current, ...updates };
+  // Time-of-day slots belong to the request. Approval never changes them.
+  const next: Booking = { ...current, ...updates, dayparts: current.dayparts };
   const unit = (await database.query<{image_interval:number;max_loop_seconds:number;delivery_mode:string}>("SELECT image_interval,max_loop_seconds,delivery_mode FROM inventory WHERE id=$1 FOR UPDATE", [next.inventoryId])).rows[0];
   if (unit?.delivery_mode === "digital" && ["approved", "scheduled", "live"].includes(next.status)) {
     const existing = locked.rows[0].schedule_snapshot;
     if(existing && (next.start!==existing.startDate || next.end!==existing.endDate || clampAdSlots(next.adSlots)!==existing.slots || next.inventoryId!==current.inventoryId))throw new ScheduleError("Confirmed digital allocation cannot be edited");
-    const snapshot = existing ?? allocation(next.start,next.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(next.adSlots));
+    const snapshot = existing ?? allocation(next.start,next.end,unit.image_interval,unit.max_loop_seconds,clampAdSlots(next.adSlots),bookingDayparts(next.dayparts));
     await checkDigitalCapacity(database,next.inventoryId,snapshot,[id]);
     await database.query("UPDATE bookings SET schedule_snapshot=$2::jsonb WHERE id=$1",[id,JSON.stringify(snapshot)]);
   }
@@ -545,7 +567,7 @@ export async function updateBookingRecord(id: string, updates: Partial<Booking>)
   await database.query("UPDATE placements SET inventory_id=$1,start_date=$2,end_date=$3,status=$4,estimated_media_cost=$5,version=version+1,updated_at=$6 WHERE id='PLC-LEGACY-' || $7", [next.inventoryId,next.start,next.end,compatibilityStatus,next.spend,new Date().toISOString(),id]);
   await database.query("UPDATE placements SET schedule_snapshot=(SELECT schedule_snapshot FROM bookings WHERE id=$1) WHERE id='PLC-LEGACY-' || $1",[id]);
   await database.query("COMMIT");
-  return next;
+  return withDayparts(next, current.dayparts);
   } catch(error) { await database.query("ROLLBACK"); throw error; } finally { database.release(); }
 }
 
@@ -628,7 +650,7 @@ export async function recomputeBookingPop(bookingId: string) {
   if (!booking || !inventory) return null;
   const logs = await listPopLogs(bookingId);
   const verifiedPlays = logs.filter((log) => log.status === "verified").reduce((sum, log) => sum + log.plays, 0);
-  const pop = Math.min(100, Math.round((verifiedPlays / Math.max(1, expectedPlays(booking.start, booking.end))) * 100));
+  const pop = Math.min(100, Math.round((verifiedPlays / Math.max(1, expectedPlays(booking.start, booking.end, booking.dayparts ?? []))) * 100));
   await exec("UPDATE bookings SET pop = $1, updated_at = $2 WHERE id = $3", [pop, new Date().toISOString(), bookingId]);
   return pop;
 }
@@ -790,6 +812,9 @@ export async function getLegacyTemplateCreative(id: string) {
   `, [id]);
 }
 
+// A time-of-day booking runs on Toronto dates. asOf is a UTC date, which is
+// already tomorrow after 8 p.m. in Toronto, so those bookings are read from one
+// day earlier and the caller applies the exact local rule.
 export async function listInventoryAdvertiserResources(inventoryId: string, asOf = new Date().toISOString().slice(0, 10), client?: PoolClient, through = asOf) {
   const result = await rows<InventoryAdvertiserResourceRow>(`
     SELECT
@@ -798,7 +823,8 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
       bookings.campaign,
       bookings.start_date,
       bookings.end_date,
-      bookings.status AS booking_status
+      bookings.status AS booking_status,
+      bookings.dayparts
     FROM creatives
     JOIN bookings ON bookings.id = creatives.booking_id
     WHERE bookings.inventory_id = $1
@@ -807,9 +833,9 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
       AND (creatives.public_url IS NOT NULL OR creatives.source = 'template')
       AND bookings.status IN ('approved', 'scheduled', 'live')
       AND bookings.start_date <= $3
-      AND bookings.end_date >= $2
+      AND (bookings.end_date >= $2 OR (cardinality(bookings.dayparts) > 0 AND bookings.end_date >= $4))
     ORDER BY creatives.created_at DESC
-  `, [inventoryId, asOf, through], client);
+  `, [inventoryId, asOf, through, addDays(asOf, -1)], client);
 
   return result.map((entry) => ({
     ...mapCreative(entry),
@@ -818,6 +844,7 @@ export async function listInventoryAdvertiserResources(inventoryId: string, asOf
     start: entry.start_date,
     end: entry.end_date,
     bookingStatus: entry.booking_status,
+    ...(bookingDayparts(entry.dayparts).length ? { dayparts: bookingDayparts(entry.dayparts) } : {}),
   } satisfies InventoryAdvertiserResource));
 }
 
@@ -1231,7 +1258,18 @@ function mapBooking(entry: BookingRow): Booking {
     paid: Boolean(entry.paid),
     pop: Number(entry.pop),
     createdBy: entry.created_by ?? undefined,
+    // Only a booking with chosen slots carries the field. All day is the default.
+    ...(bookingDayparts(entry.dayparts).length ? { dayparts: bookingDayparts(entry.dayparts) } : {}),
   };
+}
+
+function withDayparts(booking: Booking, dayparts: Booking["dayparts"] = []): Booking {
+  const { dayparts: _requested, ...rest } = booking;
+  return dayparts.length ? { ...rest, dayparts } : rest;
+}
+
+function bookingDayparts(value: unknown) {
+  return parseDayparts(value) ?? [];
 }
 
 function mapApprovalEvent(entry: ApprovalEventRow): ApprovalEvent {
@@ -1281,6 +1319,8 @@ function mapDeviceAlert(entry: DeviceAlertRow): DeviceAlert {
     expiresAt: stringifyDate(entry.expires_at),
     endedAt: entry.ended_at ? stringifyDate(entry.ended_at) : null,
     image: entry.image ?? null,
+    // Only a relayed official alert carries the fields; institution overrides stay as they were.
+    ...(entry.source === "alert-ready" ? { source: "alert-ready" as const, officialAlertKey: entry.official_alert_key ?? null } : {}),
   };
 }
 

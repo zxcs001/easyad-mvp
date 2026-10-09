@@ -37,12 +37,22 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export function renderCreativeDocument(topic: CreativeTemplateTopic, sanitizedHtml: string) {
+/**
+ * The stored ad document. `qrSvg` must come from the server's own QR
+ * generator (app/lib/responses.ts), never from the person's HTML: it is the
+ * one piece of markup that does not pass through the sanitizer.
+ */
+export function renderCreativeDocument(topic: CreativeTemplateTopic, sanitizedHtml: string, options: { qrSvg?: string } = {}) {
   if (!isCreativeTemplateTopic(topic)) throw new Error("Unknown template topic.");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>${templateCss}</style></head><body class="${topic}"><main class="artwork">${sanitizedHtml}</main></body></html>`;
+  const qr = options.qrSvg && /^<svg[\s\S]*<\/svg>\s*$/.test(options.qrSvg.trim()) && !/<script|on\w+=|href=/i.test(options.qrSvg)
+    ? `<aside class="ad-qr" aria-label="QR code">${options.qrSvg.trim()}<span>SCAN ME</span></aside>` : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>${templateCss}</style></head><body class="${topic}"><main class="artwork">${sanitizedHtml}${qr}</main></body></html>`;
 }
 
 const templateCss = `
+  .ad-qr{position:absolute;z-index:9;right:3%;bottom:12%;width:13.5vw;min-width:64px;padding:.6vw .6vw .3vw;background:#fff;border-radius:.6vw;box-shadow:0 .3vw 1.2vw rgba(0,0,0,.25);text-align:center}
+  .ad-qr svg{display:block;width:100%;height:auto}
+  .ad-qr span{display:block;margin-top:.2vw;color:#111;font:900 clamp(6px,1vw,20px)/1.2 Arial,Helvetica,sans-serif;letter-spacing:.12em}
   *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}
   body{font-family:Arial,Helvetica,sans-serif;color:#17202a}
   .artwork{position:relative;width:100%;height:100%;overflow:hidden}

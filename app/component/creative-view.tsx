@@ -4,13 +4,15 @@ import "./creative-view.css";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Booking, Creative, InventoryItem, formats } from "../data";
 import type { CreativeDraft } from "../types";
-import { creativeTemplateExamples, creativeTemplateTopics, defaultCreativeHtml, type CreativeTemplateTopic } from "../creative-templates";
+import { creativeTemplateExamples, creativeTemplateTopics, type CreativeTemplateTopic } from "../creative-templates";
 import { capitalize, creativeDraftForFormat, creativeHref, isCreativeSubmissionAllowed, isPlainLeftClick, validateCreative } from "../utils";
 import { BookingsTable, EmptyState, PanelHeading, Range } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 import LocalDateTime from "./local-date-time";
 import { isStaticInventory } from "../lib/inventory-delivery";
+import { effectiveTemplateHtml } from "../quick-ad";
+import { GlanceTest, QuickAdEditor } from "./quick-ad-editor";
 
 export default function CreativeView({
   draft: inputDraft,
@@ -49,8 +51,11 @@ export default function CreativeView({
   const requiresUpload = selectedInventory ? isStaticInventory(selectedInventory) : inputDraft.format === "static";
   const sourceMode = requiresUpload ? "upload" : preferredSource;
   const draft = selectedInventory ? creativeDraftForFormat(inputDraft, selectedInventory.format) : inputDraft;
-  const templateHtml = draft.htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template];
-  const previewKey = `${draft.template}\u0000${templateHtml}`;
+  const templateHtml = effectiveTemplateHtml(draft);
+  const handEdited = draft.htmlByTopic?.[draft.template] !== undefined;
+  const [htmlEditorOpen, setHtmlEditorOpen] = useState(handEdited);
+  const responseUrl = (draft.responseUrl ?? "").trim();
+  const previewKey = `${draft.template}\u0000${templateHtml}\u0000${responseUrl}`;
   const [htmlPreview, setHtmlPreview] = useState<{ key: string; document: string } | null>(null);
   const [examplePreviews, setExamplePreviews] = useState<Partial<Record<CreativeTemplateTopic, string>>>({});
   const [htmlError, setHtmlError] = useState<string | null>(null);
@@ -61,7 +66,9 @@ export default function CreativeView({
   const allowedUploadTypes = requiresUpload ? ["png", "jpg", "pdf"] : ["png", "jpg", "gif", "mp4"];
   const detectedFileType = uploadFile ? fileTypeFromUpload(uploadFile) : null;
   const uploadFileType = detectedFileType && allowedUploadTypes.includes(detectedFileType) ? detectedFileType : null;
-  const validations = validateCreative(sourceMode === "template" ? { ...draft, fileType: "html", fileSize: 1 } : {
+  // A ready-made design is laid out inside the safe zone and never scaled, so
+  // those two checks are the format's own values, not slider input.
+  const validations = validateCreative(sourceMode === "template" ? { ...draft, fileType: "html", fileSize: 1, safeZone: Math.max(draft.safeZone, spec.safeZone), distortion: 0 } : {
     ...draft,
     fileType: uploadFileType ?? draft.fileType,
     fileSize: uploadFile ? Math.max(1, Math.ceil(uploadFile.size / 1048576)) : draft.fileSize,
@@ -130,7 +137,7 @@ export default function CreativeView({
         const response = await fetch("/api/creative/template-preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ template: draft.template, html: templateHtml }),
+          body: JSON.stringify({ template: draft.template, html: templateHtml, ...(responseUrl ? { responseUrl } : {}) }),
           signal: controller.signal,
         });
         const result = await response.json() as { document?: string; error?: string };
@@ -144,7 +151,7 @@ export default function CreativeView({
       }
     }, 250);
     return () => { controller.abort(); window.clearTimeout(timer); };
-  }, [draft.template, previewKey, sourceMode, templateHtml]);
+  }, [draft.template, previewKey, responseUrl, sourceMode, templateHtml]);
 
   useEffect(() => {
     if (sourceMode !== "template") return;
@@ -213,16 +220,30 @@ export default function CreativeView({
             <div className="creative-html-preview" style={{ aspectRatio: spec.ratio }}>
               {htmlPreview?.key === previewKey ? <iframe title={t("Template preview")} sandbox="" referrerPolicy="no-referrer" srcDoc={htmlPreview.document} /> : <span>{t("Preparing safe preview…")}</span>}
             </div>
-            <label className="creative-html-editor">{t("Template HTML")}
-              <textarea value={templateHtml} maxLength={16384} rows={20} spellCheck={false} onChange={(event) => {
-                const html = event.target.value;
-                setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: html } }));
-              }} />
+            <QuickAdEditor
+              topic={draft.template}
+              fields={draft.fieldsByTopic?.[draft.template]}
+              handEdited={handEdited}
+              onChange={(fields) => setDraft((current) => ({ ...current, fieldsByTopic: { ...current.fieldsByTopic, [current.template]: fields } }))}
+              onUseFields={() => setDraft((current) => ({ ...current, htmlByTopic: withoutTopic(current.htmlByTopic, current.template) }))}
+            />
+            <details className="creative-html-advanced" open={htmlEditorOpen || handEdited} onToggle={(event) => setHtmlEditorOpen(event.currentTarget.open)}>
+              <summary>{t("Edit the HTML instead (advanced)")}</summary>
+              <label className="creative-html-editor">{t("Template HTML")}
+                <textarea value={templateHtml} maxLength={16384} rows={20} spellCheck={false} onChange={(event) => {
+                  const html = event.target.value;
+                  setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: html } }));
+                }} />
+              </label>
+              <div className="creative-html-editor-foot">
+                <small>{t("Edit the words and layout tags. Scripts, links, images, and inline styles are removed for safety.")}</small>
+                <button type="button" onClick={() => setDraft((current) => ({ ...current, htmlByTopic: withoutTopic(current.htmlByTopic, current.template), fieldsByTopic: withoutTopic(current.fieldsByTopic, current.template) }))}>{t("Reset this topic")}</button>
+              </div>
+            </details>
+            <label className="creative-qr-field">{t("QR code on the ad (optional)")}
+              <input type="text" inputMode="url" autoComplete="url" placeholder="yourbusiness.ca/offer" maxLength={500} value={draft.responseUrl ?? ""} aria-describedby="creative-qr-help" onChange={(event) => setDraft((current) => ({ ...current, responseUrl: event.target.value }))} />
+              <small id="creative-qr-help">{t("People who scan it open this page, and every scan counts in your results. Leave it empty for no QR code.")}</small>
             </label>
-            <div className="creative-html-editor-foot">
-              <small>{t("Edit the words and layout tags. Scripts, links, images, and inline styles are removed for safety.")}</small>
-              <button type="button" onClick={() => setDraft((current) => ({ ...current, htmlByTopic: { ...current.htmlByTopic, [current.template]: defaultCreativeHtml[current.template] } }))}>{t("Reset this topic")}</button>
-            </div>
             {htmlError ? <p className="form-error" role="alert">{t(htmlError)}</p> : null}
           </>
         ) : (
@@ -273,9 +294,12 @@ export default function CreativeView({
             <label>{t("Height")}<input type="number" value={draft.height} readOnly /></label>
             <label>{t("File type")}<input value={sourceMode === "template" ? "HTML" : uploadFileType?.toUpperCase() ?? t(uploadFile ? "Unsupported file type" : "No file selected")} readOnly /></label>
             {sourceMode === "upload" ? <label>{t("File size")}<input value={uploadFile ? `${Math.max(1, Math.ceil(uploadFile.size / 1048576))} MB` : t("No file selected")} readOnly /></label> : null}
-            <Range label={t("Safe zone: {count}%", { count: draft.safeZone })} min={0} max={18} value={draft.safeZone} onChange={(safeZone) => setDraft((current) => ({ ...current, safeZone }))} />
-            <Range label={t("Distortion: {count}%", { count: draft.distortion })} min={0} max={12} value={draft.distortion} onChange={(distortion) => setDraft((current) => ({ ...current, distortion }))} />
+            {sourceMode === "upload" ? <>
+              <Range label={t("Safe zone: {count}%", { count: draft.safeZone })} min={0} max={18} value={draft.safeZone} onChange={(safeZone) => setDraft((current) => ({ ...current, safeZone }))} />
+              <Range label={t("Distortion: {count}%", { count: draft.distortion })} min={0} max={12} value={draft.distortion} onChange={(distortion) => setDraft((current) => ({ ...current, distortion }))} />
+            </> : null}
           </div>
+          {sourceMode === "template" && !handEdited ? <GlanceTest topic={draft.template} fields={draft.fieldsByTopic?.[draft.template]} /> : null}
           <div className="validation-list">
             {validations.map((check) => <div className={check.ok ? "pass" : "fail"} key={check.label}><strong>{t(check.label)}</strong><span>{t(check.message)}</span></div>)}
           </div>
@@ -304,6 +328,12 @@ export default function CreativeView({
       </div>
     </section>
   );
+}
+
+function withoutTopic<T>(record: Partial<Record<CreativeTemplateTopic, T>> | undefined, topic: CreativeTemplateTopic) {
+  if (!record || !(topic in record)) return record;
+  const { [topic]: _removed, ...rest } = record;
+  return rest;
 }
 
 function fileTypeFromUpload(file: File): Creative["fileType"] | null {

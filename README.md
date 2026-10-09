@@ -145,6 +145,16 @@ Authorized institutional staff can create time-limited AMBER, evacuation, or pub
 
 Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.
 
+### Alert Ready relay
+
+`FEATURE_ALERT_READY=true` relays official Alert Ready alerts (the NAAD System CAP-CP feed run by Pelmorex) to institution screens inside each alert's area. Run the listener as its own long-running process:
+
+```bash
+ALERT_READY_INGEST_TOKEN=<32+ random characters> APP_ORIGIN=https://your-public-domain.example node scripts/naad-listener.cjs
+```
+
+The same token goes in the web app's environment. Each institution chooses Off, Ask me first (default) or Show automatically on the Emergency updates page. Show automatically needs the Pelmorex signing certificate in `ALERT_READY_SIGNING_CERTS`; without it every alert waits for a person. The listener is not yet tested against the live feed: the release gates (Pelmorex terms, network access to TCP 8080, the certificate) are in [ADR 0010](docs/adr/0010-alert-ready-relay.md).
+
 ## Colour and Status Encoding
 
 The design system encodes status by visual weight, not by hue. A colour-vision deficiency removes a hue channel, but it never removes lightness. Each state is a surface-and-ink pair on a five-step severity ladder, and weight 4 is reserved for an active screen override.
@@ -209,7 +219,23 @@ The floating card sits inside `.detail-dock`, which uses `contain: size`. Keep i
 
 Known limit: public screens show "ON" instead of "Thunder Bay, ON". `deriveScreenCity` in [`app/component/device-templates.ts`](app/component/device-templates.ts) keeps only the last address part. The profile page, the public playback page and the Discover preview share it, so the fix is one line, but it changes what physical screens display.
 
+Results report responses as well as delivery: each booking can have a QR code and short link (`/go/{code}`), counted by EasyAD with no personal data, and a promo code whose use the advertiser reports. `/report/{bookingId}` is a printable one-page report. See [Results reporting](docs/RESULTS_REPORTING.md).
+
 The advertiser buying flow shows a three-step indicator in the top bar: Find screens, Book dates, Make an ad. Booking already takes the ad picture, so a person can buy screen time in two steps. Make an ad is a separate task for a campaign that is already booked, and it stays locked until one exists.
+
+### Booking schedule: quick dates, budget and time of day
+
+The Request dates step has one **When it runs** block. The helpers are pure functions in [`app/lib/booking-schedule.ts`](app/lib/booking-schedule.ts), and the fields are in [`app/component/booking-schedule-fields.tsx`](app/component/booking-schedule-fields.tsx).
+
+- **Quick lengths.** `1 week`, `2 weeks` and `4 weeks` set the end date from the start date. A changed start date keeps the run length.
+- **Availability calendar.** Five weeks of days: space open, few spots left, full and not available. Each state has a shape and a label as well as a colour. A click on a day moves the start there. The calendar reads `GET /api/inventory/{id}/availability`, which returns confirmed loop time with dates and slots only, and no advertiser names.
+- **Next open dates.** When the chosen dates are full or in the past, the form offers the nearest run of the same length that fits, with a **Use these dates** button.
+- **Start from a budget.** The person types a budget in CAD. The form sets the end date to the most whole days the budget pays for, and shows the total and what is left. A budget below one day blocks the request and says why.
+- **Time of day.** Digital screens only. Morning, Midday, Afternoon drive, Evening and Overnight, in Toronto time. A slot costs its share of the daily rate, and all five cost the daily rate. Each slot has its own loop capacity. The rule, the prices and the playback behaviour are in [ADR 0009](docs/adr/0009-time-of-day-booking.md).
+
+The booking API takes the slots as a `dayparts` form field (comma-separated, for example `morning,evening`). Run `npm run db:migrate` after deployment so the `bookings.dayparts` column exists.
+
+Make an ad opens a ready-made design on plain fields, not on HTML. [`app/quick-ad.ts`](app/quick-ad.ts) holds the fields of each design, the headline ideas, `composeQuickAdHtml` (fields to the design's markup, every value escaped) and the glance test. The default fields build exactly the HTML in `defaultCreativeHtml`, and a test holds that equal. The HTML editor is still there behind **Edit the HTML instead (advanced)**; hand-edited HTML wins over the fields until the person chooses **Use the fields again**. The server still sanitizes whatever HTML arrives.
 
 Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
 
@@ -262,4 +288,8 @@ Campaigns now expose quote cost lines, persisted artwork approvals and placement
 
 ## Institutional fleet pilot (P4)
 
-Enable `FEATURE_FLEET_OPERATIONS=true` with authenticated player control for the authorized pilot. Owners can group screens, schedule reusable announcements, assign department scope, set privacy and advertising policy, and inspect per-player alert reports. See [P4 verification and rollout gates](docs/INSTITUTIONAL_FLEET_BASELINE.md) and [fleet policy decisions](docs/adr/0006-institutional-fleet-policy.md). Institutional SSO/MFA provider selection is deferred until requirements are confirmed before broader rollout.
+Enable `FEATURE_FLEET_OPERATIONS=true` with authenticated player control for the authorized pilot. Owners can group screens, schedule reusable announcements, assign department scope, set privacy and advertising policy, and inspect per-player alert reports.
+
+These bulk tools have their own page, **Fleet tools** (`/government?view=fleet`, or `view=fleet` in the marketplace workspace for operators and Super Admin). The sidebar shows the entry only while the flag is on, and only to institution accounts, operators and Super Admin. Step 1 chooses the screens. Step 2 is a tab list with one task each: Screen policy (owner only), Announcements, Editor access (when the institution has operators), Alert delivery and Audit history. The tools used to sit under the Command centre, Screens and People and access pages, which made each of them several screens long.
+
+The Command centre keeps the map, the selected screen and the emergency override. The selected screen's content and its player connection share one tab list; `?panel=player` opens the Player connection tab, so a reload or a shared link keeps it. The screen list under the map scrolls inside the panel for a large fleet. See [P4 verification and rollout gates](docs/INSTITUTIONAL_FLEET_BASELINE.md) and [fleet policy decisions](docs/adr/0006-institutional-fleet-policy.md). Institutional SSO/MFA provider selection is deferred until requirements are confirmed before broader rollout.

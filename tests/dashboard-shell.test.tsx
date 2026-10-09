@@ -210,6 +210,23 @@ describe("dashboard shell", () => {
     expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
   });
 
+  test("fleet tools get one navigation entry after Emergency updates, and only when switched on", () => {
+    const { unmount } = render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" showFleetTools />);
+
+    const links = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(screen.getByRole("link", { name: "Fleet tools" })).toHaveAttribute("href", "/government?view=fleet");
+    expect(links.indexOf("Fleet tools")).toBe(links.indexOf("Emergency updates") + 1);
+    unmount();
+
+    render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" />);
+    expect(screen.queryByRole("link", { name: "Fleet tools" })).not.toBeInTheDocument();
+  });
+
+  test("an advertiser never sees fleet tools", () => {
+    render(<Sidebar role="advertiser" view="discover" setRole={vi.fn()} setView={vi.fn()} currentUser={{ ...adminUser, role: "advertiser" }} showFleetTools />);
+    expect(screen.queryByRole("link", { name: "Fleet tools" })).not.toBeInTheDocument();
+  });
+
   test("Super Admin keeps the marketplace link in the government shell", () => {
     render(<Sidebar role="admin" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={{ ...institutionUser, id: "USR-ADMIN", role: "admin" }} surface="government" />);
 

@@ -15,6 +15,7 @@ import {
   Gauge,
   Globe2,
   Images,
+  Layers,
   LayoutDashboard,
   LogOut,
   Map,
@@ -107,6 +108,7 @@ const viewTitles: Record<View, { title: string; eyebrow: string }> = {
   reports: { title: "Campaign analytics", eyebrow: "Performance" },
   billing: { title: "Payments and billing", eyebrow: "Finance" },
   advertising: { title: "Private-sector advertising", eyebrow: "Advertising" },
+  fleet: { title: "Fleet tools", eyebrow: "Many screens at once" },
 };
 
 // Institution and government titles name screen operations, not media sales.
@@ -118,6 +120,7 @@ const governmentViewTitles: Partial<Record<View, string>> = {
   approvals: "Content approvals",
   accounts: "People and access",
   advertising: "Private-sector advertising",
+  fleet: "Fleet tools",
 };
 
 // Plain-language titles for the advertiser only. A shop owner buying a week of
@@ -184,10 +187,18 @@ const governmentNav: NavItem[] = [
   { view: "accounts", label: "People and access", icon: Users, group: "Operations" },
 ];
 const governmentAdvertisingNav: NavItem = { view: "advertising", label: "Advertising", icon: Megaphone, group: "Insights" };
+// Bulk work across many screens (policy, announcements, editor access, alert
+// delivery, audit) has its own page. It was stacked under three other pages.
+const fleetToolsNav: NavItem = { view: "fleet", label: "Fleet tools", icon: Layers, group: "Operations" };
+
+function withFleetTools(items: NavItem[]) {
+  const after = items.findIndex((item) => item.view === "emergency");
+  return after < 0 ? [...items, fleetToolsNav] : [...items.slice(0, after + 1), fleetToolsNav, ...items.slice(after + 1)];
+}
 
 type AppSurface = "marketplace" | "government";
 
-export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed, navigationLocked = false, showAdvertising = false }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void; navigationLocked?: boolean; showAdvertising?: boolean }) {
+export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed, navigationLocked = false, showAdvertising = false, showFleetTools = false }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void; navigationLocked?: boolean; showAdvertising?: boolean; showFleetTools?: boolean }) {
   // At 900px and below the nav is a strip that scrolls sideways and loaded at
   // its start, so "Results" or "Invoices" could be the current page with no
   // visible "you are here". Bring the current item into view. "nearest" does
@@ -201,7 +212,8 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
   const displayRole = roleLabel(role);
   const userName = currentUser?.name ?? (role === "operator" ? "MetroScreens" : role === "institutional" ? "Civic Media Group" : role === "admin" ? "Platform Admin" : "Pulse Athletic");
   const isGovernment = surface === "government";
-  const navigation = isGovernment ? (showAdvertising || view === "advertising" ? [...governmentNav, governmentAdvertisingNav] : governmentNav) : roleNav[role];
+  const baseNavigation = isGovernment ? (showAdvertising || view === "advertising" ? [...governmentNav, governmentAdvertisingNav] : governmentNav) : roleNav[role];
+  const navigation = showFleetTools && role !== "advertiser" ? withFleetTools(baseNavigation) : baseNavigation;
   // Only Super Admin moves between the marketplace and the institution
   // workspace. An institution account has no marketplace to return to.
   const showMarketplaceLink = isGovernment && currentUser?.role === "admin";
@@ -274,7 +286,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
 // The Advertising view adds the commercial figures for the opened screens.
 function GovernmentMetrics({ view, inventory, bookings }: { view: View; inventory: InventoryItem[]; bookings: Booking[] }) {
   const { locale, t } = useI18n();
-  if (view === "network" || view === "emergency") return null;
+  if (view === "network" || view === "emergency" || view === "fleet") return null;
   const opened = advertisingScreens(inventory);
   if (view === "advertising") {
     const openedIds = new Set(opened.map((item) => item.id));
@@ -435,7 +447,7 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, surface 
       {campaignCreationLocked ? <p className="campaign-flow-lock">{t(view === "booking" ? "Finish creating this campaign, or cancel to return to screen selection." : "Submit your ad for review, or cancel this campaign to return to screen selection.")}</p> : null}
     </div>
   );
-  const metrics = isGovernment ? <GovernmentMetrics view={view} inventory={inventory} bookings={bookings} /> : view !== "network" && view !== "emergency" ? (
+  const metrics = isGovernment ? <GovernmentMetrics view={view} inventory={inventory} bookings={bookings} /> : view !== "network" && view !== "emergency" && view !== "fleet" ? (
     <div className="metrics" aria-label={t("Workspace summary")}>
       <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
       {/* Occupancy is a yield metric for the person selling the screen. It

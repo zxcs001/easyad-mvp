@@ -1,46 +1,16 @@
-/* Fleet operations panel. The markup is one flat run of headings, fields,
-   buttons and forms, so the layout is a wrapping flex row: every child takes a
-   full line except buttons, which sit side by side as a toolbar, and the
-   filter field, which shares its line with the selection buttons. */
+/* Fleet tools page. Step 1 is the screen selection panel; step 2 is a tab
+   list with one task panel. Inside a panel the forms are wrapping flex rows:
+   every child takes a full line except the action toolbar. */
 .fleet-operations {
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px 8px;
+  gap: 16px;
   min-width: 0;
-  margin-top: 20px;
   font-size: .82rem;
-  display: flex;
+  display: grid;
 }
 
-.fleet-operations > *,
-.fleet-operations form > * {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
-.fleet-operations > button,
-.fleet-operations form > button {
-  flex: none;
-}
-
-.fleet-operations > label {
-  flex: 1 1 260px;
-}
-
-.fleet-operations h2,
 .fleet-operations h3,
 .fleet-operations p {
   margin: 0;
-}
-
-.fleet-operations h2 {
-  letter-spacing: -.01em;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.fleet-operations > h2 + p {
-  margin-top: -6px;
 }
 
 .fleet-operations h3 {
@@ -55,14 +25,63 @@
   line-height: 1.5;
 }
 
-.fleet-operations form {
-  border-top: 1px solid var(--line);
+.fleet-scope {
+  gap: 12px;
+  display: grid;
+}
+
+.fleet-scope .panel-heading {
+  margin-bottom: 0;
+}
+
+.fleet-scope-toolbar {
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px 8px;
-  margin-top: 8px;
-  padding-top: 16px;
+  gap: 8px;
   display: flex;
+}
+
+.fleet-scope-toolbar label {
+  flex: 1 1 260px;
+}
+
+.fleet-task {
+  gap: 8px;
+  display: grid;
+}
+
+.fleet-step-label {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  font-size: .62rem !important;
+  font-weight: 500;
+}
+
+.fleet-task-panel form,
+.fleet-section {
+  align-content: start;
+  gap: 12px;
+  display: grid;
+}
+
+.fleet-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  display: flex;
+}
+
+.fleet-selection-hint {
+  color: var(--state-warning-ink) !important;
+  background: var(--state-warning-surface);
+  border: 1px solid var(--state-warning-ink);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 600;
+}
+
+.fleet-empty {
+  padding: 12px;
 }
 
 .fleet-operations label {
@@ -90,8 +109,9 @@
 }
 
 /* Class-less buttons are the routine actions: compact outline buttons. The
-   one primary action in each form keeps .primary-button. */
-.fleet-operations button {
+   one primary action in each form keeps .primary-button. Tabs keep their own
+   styles from workspace-tabs.css. */
+.fleet-operations button:not([role=tab]) {
   white-space: nowrap;
   border-radius: 7px;
   justify-content: center;
@@ -120,7 +140,7 @@
   opacity: .55;
 }
 
-.fleet-operations button:focus-visible {
+.fleet-operations button:not([role=tab]):focus-visible {
   box-shadow: var(--ring);
   outline: none;
 }
@@ -129,7 +149,7 @@
 .fleet-operations fieldset {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -210,19 +230,9 @@
   min-height: 40px;
 }
 
-/* The alert-delivery heading opens a new section after the last form. */
-.fleet-operations > h3 {
-  border-top: 1px solid var(--line);
-  margin-top: 8px;
-  padding-top: 16px;
-}
-
-.fleet-operations > h3 + p {
-  margin-top: -6px;
-}
-
-/* Per-screen results */
-.fleet-operations ul {
+/* Per-screen results and the audit list */
+.fleet-results,
+.fleet-audit {
   gap: 4px;
   margin: 0;
   padding: 0;
@@ -232,8 +242,26 @@
   display: grid;
 }
 
-.fleet-operations > ul:empty {
+.fleet-results:empty {
   display: none;
+}
+
+.fleet-results li.is-failed {
+  color: var(--state-danger-ink);
+}
+
+.fleet-results li.is-failed::before {
+  content: "× ";
+}
+
+.fleet-results li.is-ok::before {
+  content: "✓ ";
+}
+
+.fleet-audit {
+  color: var(--muted);
+  max-height: 420px;
+  overflow: auto;
 }
 
 .fleet-table-scroll {
@@ -257,8 +285,7 @@
   padding: 8px 12px;
 }
 
-.fleet-table-scroll tbody tr:last-child td,
-.fleet-table-scroll thead:has(+ tbody:empty) th {
+.fleet-table-scroll tbody tr:last-child td {
   border-bottom: 0;
 }
 
@@ -271,34 +298,14 @@
   font-weight: 500;
 }
 
-.fleet-operations details {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.fleet-operations summary {
-  cursor: pointer;
-  font-size: .8rem;
-  font-weight: 600;
-}
-
-.fleet-operations details ul {
-  color: var(--muted);
-  margin-top: 10px;
-}
-
 @media (max-width:700px) {
 
 .fleet-form-grid {
   grid-template-columns: 1fr;
 }
 
-.fleet-operations {
-  padding: 12px;
-}
-
-.fleet-operations > button,
-.fleet-operations form > button {
+.fleet-scope-toolbar button,
+.fleet-actions button {
   white-space: normal;
   flex: 1 1 auto;
 }
@@ -316,7 +323,7 @@
 
 .fleet-operations input,
 .fleet-operations select,
-.fleet-operations button {
+.fleet-operations button:not([role=tab]) {
   border: 1px solid ButtonText;
 }
 }

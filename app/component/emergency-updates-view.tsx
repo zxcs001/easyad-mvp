@@ -12,6 +12,7 @@ import { useI18n } from "../i18n/client";
 import { toast } from "./toast";
 import EmergencyPhotoInput, { useEmergencyPhoto } from "./emergency-photo-input";
 import EmergencyTemplatePicker from "./emergency-template-picker";
+import AlertReadyPanel from "./alert-ready-panel";
 import { emergencyPlaceholders, type EmergencyTemplate } from "../emergency-templates";
 
 type Snapshot = { targets: EmergencyTarget[]; alerts: DeviceAlert[]; delivery: EmergencyDelivery[]; enabled: boolean; pollMs: number; deliveryGoalMs: number };
@@ -41,6 +42,7 @@ export default function EmergencyUpdatesView({ institutionId, institutionName, i
   const [error, setError] = useState("");
   const [statusError, setStatusError] = useState("");
   const [ending, setEnding] = useState<DeviceAlert | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const busyRef = useRef(false);
   const [selectedTemplate, setSelectedTemplate] = useState("custom");
@@ -83,7 +85,7 @@ export default function EmergencyUpdatesView({ institutionId, institutionName, i
     }
     void refresh();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [owner]);
+  }, [owner, refreshTick]);
 
   async function findScreens() {
     if (busyRef.current) return;
@@ -135,6 +137,7 @@ export default function EmergencyUpdatesView({ institutionId, institutionName, i
   return <section className="emergency-updates">
     <p className="emergency-delivery-note">{t("Emergency messages replace regular content on your published digital screens. Connected players check every 10 seconds; track receipt and on-screen reports below. Offline screens receive the current alert when they reconnect, before it expires.")}</p>
     {snapshot && !snapshot.enabled ? <p className="form-error" role="alert">{t("Device delivery is not enabled. Ask your administrator to enable and pair screen players before publishing.")}</p> : null}
+    <AlertReadyPanel institutionId={owner} onScreensChanged={() => setRefreshTick((tick) => tick + 1)} onEnd={async (id) => { const result = await onEnd(id); return { error: result.error }; }} />
     <EmergencyTemplatePicker selected={selectedTemplate} disabled={busy} onChoose={chooseTemplate} />
     <div className="emergency-update-grid">
       <div className="panel">
@@ -175,7 +178,7 @@ export default function EmergencyUpdatesView({ institutionId, institutionName, i
         const active = alert.status === "active" && Date.parse(alert.expiresAt) > Date.now();
         const delivery = snapshot.delivery.filter(row => row.alertId === alert.id);
         return <article className="emergency-update-record" key={alert.id}>
-          <div className="emergency-record-head"><div><h3>{alert.title}</h3><small>{alert.area} · {t(active ? "Active" : alert.status === "ended" ? "Ended" : "Expired")} · {t("Display until {time}", { time: date(alert.expiresAt) })}</small></div>{active ? <button className="danger-button" disabled={busy} onClick={() => { setEnding(alert); setError(""); }} type="button">{t("End update")}</button> : null}</div>
+          <div className="emergency-record-head"><div><h3>{alert.source === "alert-ready" ? <span className="emergency-official-tag">{t("Alert Ready")}</span> : null}{alert.title}</h3><small>{alert.area} · {t(active ? "Active" : alert.status === "ended" ? "Ended" : "Expired")} · {t("Display until {time}", { time: date(alert.expiresAt) })}</small></div>{active ? <button className="danger-button" disabled={busy} onClick={() => { setEnding(alert); setError(""); }} type="button">{t("End update")}</button> : null}</div>
           <p>{alert.message}</p>
           {alert.image ? <img className="emergency-record-photo" src={alert.image.url} alt={t("Emergency photo: {title}", { title: alert.title })} /> : null}
           <div className="emergency-delivery-list">{alert.targetDeviceIds.map(id => {

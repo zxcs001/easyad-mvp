@@ -6,6 +6,11 @@ import { frAdditional } from "./fr-additional";
 import { frPlayer } from "./fr-player";
 import { frScreenUse } from "./fr-screen-use";
 import { frMapLocation } from "./fr-map-location";
+import { frScheduling } from "./fr-scheduling";
+import { frFleetTools } from "./fr-fleet-tools";
+import { frQuickAd } from "./fr-quick-ad";
+import { frAlertReady } from "./fr-alert-ready";
+import { frResults } from "./fr-results";
 
 type Variables = Record<string, string | number>;
 type Messages = Record<string, string>;
@@ -65,6 +70,11 @@ const fr: Messages = {
   ...frPlayer,
   ...frScreenUse,
   ...frMapLocation,
+  ...frScheduling,
+  ...frFleetTools,
+  ...frQuickAd,
+  ...frAlertReady,
+  ...frResults,
   "Language": "Langue",
   "English": "English",
   "French": "Français",

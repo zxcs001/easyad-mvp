@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isRoleValue, isViewValue } from "./roles";
-import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View } from "./data";
+import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, formats } from "./data";
 import { ONTARIO_LOCATION_ID, isRegionLocationId, loadRegionBoundaries, normalizeLocationId, ontarioLocation, regionContains, regionLocation, regionLocations, type RegionBoundaries } from "./lib/geo/regions";
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
 import CampaignWorkspace from "./component/campaign-workspace";
 import CreativeView from "./component/creative-view";
-import { defaultCreativeHtml } from "./creative-templates";
+import { effectiveTemplateHtml } from "./quick-ad";
 import ContentLibraryView from "./component/content-library-view";
 import { Sidebar, Topbar } from "./component/dashboard-shell";
 import DiscoverView from "./component/discover-view";
@@ -24,6 +24,7 @@ import Portal from "./component/portal";
 import { EmptyState } from "./component/shared-ui";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
 import type { BookingDraft, CreativeDraft, Filters, MapPoint } from "./types";
+import type { DaypartId } from "./lib/booking-schedule";
 import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, creativeDraftForFormat, defaultBookingDates, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
 import type { DbUser } from "./lib/db";
 import { canAccessInstitutionWorkspace } from "./roles";
@@ -58,6 +59,8 @@ export default function OohApp({
   initialBookingId,
   initialCreativeSubmitted = false,
   featureFlags = { campaign_model_v2: false, agency_workspace: false, static_fulfillment: false, payments: false },
+  fleetToolsEnabled = false,
+  playerControlEnabled = false,
   surface = "marketplace",
 }: {
   currentUser?: DbUser | null;
@@ -83,6 +86,10 @@ export default function OohApp({
   initialBookingId?: string;
   initialCreativeSubmitted?: boolean;
   featureFlags?: FeatureFlags;
+  /** FEATURE_FLEET_OPERATIONS. Adds the Fleet tools page for owners, operators and Super Admin. */
+  fleetToolsEnabled?: boolean;
+  /** FEATURE_PLAYER_CONTROL. Shows the Player connection tab in the command centre. */
+  playerControlEnabled?: boolean;
   surface?: "marketplace" | "government";
 }) {
   const { t } = useI18n();
@@ -146,6 +153,8 @@ export default function OohApp({
     if (surface === "government") url.searchParams.delete("role");
     else url.searchParams.set("role", role);
     url.searchParams.set("view", view);
+    // The command centre keeps its open tab in ?panel=; other views have none.
+    if (view !== "network") url.searchParams.delete("panel");
     if (bookingId) url.searchParams.set("bookingId", bookingId);
     else url.searchParams.delete("bookingId");
     if (url.href !== window.location.href) window.history.pushState(window.history.state, "", url);
@@ -373,6 +382,7 @@ export default function OohApp({
   // The institution workspace shows commercial views only once a screen is
   // open to private-sector advertising, or advertising history remains.
   const showAdvertising = isGovernmentSurface && showsAdvertisingArea(institutionNetworkInventory, bookings);
+  const showFleetTools = fleetToolsEnabled && ["admin", "institutional", "operator"].includes(currentUser?.role ?? "");
 
   function launchPortal(nextRole: Role, nextView: View) {
     if (!currentUser) return;
@@ -388,16 +398,19 @@ export default function OohApp({
     setFilters((current) => ({ ...current, format }));
   }
 
-  function hasCapacityConflict(inventoryId: string, start: string, end: string, adSlots = 1, excludeId = "") {
+  function hasCapacityConflict(inventoryId: string, start: string, end: string, adSlots = 1, excludeId = "", dayparts: DaypartId[] = []) {
     const item = inventory.find((unit) => unit.id === inventoryId);
     if (!item) return true;
     if (isStaticInventory(item)) return !isInventoryAvailableForDates(item, start, end);
-    return exceedsLoopCapacity(item, bookings, start, end, adSlots, excludeId);
+    return exceedsLoopCapacity(item, bookings, start, end, adSlots, excludeId, dayparts);
   }
 
   async function submitBooking(file?: File | null) {
     if (!canBuyAds || !selectedInventory) return false;
-    if (hasCapacityConflict(selectedInventory.id, bookingDraft.start, bookingDraft.end, bookingDraft.adSlots)) return false;
+    // Time-of-day slots apply to digital screens only. A draft keeps them while
+    // the person browses, so a billboard request drops them here.
+    const dayparts = isStaticInventory(selectedInventory) ? [] : bookingDraft.dayparts ?? [];
+    if (hasCapacityConflict(selectedInventory.id, bookingDraft.start, bookingDraft.end, bookingDraft.adSlots, "", dayparts)) return false;
     const body = new FormData();
     if (file) body.set("file", file);
     body.set("inventoryId", selectedInventory.id);
@@ -406,6 +419,7 @@ export default function OohApp({
     body.set("start", bookingDraft.start);
     body.set("end", bookingDraft.end);
     body.set("adSlots", String(bookingDraft.adSlots));
+    if (dayparts.length) body.set("dayparts", dayparts.join(","));
     const response = await fetch("/api/bookings", {
       method: "POST",
       body,
@@ -530,10 +544,14 @@ export default function OohApp({
     if (isStaticInventory(item) && source !== "upload") throw new Error("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.");
     if (source === "upload" && !file) throw new Error("Choose a media file before submitting your creative.");
     const draft = creativeDraftForFormat(creativeDraft, item.format);
-    const { htmlByTopic, ...creativeFields } = draft;
+    const { htmlByTopic: _html, fieldsByTopic: _fields, ...creativeFields } = draft;
+    // A ready-made design is laid out inside the format's safe zone and is
+    // never scaled, so it carries the format's own values, not slider input.
     const body = source === "upload" && file ? creativeUploadForm(draft, file) : JSON.stringify({
       ...creativeFields,
-      html: htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template],
+      safeZone: Math.max(draft.safeZone, formats[draft.format].safeZone),
+      distortion: 0,
+      html: effectiveTemplateHtml(draft),
     });
     const response = await fetch(`/api/bookings/${bookingId}/creative`, {
       method: "POST",
@@ -763,9 +781,12 @@ export default function OohApp({
       case "emergency":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return <EmptyInventoryPanel canManage={false} />;
         return <EmergencyUpdatesView institutionId={currentUser?.role === "institutional" ? currentUser.id : ""} institutionName={currentUser?.name ?? ""} institutions={currentUser?.role === "admin" ? managedUsers.filter(user => user.role === "institutional").map(({ id, name }) => ({ id, name })) : []} onCreate={createEmergencyOverride} onEnd={endEmergencyOverride} />;
+      case "fleet":
+        if (!showFleetTools) return null;
+        return <FleetOperations />;
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
-        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
+        return <InstitutionNetworkView playerControlEnabled={playerControlEnabled} institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
       case "discover":
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
@@ -876,7 +897,7 @@ export default function OohApp({
             transactions={transactions}
             approvalHistory={approvalHistory}
             paymentsEnabled={featureFlags.payments}
-            hasConflict={(inventoryId, start, end, excludeId) => hasCapacityConflict(inventoryId, start, end, bookings.find((booking) => booking.id === excludeId)?.adSlots ?? 1, excludeId)}
+            hasConflict={(inventoryId, start, end, excludeId) => { const booking = bookings.find((entry) => entry.id === excludeId); return hasCapacityConflict(inventoryId, start, end, booking?.adSlots ?? 1, excludeId, booking?.dayparts ?? []); }}
             updateBooking={updateBooking}
             updateMediaApproval={updateMediaApproval}
             onSettle={settleInvoice}
@@ -906,11 +927,10 @@ export default function OohApp({
 
   return (
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} showAdvertising={showAdvertising} />
+      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} showAdvertising={showAdvertising} showFleetTools={showFleetTools} />
       <main className="workspace">
         <Topbar view={view} visibleCount={role === "advertiser" ? visibleInventory.length : inventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
-        {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
     </div>
   );
@@ -987,6 +1007,7 @@ const documentTitleByView: Record<View, string> = {
   reports: "Campaign analytics",
   billing: "Payments and billing",
   advertising: "Private-sector advertising",
+  fleet: "Fleet tools",
 };
 
 function EmptyInventoryPanel({ canManage }: { canManage: boolean }) {

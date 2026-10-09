@@ -14,6 +14,8 @@ import { CONSENT_COOKIE_NAME } from "./lib/cookie-consent";
 import { canAccessInstitutionWorkspace, roleValues, roleWorkspaceView } from "./roles";
 import GovernmentAccessDenied from "./component/government-access-denied";
 import { getFeatureFlags } from "./lib/feature-flags";
+import { fleetEnabled } from "./lib/fleet";
+import { playersEnabled } from "./lib/players";
 import { resolveCampaignView } from "./lib/campaign-creation-flow";
 
 type PageProps = {
@@ -22,21 +24,21 @@ type PageProps = {
 
 export const dynamic = "force-dynamic";
 
-const views: View[] = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing", "advertising"];
+const views: View[] = ["portal", "network", "emergency", "discover", "booking", "campaigns", "creative", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing", "advertising", "fleet"];
 const templates: CreativeDraft["template"][] = ["retail", "finance", "event"];
 const fileTypes: CreativeDraft["fileType"][] = ["png", "jpg", "gif", "pdf", "mp4"];
 const filterFormats: Filters["format"][] = ["all", "digital", "static", "transit"];
 const competitors: Filters["competitor"][] = ["all", "Low", "Medium", "High"];
 const roleAllowedViews: Record<Role, View[]> = {
   advertiser: ["portal", "discover", "booking", "campaigns", "creative", "resources", "reports", "billing"],
-  operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing"],
-  institutional: ["portal", "network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing"],
+  operator: ["portal", "resources", "inventory", "calendar", "approvals", "reports", "billing", "fleet"],
+  institutional: ["portal", "network", "emergency", "resources", "inventory", "calendar", "approvals", "accounts", "reports", "billing", "fleet"],
   admin: views.filter((entry) => entry !== "advertising"),
 };
 // The institution workspace keeps commercial views in one Advertising area.
 // Schedule, Performance and Billing were separate entries; their old links
 // now open that area, which explains when every screen is reserved.
-const governmentViews: View[] = ["network", "emergency", "resources", "inventory", "approvals", "accounts", "advertising"];
+const governmentViews: View[] = ["network", "emergency", "resources", "inventory", "approvals", "accounts", "advertising", "fleet"];
 const governmentCommercialViews: View[] = ["calendar", "reports", "billing"];
 
 export default async function Page({ searchParams }: PageProps) {
@@ -75,7 +77,10 @@ export default async function Page({ searchParams }: PageProps) {
   }
 
   const effectiveRole = !user ? "advertiser" : user.role === "admin" ? requestedRole ?? "admin" : user.role;
-  const allowedViews = isGovernmentSurface ? governmentViews : roleAllowedViews[effectiveRole];
+  // Fleet tools exist only while FEATURE_FLEET_OPERATIONS is on. A saved link
+  // to them then opens the role's own workspace instead of an empty page.
+  const fleetToolsEnabled = fleetEnabled();
+  const allowedViews = (isGovernmentSurface ? governmentViews : roleAllowedViews[effectiveRole]).filter((entry) => entry !== "fleet" || fleetToolsEnabled);
   const effectiveView = allowedViews.includes(requestedView) ? requestedView : isGovernmentSurface ? "network" : roleWorkspaceView[effectiveRole];
 
   if (user && (requestedRole !== effectiveRole || parsedView !== effectiveView)) {
@@ -149,6 +154,8 @@ export default async function Page({ searchParams }: PageProps) {
         initialBookingId={bookingId}
         initialCreativeSubmitted={readOne(params.submitted) === "creative"}
         featureFlags={getFeatureFlags()}
+        fleetToolsEnabled={fleetToolsEnabled}
+        playerControlEnabled={playersEnabled()}
         surface={surface}
         initialCreative={{
           template: isTemplate(template) ? template : undefined,

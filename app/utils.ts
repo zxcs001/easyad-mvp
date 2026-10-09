@@ -2,6 +2,7 @@ import { Booking, FormatKey, InventoryItem, Role, View, formats } from "./data";
 import type { CreativeDraft, Filters } from "./types";
 import { mapPointToLngLat } from "./lib/geo/projection";
 import { isRegionLocationId } from "./lib/geo/regions";
+import { daypartHoursPerDay, daypartPriceShare, peakUsedInRange, rangeFits, type DaypartId, type LoopCommitment } from "./lib/booking-schedule";
 
 export const CURRENT_LOCATION_ID = "current";
 export const MANUAL_LOCATION_ID = "manual";
@@ -108,8 +109,9 @@ export function validateCreative(draft: CreativeDraft) {
   ];
 }
 
-export function money(value: number, locale: "en" | "fr" = "en") {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(value);
+/** Dollars. Per-unit costs (per response, per 1,000 views) pass cents = true, since rounding $1.40 to $1 misleads. */
+export function money(value: number, locale: "en" | "fr" = "en", cents = false) {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 }).format(value);
 }
 
 export function number(value: number, locale: "en" | "fr" = "en") {
@@ -143,8 +145,14 @@ export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: str
   return new Date(aStart) <= new Date(bEnd) && new Date(bStart) <= new Date(aEnd);
 }
 
-export function estimateSpend(item: InventoryItem, start: string, end: string, adSlots = 1) {
-  return Math.round(item.price * daysBetween(start, end) * formats[item.format].priceMultiplier * Math.max(1, adSlots));
+// The cost of one day with the chosen showings and time-of-day slots. All day
+// is the daily rate; a slot costs its share of it (see DAYPARTS).
+export function dailyCost(item: InventoryItem, adSlots = 1, dayparts: readonly DaypartId[] = []) {
+  return item.price * formats[item.format].priceMultiplier * Math.max(1, adSlots) * daypartPriceShare(dayparts);
+}
+
+export function estimateSpend(item: InventoryItem, start: string, end: string, adSlots = 1, dayparts: readonly DaypartId[] = []) {
+  return Math.round(dailyCost(item, adSlots, dayparts) * daysBetween(start, end));
 }
 
 export function reservedLoopSeconds(item: InventoryItem, adSlots: number) {
@@ -155,21 +163,28 @@ export function isCapacityReservingStatus(status: Booking["status"]) {
   return ["approved", "scheduled", "live"].includes(status);
 }
 
-export function bookedLoopSeconds(item: InventoryItem, bookings: Booking[], start: string, end: string, excludeId = "") {
+// Loop time the item's confirmed bookings hold. Pending requests hold none.
+export function bookingCommitments(item: InventoryItem, bookings: Booking[], excludeId = ""): LoopCommitment[] {
   return bookings
     .filter((booking) => booking.id !== excludeId)
     .filter((booking) => booking.inventoryId === item.id)
     .filter((booking) => isCapacityReservingStatus(booking.status))
-    .filter((booking) => overlaps(start, end, booking.start, booking.end))
-    .reduce((sum, booking) => sum + reservedLoopSeconds(item, booking.adSlots), 0);
+    .map((booking) => ({ start: booking.start, end: booking.end, seconds: reservedLoopSeconds(item, booking.adSlots), dayparts: booking.dayparts ?? [] }));
 }
 
-export function availableLoopSeconds(item: InventoryItem, bookings: Booking[], start: string, end: string, excludeId = "") {
-  return Math.max(0, item.maxLoopSeconds - bookedLoopSeconds(item, bookings, start, end, excludeId));
+// The most loop time already booked on any one date of the range, in the
+// chosen time-of-day slots. Two bookings that never run on the same day, or in
+// the same slot, do not add up.
+export function bookedLoopSeconds(item: InventoryItem, bookings: Booking[], start: string, end: string, excludeId = "", dayparts: readonly DaypartId[] = []) {
+  return peakUsedInRange(start, end, dayparts, bookingCommitments(item, bookings, excludeId));
 }
 
-export function exceedsLoopCapacity(item: InventoryItem, bookings: Booking[], start: string, end: string, adSlots: number, excludeId = "") {
-  return bookedLoopSeconds(item, bookings, start, end, excludeId) + reservedLoopSeconds(item, adSlots) > item.maxLoopSeconds;
+export function availableLoopSeconds(item: InventoryItem, bookings: Booking[], start: string, end: string, excludeId = "", dayparts: readonly DaypartId[] = []) {
+  return Math.max(0, item.maxLoopSeconds - bookedLoopSeconds(item, bookings, start, end, excludeId, dayparts));
+}
+
+export function exceedsLoopCapacity(item: InventoryItem, bookings: Booking[], start: string, end: string, adSlots: number, excludeId = "", dayparts: readonly DaypartId[] = []) {
+  return !rangeFits(start, end, { capacitySeconds: item.maxLoopSeconds, requestSeconds: reservedLoopSeconds(item, adSlots), dayparts, commitments: bookingCommitments(item, bookings, excludeId) });
 }
 
 export function isCreativeSubmissionAllowed(booking: Booking, asOf = toDate(new Date())) {
@@ -197,8 +212,8 @@ export function splitRevenue(gross: number) {
 // would derive this from the screen's loop length and operating hours.
 export const PLAYS_PER_DAY = 180;
 
-export function expectedPlays(start: string, end: string) {
-  return daysBetween(start, end) * PLAYS_PER_DAY;
+export function expectedPlays(start: string, end: string, dayparts: readonly DaypartId[] = []) {
+  return Math.round(daysBetween(start, end) * PLAYS_PER_DAY * (daypartHoursPerDay(dayparts) / 24));
 }
 
 // A screen's impressions figure belongs to the screen, for one day. An
@@ -214,14 +229,17 @@ export function loopShare(item: Pick<InventoryItem, "deliveryMode" | "imageInter
   return Math.min(1, (Math.max(1, adSlots) * spotSeconds) / loopSeconds);
 }
 
-export function expectedImpressions(item: InventoryItem, start: string, end: string, adSlots = 1) {
-  return Math.round(item.impressions * daysBetween(start, end) * loopShare(item, adSlots));
+// Time-of-day slots scale the figure by the hours on screen. The screen's
+// figure is for a whole day, and no hourly audience data exists, so this is an
+// estimate by time, not a measured audience by hour.
+export function expectedImpressions(item: InventoryItem, start: string, end: string, adSlots = 1, dayparts: readonly DaypartId[] = []) {
+  return Math.round(item.impressions * daysBetween(start, end) * loopShare(item, adSlots) * (daypartHoursPerDay(dayparts) / 24));
 }
 
 // Delivered impressions scale the booked figure by operator-declared completion.
 // They are not measured views or authenticated player evidence.
-export function deliveredImpressions(item: InventoryItem, booking: { start: string; end: string; pop: number; adSlots?: number }) {
-  return Math.round(expectedImpressions(item, booking.start, booking.end, booking.adSlots ?? 1) * (booking.pop / 100));
+export function deliveredImpressions(item: InventoryItem, booking: { start: string; end: string; pop: number; adSlots?: number; dayparts?: readonly DaypartId[] }) {
+  return Math.round(expectedImpressions(item, booking.start, booking.end, booking.adSlots ?? 1, booking.dayparts ?? []) * (booking.pop / 100));
 }
 
 export function formatRatio(value: number) {

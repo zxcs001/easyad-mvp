@@ -108,6 +108,21 @@
   gap: 7px;
   margin-top: 10px;
   display: grid;
+  /* A large fleet scrolls inside the map panel instead of making the page longer. */
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1px;
+}
+
+/* The selected screen's content and player connection share one tabbed area. */
+.network-screen-tabs {
+  gap: 8px;
+  display: grid;
+}
+
+.network-screen-tabs > [role=tabpanel] > .panel {
+  margin: 0;
 }
 
 .network-device-strip button {

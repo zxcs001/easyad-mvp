@@ -16,6 +16,7 @@ import { useI18n } from "../i18n/client";
 import { toDate } from "../utils";
 import { isDigitalInventory } from "../lib/inventory-delivery";
 import PlayerControl from "./player-control";
+import { WorkspaceTabs, workspaceTabPanel, type WorkspaceTab } from "./workspace-tabs";
 import ScreenSettingsDialog, { type ScreenSettings } from "./screen-settings-dialog";
 import type { EmergencyTargeting } from "../lib/emergency-updates";
 import EmergencyPhotoInput, { useEmergencyPhoto } from "./emergency-photo-input";
@@ -53,6 +54,7 @@ export default function InstitutionNetworkView({
   onSaveSettings,
   onSetScreenUse,
   onOpenAdvertising,
+  playerControlEnabled = true,
 }: {
   institutionName: string;
   isSuperAdmin?: boolean;
@@ -71,6 +73,8 @@ export default function InstitutionNetworkView({
   onSaveSettings?: (id: string, settings: ScreenSettings) => Promise<MutationResult<InventoryItem>>;
   onSetScreenUse?: (id: string, use: ScreenUse) => Promise<MutationResult<InventoryItem>>;
   onOpenAdvertising?: () => void;
+  /** FEATURE_PLAYER_CONTROL. Off hides the Player connection tab. */
+  playerControlEnabled?: boolean;
 }) {
   const { t } = useI18n();
   const [screenUseOpen, setScreenUseOpen] = useState(false);
@@ -81,6 +85,20 @@ export default function InstitutionNetworkView({
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [screenTab, setScreenTab] = useState<"content" | "player">("content");
+  // The open tab is part of the address (?panel=player), so a reload or a
+  // shared link lands on the same tab. It is read after mount to keep the
+  // server render and the first client render identical.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("panel") === "player") setScreenTab("player");
+  }, []);
+  function chooseScreenTab(next: "content" | "player") {
+    setScreenTab(next);
+    const url = new URL(window.location.href);
+    if (next === "player") url.searchParams.set("panel", "player");
+    else url.searchParams.delete("panel");
+    window.history.replaceState(window.history.state, "", url);
+  }
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const filteredInventory = useMemo(() => inventory.filter((device) => `${device.name} ${device.address} ${device.id} ${device.building ?? ""} ${device.department ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())), [inventory, query]);
@@ -149,6 +167,13 @@ export default function InstitutionNetworkView({
   const institutionScreens = inventory.filter((device) => Boolean(device.institutionId));
   const openedScreens = advertisingScreens(institutionScreens);
   const selectedUse = screenUseOf(selected);
+  // The selected screen's content and its player connection share one tabbed
+  // area, so the page does not grow by a full panel for each.
+  const screenTabs: WorkspaceTab<"content" | "player">[] = [
+    { id: "content", label: "Screen content", badge: selectedResources.length || undefined },
+    ...(isDigitalInventory(selected) && playerControlEnabled ? [{ id: "player" as const, label: "Player connection" }] : []),
+  ];
+  const activeScreenTab = screenTabs.some((entry) => entry.id === screenTab) ? screenTab : "content";
 
   return (
     <section className="institution-network">
@@ -243,20 +268,25 @@ export default function InstitutionNetworkView({
         </div>
       </div>
 
-      <section className="panel network-content-panel" aria-label={t("Screen content")}>
-        <PanelHeading eyebrow={selected.name} title="Screen content" action={<button className="secondary-button" onClick={() => onOpenInventory(selected.id)} type="button">{t("Manage content")}</button>} />
-        <p className="network-delivery-note">{t("Uploaded resources and their approval status. Scheduled content and emergency overrides may change what plays.")}</p>
-        {selectedResources.length ? <ul className="network-content-list">{selectedResources.map((resource) => <li key={resource.id}>
-          <div className="network-content-thumbnail">{resource.mediaType === "image" ? <img src={resource.publicUrl} alt="" loading="lazy" /> : <Images aria-hidden="true" />}</div>
-          <div><strong>{resource.title}</strong><small>{resource.originalName}</small><span className={`status ${resource.approvalStatus === "approved" ? "good" : ""}`}>{t(resource.approvalStatus)}</span></div>
-        </li>)}</ul> : <div className="empty-state"><strong>{t("No content uploaded to this screen")}</strong><span>{t("Add an image or video to start your screen rotation.")}</span><button className="primary-button" type="button" onClick={() => setUploadDialog(true)}>{t("Add content")}</button></div>}
-      </section>
-
       {settingsOpen && onSaveSettings ? <ScreenSettingsDialog key={`settings-${selected.id}`} screen={selected} onClose={() => setSettingsOpen(false)} onSave={onSaveSettings} /> : null}
 
-      {isDigitalInventory(selected) ? <PlayerControl key={selected.id} inventoryId={selected.id} screenName={selected.name} /> : null}
+      <div className="network-screen-tabs">
+        <WorkspaceTabs label="Selected screen details" idPrefix="network-screen" tabs={screenTabs} value={activeScreenTab} onChange={chooseScreenTab} />
+        <div {...workspaceTabPanel("network-screen", activeScreenTab)}>
+          {activeScreenTab === "player" ? <PlayerControl key={selected.id} inventoryId={selected.id} screenName={selected.name} /> : (
+          <section className="panel network-content-panel" aria-label={t("Screen content")}>
+            <PanelHeading eyebrow={selected.name} title="Screen content" action={<button className="secondary-button" onClick={() => onOpenInventory(selected.id)} type="button">{t("Manage content")}</button>} />
+            <p className="network-delivery-note">{t("Uploaded resources and their approval status. Scheduled content and emergency overrides may change what plays.")}</p>
+            {selectedResources.length ? <ul className="network-content-list">{selectedResources.map((resource) => <li key={resource.id}>
+              <div className="network-content-thumbnail">{resource.mediaType === "image" ? <img src={resource.publicUrl} alt="" loading="lazy" /> : <Images aria-hidden="true" />}</div>
+              <div><strong>{resource.title}</strong><small>{resource.originalName}</small><span className={`status ${resource.approvalStatus === "approved" ? "good" : ""}`}>{t(resource.approvalStatus)}</span></div>
+            </li>)}</ul> : <div className="empty-state"><strong>{t("No content uploaded to this screen")}</strong><span>{t("Add an image or video to start your screen rotation.")}</span><button className="primary-button" type="button" onClick={() => setUploadDialog(true)}>{t("Add content")}</button></div>}
+          </section>
+          )}
+        </div>
+      </div>
 
-      <div className="panel network-alert-panel">
+      <div className="panel network-alert-panel" role="region" aria-label={t("Emergency screen override")}>
         <div className="network-alert-copy">
           <span className="network-alert-icon"><AlertTriangle aria-hidden="true" /></span>
           <div><span className="eyebrow">{t("Local-government controls")}</span><h2>{t("Emergency screen override")}</h2><p>{t("Replace regular content on selected published screens with an AMBER Alert, evacuation notice, or public-safety message.")}</p></div>

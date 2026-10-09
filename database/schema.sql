@@ -377,6 +377,8 @@ CREATE TABLE IF NOT EXISTS placement_issues (
 );
 ALTER TABLE placements ADD COLUMN IF NOT EXISTS schedule_snapshot JSONB;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS schedule_snapshot JSONB;
+-- Time-of-day slots in Toronto time (morning, midday, afternoon, evening, overnight). Empty means all day.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dayparts TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE digital_delivery_events ALTER COLUMN placement_id DROP NOT NULL;
 ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'legacy_ingest';
 ALTER TABLE digital_delivery_events ADD COLUMN IF NOT EXISTS manifest_revision INTEGER;
@@ -532,3 +534,73 @@ ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS target_scope JSONB NOT NULL DEF
 ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS resource_id TEXT;
 ALTER TABLE fleet_audit ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ NOT NULL DEFAULT (NOW()+INTERVAL '7 years');
 ALTER TABLE player_alert_state ADD COLUMN IF NOT EXISTS retention_until TIMESTAMPTZ NOT NULL DEFAULT (NOW()+INTERVAL '90 days');
+
+-- Alert Ready relay (ADR 0010). Official CAP-CP alerts from the NAAD System,
+-- which screens they cover, and how each institution wants them shown.
+CREATE TABLE IF NOT EXISTS official_alerts (
+  key TEXT PRIMARY KEY,
+  identifier TEXT NOT NULL,
+  sender TEXT NOT NULL,
+  sent TEXT NOT NULL,
+  status TEXT NOT NULL,
+  msg_type TEXT NOT NULL,
+  reference_keys JSONB NOT NULL DEFAULT '[]'::jsonb,
+  event TEXT NOT NULL DEFAULT '',
+  broadcast_immediately BOOLEAN NOT NULL DEFAULT FALSE,
+  signature TEXT NOT NULL CHECK (signature IN ('verified', 'unverified', 'unsigned', 'no-trusted-certificate')),
+  expires_at TEXT,
+  infos JSONB NOT NULL DEFAULT '[]'::jsonb,
+  raw_xml TEXT,
+  received_via TEXT NOT NULL,
+  received_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_official_alerts_received ON official_alerts(received_at DESC);
+
+CREATE TABLE IF NOT EXISTS official_alert_matches (
+  alert_key TEXT NOT NULL REFERENCES official_alerts(key) ON DELETE CASCADE,
+  institution_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  inventory_id TEXT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+  area_match TEXT NOT NULL,
+  PRIMARY KEY (alert_key, inventory_id)
+);
+CREATE INDEX IF NOT EXISTS idx_official_alert_matches_institution ON official_alert_matches(institution_id, alert_key);
+
+CREATE TABLE IF NOT EXISTS alert_ready_settings (
+  institution_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'review' CHECK (mode IN ('off', 'review', 'automatic')),
+  updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS alert_ready_feed (
+  id TEXT PRIMARY KEY,
+  last_heartbeat_at TEXT,
+  last_alert_at TEXT,
+  updated_at TEXT NOT NULL
+);
+
+ALTER TABLE device_alerts ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'institution';
+ALTER TABLE device_alerts ADD COLUMN IF NOT EXISTS official_alert_key TEXT;
+CREATE INDEX IF NOT EXISTS idx_device_alerts_official ON device_alerts(official_alert_key) WHERE official_alert_key IS NOT NULL;
+
+-- Response tracking (QR code and short link per booking). No personal data:
+-- a response event stores only its time. See docs/RESULTS_REPORTING.md.
+CREATE TABLE IF NOT EXISTS response_links (
+  code TEXT PRIMARY KEY,
+  booking_id TEXT NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
+  destination_url TEXT NOT NULL,
+  on_ad BOOLEAN NOT NULL DEFAULT FALSE,
+  promo_code TEXT,
+  promo_redemptions INTEGER NOT NULL DEFAULT 0 CHECK (promo_redemptions >= 0),
+  promo_updated_at TEXT,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS response_events (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT NOT NULL REFERENCES response_links(code) ON DELETE CASCADE,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_response_events_code ON response_events(code, occurred_at);

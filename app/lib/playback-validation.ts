@@ -1,5 +1,11 @@
+import { isScheduledNow } from "./booking-schedule";
 import type { PlaybackEvent, PlayerManifest, PlayerSlide } from "../player-types";
 export function slideEligible(slide: PlayerSlide, now: number) {
+    // A time-of-day booking plays on local dates, inside its local slots only.
+    // The check runs on the player as well, so it keeps working offline.
+    const allocation = slide.allocation;
+    if (allocation && allocation.dayparts?.length)
+        return isScheduledNow(allocation, now);
     const date = new Date(now).toISOString().slice(0, 10);
     return (!slide.startsOn || (slide.startsOn.length>10?Date.parse(slide.startsOn)<=now:slide.startsOn<=date)) && (!slide.endsOn || (slide.endsOn.length>10?Date.parse(slide.endsOn)>now:slide.endsOn>=date));
 }

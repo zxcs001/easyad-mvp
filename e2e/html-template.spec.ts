@@ -27,8 +27,10 @@ test("edited HTML templates are sanitized, private during review, and displayed 
     const { booking } = await bookingResponse.json() as { booking: { id: string } };
     const editorPage = await advertiser.newPage();
     await editorPage.goto(`${origin}/?view=creative&bookingId=${booking.id}`);
-    const editor = editorPage.getByRole("textbox", { name: "Template HTML" });
-    await expect(editor).toBeVisible();
+    // The ready-made design opens on plain fields; the HTML editor is the advanced option.
+    const headline = editorPage.getByRole("textbox", { name: "Headline" });
+    await expect(headline).toBeVisible();
+    await expect(editorPage.getByRole("textbox", { name: "Template HTML" })).toBeHidden();
     await expect(editorPage.getByRole("link", { name: "Retail design: The weekend edit" })).toHaveAttribute("aria-current", "true");
     await expect(editorPage.getByRole("link", { name: "Finance design: The next chapter" })).toBeVisible();
     await expect(editorPage.getByRole("link", { name: "Event design: After dark" })).toBeVisible();
@@ -48,13 +50,22 @@ test("edited HTML templates are sanitized, private during review, and displayed 
     }
     await editorPage.setViewportSize({ width: 390, height: 844 });
     await editorPage.screenshot({ path: "docs/verification/html-template-gallery-phone.png" });
+    await headline.fill("Fresh this\nweek.");
+    await expect(editorPage.frameLocator('iframe[title="Template preview"]').locator("h1 em")).toHaveText("WEEK.");
+    await editorPage.screenshot({ path: "docs/verification/quick-ad-fields-phone.png", fullPage: true });
+    await editorPage.getByText("Edit the HTML instead (advanced)").click();
+    const editor = editorPage.getByRole("textbox", { name: "Template HTML" });
+    await expect(editor).toHaveValue(/FRESH THIS<br>/);
     await editor.fill("<h1>Browser preview</h1>");
+    await expect(editorPage.getByText("You changed the HTML by hand, so these fields no longer control the ad.")).toBeVisible();
     await expect(editorPage.frameLocator('iframe[title="Template preview"]').locator("h1")).toHaveText("Browser preview");
     await expect(editor).toBeInViewport();
     const previewBox = await editorPage.locator(".creative-html-preview").boundingBox();
     const frameBox = await editorPage.locator(".creative-html-preview iframe").boundingBox();
     expect(frameBox?.width).toBeGreaterThan((previewBox?.width ?? 0) - 3);
     await editorPage.screenshot({ path: "docs/verification/html-template-editor-phone.png", fullPage: true });
+    // The fields now sit between the preview and the HTML editor, so bring the preview back into view first.
+    await editorPage.locator(".creative-html-preview").scrollIntoViewIfNeeded();
     await editorPage.frameLocator('iframe[title="Template preview"]').locator("body").screenshot({ path: "docs/verification/html-template-preview.png" });
     const source = `<section class="content" onclick="alert(1)"><h1 style="color:red">Safe offer</h1><script>alert(1)</script><a href="javascript:alert(1)">Visit us</a><img src="https://bad.example/pixel"></section>`;
     const submitted = await advertiser.request.post(`${origin}/api/bookings/${booking.id}/creative`, { headers: { Origin: origin }, data: {
