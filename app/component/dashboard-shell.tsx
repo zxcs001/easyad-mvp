@@ -15,6 +15,7 @@ import {
   Gauge,
   Globe2,
   Images,
+  Layers,
   LayoutDashboard,
   LogOut,
   Map,
@@ -28,6 +29,7 @@ import {
   Users,
 } from "lucide-react";
 import { Booking, InventoryItem, Role, View } from "../data";
+import { advertisingScreens } from "../lib/screen-use-policy";
 import { roleLabel, roleValues, roleWorkspaceView } from "../roles";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { isPlainLeftClick, money, portalHref } from "../utils";
@@ -105,6 +107,20 @@ const viewTitles: Record<View, { title: string; eyebrow: string }> = {
   accounts: { title: "Account management", eyebrow: "People and access" },
   reports: { title: "Campaign analytics", eyebrow: "Performance" },
   billing: { title: "Payments and billing", eyebrow: "Finance" },
+  advertising: { title: "Private-sector advertising", eyebrow: "Advertising" },
+  fleet: { title: "Fleet tools", eyebrow: "Many screens at once" },
+};
+
+// Institution and government titles name screen operations, not media sales.
+// Inventory, schedule and billing language belongs only in Advertising.
+const governmentViewTitles: Partial<Record<View, string>> = {
+  network: "Screen network command centre",
+  inventory: "Screens",
+  resources: "Media library",
+  approvals: "Content approvals",
+  accounts: "People and access",
+  advertising: "Private-sector advertising",
+  fleet: "Fleet tools",
 };
 
 // Plain-language titles for the advertiser only. A shop owner buying a week of
@@ -159,21 +175,30 @@ function BuyingSteps({ view }: { view: View }) {
 }
 
 const groups: NavItem["group"][] = ["Workspace", "Operations", "Insights"];
+// The institution workspace is a screen-operations tool. Commercial views
+// (booking calendar, campaign performance, billing) live in one Advertising
+// entry, and that entry appears only when a screen is open to advertising.
 const governmentNav: NavItem[] = [
   { view: "network", label: "Command centre", icon: Map, group: "Workspace" },
   { view: "emergency", label: "Emergency updates", icon: ShieldAlert, group: "Operations" },
   { view: "inventory", label: "Screens", icon: PanelsTopLeft, group: "Workspace" },
   { view: "resources", label: "Media library", icon: Images, group: "Workspace" },
-  { view: "calendar", label: "Schedule", icon: CalendarDays, group: "Operations" },
   { view: "approvals", label: "Approvals", icon: ClipboardCheck, group: "Operations" },
   { view: "accounts", label: "People and access", icon: Users, group: "Operations" },
-  { view: "reports", label: "Performance", icon: BarChart3, group: "Insights" },
-  { view: "billing", label: "Billing", icon: CreditCard, group: "Insights" },
 ];
+const governmentAdvertisingNav: NavItem = { view: "advertising", label: "Advertising", icon: Megaphone, group: "Insights" };
+// Bulk work across many screens (policy, announcements, editor access, alert
+// delivery, audit) has its own page. It was stacked under three other pages.
+const fleetToolsNav: NavItem = { view: "fleet", label: "Fleet tools", icon: Layers, group: "Operations" };
+
+function withFleetTools(items: NavItem[]) {
+  const after = items.findIndex((item) => item.view === "emergency");
+  return after < 0 ? [...items, fleetToolsNav] : [...items.slice(0, after + 1), fleetToolsNav, ...items.slice(after + 1)];
+}
 
 type AppSurface = "marketplace" | "government";
 
-export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed, navigationLocked = false }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void; navigationLocked?: boolean }) {
+export function Sidebar({ role, view, setRole, setView, currentUser, surface = "marketplace", collapsed = false, onToggleCollapsed, navigationLocked = false, showAdvertising = false, showFleetTools = false }: { role: Role; view: View; setRole: (role: Role) => void; setView: (view: View) => void; currentUser?: DbUser | null; surface?: AppSurface; collapsed?: boolean; onToggleCollapsed?: () => void; navigationLocked?: boolean; showAdvertising?: boolean; showFleetTools?: boolean }) {
   // At 900px and below the nav is a strip that scrolls sideways and loaded at
   // its start, so "Results" or "Invoices" could be the current page with no
   // visible "you are here". Bring the current item into view. "nearest" does
@@ -187,7 +212,11 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
   const displayRole = roleLabel(role);
   const userName = currentUser?.name ?? (role === "operator" ? "MetroScreens" : role === "institutional" ? "Civic Media Group" : role === "admin" ? "Platform Admin" : "Pulse Athletic");
   const isGovernment = surface === "government";
-  const navigation = isGovernment ? governmentNav : roleNav[role];
+  const baseNavigation = isGovernment ? (showAdvertising || view === "advertising" ? [...governmentNav, governmentAdvertisingNav] : governmentNav) : roleNav[role];
+  const navigation = showFleetTools && role !== "advertiser" ? withFleetTools(baseNavigation) : baseNavigation;
+  // Only Super Admin moves between the marketplace and the institution
+  // workspace. An institution account has no marketplace to return to.
+  const showMarketplaceLink = isGovernment && currentUser?.role === "admin";
 
   return (
     <aside className={`sidebar${isGovernment ? " government-sidebar" : ""}${collapsed ? " is-rail" : ""}`}>
@@ -233,7 +262,7 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
           );
         })}
       </nav>
-      {isGovernment ? <a className="government-marketplace-link" href="/"><Globe2 aria-hidden="true" /><span>{t("Open EasyAD Platform")}</span></a> : null}
+      {showMarketplaceLink ? <a className="government-marketplace-link" href="/"><Globe2 aria-hidden="true" /><span>{t("Open EasyAD Platform")}</span></a> : null}
       <div className="tenant-card">
         <div className="tenant-avatar" aria-hidden="true">{userName.slice(0, 2).toUpperCase()}</div>
         <div className="tenant-identity">
@@ -249,6 +278,33 @@ export function Sidebar({ role, view, setRole, setView, currentUser, surface = "
         )}
       </div>
     </aside>
+  );
+}
+
+// Institution screens carry no occupancy or booked value unless they are open
+// to advertising, so the government shell counts screens and screen use only.
+// The Advertising view adds the commercial figures for the opened screens.
+function GovernmentMetrics({ view, inventory, bookings }: { view: View; inventory: InventoryItem[]; bookings: Booking[] }) {
+  const { locale, t } = useI18n();
+  if (view === "network" || view === "emergency" || view === "fleet") return null;
+  const opened = advertisingScreens(inventory);
+  if (view === "advertising") {
+    const openedIds = new Set(opened.map((item) => item.id));
+    const occupancy = opened.length ? Math.round(opened.reduce((sum, item) => sum + item.occupancy, 0) / opened.length) : 0;
+    const bookedValue = bookings.filter((booking) => booking.status !== "cancelled" && openedIds.has(booking.inventoryId)).reduce((sum, booking) => sum + booking.spend, 0);
+    return (
+      <div className="metrics" aria-label={t("Advertising summary")}>
+        <div><Megaphone aria-hidden="true" /><span>{opened.length}</span><small>{t("Open to advertising")}</small></div>
+        <div><Gauge aria-hidden="true" /><span>{occupancy}%</span><small>{t("Average occupancy")}</small></div>
+        <div><CircleDollarSign aria-hidden="true" /><span>{money(bookedValue, locale)}</span><small>{t("Booked value")}</small></div>
+      </div>
+    );
+  }
+  return (
+    <div className="metrics" aria-label={t("Workspace summary")}>
+      <div><MapPin aria-hidden="true" /><span>{inventory.length}</span><small>{t("Managed screens")}</small></div>
+      <div><ShieldCheck aria-hidden="true" /><span>{inventory.length - opened.length}</span><small>{t("Institution use only")}</small></div>
+    </div>
   );
 }
 
@@ -381,16 +437,17 @@ export function Topbar({ view, visibleCount, inventory, bookings, role, surface 
   const isGovernment = surface === "government";
   const isAdvertiser = role === "advertiser" && !isGovernment;
   const title = (isAdvertiser ? advertiserViewTitles[view] : undefined) ?? viewTitles[view];
+  const governmentTitle = isGovernment ? governmentViewTitles[view] : undefined;
   const showSteps = isAdvertiser && (view === "discover" || (campaignCreationLocked && buyingSteps.some((step) => step.view === view)));
   const titleBlock = (
     <div className="topbar-title">
       <p className="eyebrow">{t(isGovernment ? "Civic Screen Operations" : title.eyebrow)}</p>
-      <h1>{t(isGovernment && view === "network" ? "Screen network command centre" : title.title)}</h1>
+      <h1>{t(governmentTitle ?? title.title)}</h1>
       {showSteps ? <BuyingSteps view={view} /> : null}
       {campaignCreationLocked ? <p className="campaign-flow-lock">{t(view === "booking" ? "Finish creating this campaign, or cancel to return to screen selection." : "Submit your ad for review, or cancel this campaign to return to screen selection.")}</p> : null}
     </div>
   );
-  const metrics = view !== "network" && view !== "emergency" ? (
+  const metrics = isGovernment ? <GovernmentMetrics view={view} inventory={inventory} bookings={bookings} /> : view !== "network" && view !== "emergency" && view !== "fleet" ? (
     <div className="metrics" aria-label={t("Workspace summary")}>
       <div><MapPin aria-hidden="true" /><span>{visibleCount}</span><small>{t(isAdvertiser ? "Screens you can book" : "Matching units")}</small></div>
       {/* Occupancy is a yield metric for the person selling the screen. It

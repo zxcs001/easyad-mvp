@@ -1,6 +1,7 @@
 "use client";
 
 import "./portal.css";
+import type { GeoBounds } from "../lib/geo/regions";
 import { ArrowUpRight } from "lucide-react";
 import { Booking, FormatKey, InventoryItem, Role, View, formats } from "../data";
 import type { DbUser } from "../lib/db";
@@ -23,7 +24,7 @@ export default function Portal({
 }: {
   inventory: InventoryItem[];
   bookings: Booking[];
-  selectedLocation: { x: number; y: number };
+  selectedLocation: { x: number; y: number; bounds?: GeoBounds };
   filters: Filters;
   launch: (role: Role, view: View) => void;
   selectFormat: (format: FormatKey) => void;
@@ -203,7 +204,7 @@ function AdvertiserHome({
   currentUser?: DbUser | null;
   filters: Filters;
   launch: (role: Role, view: View) => void;
-  selectedLocation: { x: number; y: number };
+  selectedLocation: { x: number; y: number; bounds?: GeoBounds };
 }) {
   const { locale, t } = useI18n();
   const spend = bookings.filter((booking) => booking.status !== "cancelled").reduce((sum, booking) => sum + booking.spend, 0);

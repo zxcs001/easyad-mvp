@@ -4,6 +4,7 @@ import "./shared-ui.css";
 import { Booking, InventoryItem } from "../data";
 import { isPlainLeftClick, money } from "../utils";
 import { useI18n } from "../i18n/client";
+import { daypartSummary } from "./daypart-summary";
 
 export function PanelHeading({ eyebrow, title, action }: { eyebrow: string; title: string; action?: React.ReactNode }) {
   const { t } = useI18n();
@@ -82,7 +83,7 @@ export function BookingsTable({ bookings, inventory }: { bookings: Booking[]; in
       {bookings.length ? <div className="table-head"><span>{t("Campaign")}</span><span>{t("Inventory")}</span><span>{t("Dates")}</span><span>{t("Status")}</span><span>{t("Creative")}</span><span>{t("Spend")}</span></div> : <EmptyState title="No bookings to show" copy="Bookings appear here once a screen is reserved." />}
       {bookings.map((booking) => {
         const item = inventory.find((unit) => unit.id === booking.inventoryId);
-        return <div className="table-row" key={booking.id}><span><strong>{booking.campaign}</strong><small>{booking.advertiser} - {t(booking.adSlots === 1 ? "{count} slot" : "{count} slots", { count: booking.adSlots })}</small></span><span>{item?.name ?? booking.inventoryId}</span><span>{booking.start}<small>{booking.end}</small></span><span><span className="status">{t(booking.status)}</span></span><span>{t(booking.creativeStatus)}</span><span>{money(booking.spend, locale)}</span></div>;
+        return <div className="table-row" key={booking.id}><span><strong>{booking.campaign}</strong><small>{booking.advertiser} - {t(booking.adSlots === 1 ? "{count} slot" : "{count} slots", { count: booking.adSlots })}</small></span><span>{item?.name ?? booking.inventoryId}</span><span>{booking.start}<small>{booking.end}</small>{booking.dayparts?.length ? <small>{daypartSummary(booking.dayparts, t)}</small> : null}</span><span><span className="status">{t(booking.status)}</span></span><span>{t(booking.creativeStatus)}</span><span>{money(booking.spend, locale)}</span></div>;
       })}
     </div>
   );

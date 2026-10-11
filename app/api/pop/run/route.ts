@@ -24,7 +24,7 @@ export async function POST() {
   for (const booking of visibleBookings) {
     const item = await getInventory(booking.inventoryId);
     if (!item) continue;
-    const impressionsPerPlay = expectedImpressions(item, booking.start, booking.end, booking.adSlots) / Math.max(1, expectedPlays(booking.start, booking.end));
+    const impressionsPerPlay = expectedImpressions(item, booking.start, booking.end, booking.adSlots, booking.dayparts ?? []) / Math.max(1, expectedPlays(booking.start, booking.end, booking.dayparts ?? []));
     await createPopLog({
       bookingId: booking.id,
       inventoryId: booking.inventoryId,

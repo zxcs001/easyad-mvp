@@ -1,6 +1,6 @@
 # ADR 0005 — Pilot scheduling, offline leases, and playback evidence
 
-Status: implementation decision, 2026-09-05. Commercial expansion requires pilot review.
+Status: implementation decision, 2026-09-05. Commercial expansion requires pilot review. Time-of-day booking in local time is decided in [ADR 0009](0009-time-of-day-booking.md); it replaces the "no dayparts" rule below for a booking that chooses slots.
 
 The pilot allocation is a fixed slot in a bounded loop, using the screen's image interval and maximum loop duration captured at operator quote confirmation and shown before client acceptance. This immutable snapshot reserves no capacity until acceptance. One new digital placement reserves one slot; legacy bookings reserve their existing ad-slot count. Reservations use inclusive UTC dates, 24-hour operation, no dayparts. UTC is explicit: local-time/daypart products are rejected until supported, rather than guessing daylight-saving offsets. Inquiry and operator quote confirmation hold no capacity; offline client acceptance and legacy approval acquire the same inventory lock and recheck commitments. Existing commitments without snapshots require operator reconfirmation before campaign-v2 playback. Legacy compatibility placements are never counted twice.
 

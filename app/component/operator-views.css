@@ -860,3 +860,26 @@
   grid-template-columns: 1fr 1fr;
 }
 }
+
+/* Institution screens: no rate or occupancy columns. */
+.inventory-management-table.is-institution .table-head,
+.inventory-management-table.is-institution .table-row {
+  grid-template-columns: minmax(0,1.75fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,.8fr);
+  min-width: 620px;
+}
+
+.screen-use-note {
+  margin-bottom: 14px;
+}
+
+.advertising-fields-heading {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.advertising-fields-heading small {
+  color: var(--muted);
+}

@@ -39,3 +39,12 @@ describe("HTML creative templates", () => {
     expect(() => sanitizeCreativeHtml("a".repeat(16_385))).toThrow("16 KB");
   });
 });
+
+test("a server-made QR code joins the ad; anything that is not a plain SVG is dropped", async () => {
+  const { responseQrSvg } = await import("../app/lib/responses");
+  const svg = await responseQrSvg("https://easyad.example/go/ABCDEFGH");
+  const html = sanitizeCreativeHtml(defaultCreativeHtml.retail);
+  expect(renderCreativeDocument("retail", html, { qrSvg: svg })).toContain('<aside class="ad-qr" aria-label="QR code"><svg');
+  expect(renderCreativeDocument("retail", html, { qrSvg: '<svg onload="alert(1)"></svg>' })).not.toContain("ad-qr\"");
+  expect(renderCreativeDocument("retail", html, { qrSvg: "<script>alert(1)</script>" })).not.toContain("<script>");
+});

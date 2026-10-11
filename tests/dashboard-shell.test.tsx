@@ -189,8 +189,58 @@ describe("dashboard shell", () => {
     screensLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
     screensLink.click();
     expect(setView).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: "Open EasyAD Platform" })).toHaveAttribute("href", "/");
+    // An institution account has no marketplace to return to.
+    expect(screen.queryByRole("link", { name: "Open EasyAD Platform" })).not.toBeInTheDocument();
     expect(document.querySelector('input[name="returnTo"]')).toHaveValue("/government/login");
+  });
+
+  test("government navigation leaves out commercial views while every screen is reserved", () => {
+    render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" />);
+
+    for (const name of ["Billing", "Performance", "Schedule", "Advertising"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: "Approvals" })).toHaveAttribute("href", "/government?view=approvals");
+  });
+
+  test("government navigation adds one Advertising entry once a screen is open to advertising", () => {
+    render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" showAdvertising />);
+
+    expect(screen.getByRole("link", { name: "Advertising" })).toHaveAttribute("href", "/government?view=advertising");
+    expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
+  });
+
+  test("fleet tools get one navigation entry after Emergency updates, and only when switched on", () => {
+    const { unmount } = render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" showFleetTools />);
+
+    const links = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(screen.getByRole("link", { name: "Fleet tools" })).toHaveAttribute("href", "/government?view=fleet");
+    expect(links.indexOf("Fleet tools")).toBe(links.indexOf("Emergency updates") + 1);
+    unmount();
+
+    render(<Sidebar role="institutional" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={institutionUser} surface="government" />);
+    expect(screen.queryByRole("link", { name: "Fleet tools" })).not.toBeInTheDocument();
+  });
+
+  test("an advertiser never sees fleet tools", () => {
+    render(<Sidebar role="advertiser" view="discover" setRole={vi.fn()} setView={vi.fn()} currentUser={{ ...adminUser, role: "advertiser" }} showFleetTools />);
+    expect(screen.queryByRole("link", { name: "Fleet tools" })).not.toBeInTheDocument();
+  });
+
+  test("Super Admin keeps the marketplace link in the government shell", () => {
+    render(<Sidebar role="admin" view="network" setRole={vi.fn()} setView={vi.fn()} currentUser={{ ...institutionUser, id: "USR-ADMIN", role: "admin" }} surface="government" />);
+
+    expect(screen.getByRole("link", { name: "Open EasyAD Platform" })).toHaveAttribute("href", "/");
+  });
+
+  test("government Topbar counts screen use instead of occupancy and booked value", () => {
+    const institutionInventory = inventory.map((item) => ({ ...item, institutionId: "USR-CIVIC", advertisingOptIn: false }));
+    render(<Topbar view="inventory" visibleCount={2} inventory={institutionInventory} bookings={bookings} surface="government" />);
+
+    expect(screen.getByRole("heading", { name: "Screens" })).toBeInTheDocument();
+    expect(screen.getByText("Institution use only")).toBeInTheDocument();
+    expect(screen.queryByText("Average occupancy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Booked value")).not.toBeInTheDocument();
   });
 
   test("government Topbar identifies the command centre session", () => {

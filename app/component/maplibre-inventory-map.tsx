@@ -4,7 +4,9 @@ import "./maplibre-inventory-map.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { Feature, Polygon } from "geojson";
-import { InventoryItem, formats, locations } from "../data";
+import { InventoryItem, formats } from "../data";
+import type { GeoBounds, MapLocation } from "../lib/geo/regions";
+import { defaultPlaceSearchProviders, searchPlaces, type PlaceSearchProvider, type PlaceSearchResult } from "../lib/geo/search";
 import { mapBounds } from "../utils";
 import { useI18n } from "../i18n/client";
 import { mapLibreLocale } from "../i18n/maplibre";
@@ -15,13 +17,22 @@ import { isMarketplaceInventoryAvailable } from "../lib/inventory-availability";
 type MapPoint = {
   x: number;
   y: number;
+  /** A region to fit instead of a point to centre on. */
+  bounds?: GeoBounds;
 };
 
 type MapSearchResult = MapPoint & {
   id: string;
   label: string;
   detail: string;
+  source: "place" | "device";
+  level?: PlaceSearchResult["level"];
+  place?: PlaceSearchResult;
 };
+
+// A one-off request to move the view (a search result), for the map that is
+// showing. The nonce makes the same result chosen twice move the map twice.
+type ViewRequest = { target: MapPoint; zoom?: number; nonce: number };
 
 export type AvailableCity = MapPoint & {
   id: string;
@@ -41,7 +52,13 @@ type Props = {
   onMarkerOpen?: (id: string) => void;
   variant?: "workspace" | "portal";
   followSelectedLocation?: boolean;
+  /** A search result chosen in the map's own search bar. */
+  onLocationChange?: (location: MapLocation) => void;
+  /** County level by default; a street geocoder adds itself as another provider. */
+  searchProviders?: PlaceSearchProvider[];
 };
+
+const defaultSearchProviders = defaultPlaceSearchProviders();
 
 const tileSize = 256;
 const FALLBACK_PIN_VIEW_BOX = "0 0 34 40";
@@ -65,9 +82,12 @@ export default function MapLibreInventoryMap({
   onMarkerOpen,
   variant = "workspace",
   followSelectedLocation = true,
+  onLocationChange,
+  searchProviders = defaultSearchProviders,
 }: Props) {
   const { locale, t } = useI18n();
   const isPortal = variant === "portal";
+  const [viewRequest, setViewRequest] = useState<ViewRequest | null>(null);
   const selectionEnabled = !isPortal;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -80,7 +100,25 @@ export default function MapLibreInventoryMap({
   const [deviceMarkersVisible, setDeviceMarkersVisible] = useState(() => shouldShowDeviceMarkers(initialZoom ?? DEFAULT_MAP_ZOOM));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const searchResults = useMemo(() => findMapSearchResults(searchQuery, inventory), [inventory, searchQuery]);
+  const [placeResults, setPlaceResults] = useState<MapSearchResult[]>([]);
+  const deviceResults = useMemo(() => findDeviceSearchResults(searchQuery, inventory), [inventory, searchQuery]);
+  const searchResults = useMemo(() => [...placeResults, ...deviceResults].slice(0, 8), [deviceResults, placeResults]);
+  const streetSearch = searchProviders.some((provider) => provider.levels.includes("street"));
+
+  // Places come from providers, which may be remote. Wait for a pause in
+  // typing and drop answers to an older query.
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) { setPlaceResults([]); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void searchPlaces(query, searchProviders, { signal: controller.signal, limit: 6 }).then((places) => {
+        if (controller.signal.aborted) return;
+        setPlaceResults(places.map((place) => ({ id: place.id, label: place.label, detail: place.detail, x: place.x, y: place.y, bounds: place.bounds, source: "place", level: place.level, place })));
+      }).catch(() => { if (!controller.signal.aborted) setPlaceResults([]); });
+    }, searchProviders.every((provider) => provider.levels.every((level) => level !== "street")) ? 0 : 200);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [searchProviders, searchQuery]);
   const availableCities = useMemo(() => getAvailableCities(visibleInventory), [visibleInventory]);
 
   useEffect(() => {
@@ -161,7 +199,10 @@ export default function MapLibreInventoryMap({
 
     map.on("load", () => {
       if (disposed) return;
-      if (initialZoom === undefined) fitDefaultOperatingRadius(map, selectedLocation, containerRef.current);
+      if (initialZoom === undefined) {
+        if (selectedLocation.bounds) fitRegion(map, selectedLocation.bounds, containerRef.current, 0);
+        else fitDefaultOperatingRadius(map, selectedLocation, containerRef.current);
+      }
       if (!isPortal) {
         map.addSource("radius-area", { type: "geojson", data: radiusFeature(selectedLocation, radius) });
         map.addLayer({
@@ -224,7 +265,8 @@ export default function MapLibreInventoryMap({
     }
 
     centerMarkerRef.current?.remove();
-    centerMarkerRef.current = isPortal ? null : createCenterMarker(map, selectedLocation, locale);
+    // A region has no search centre: the list is every screen inside it.
+    centerMarkerRef.current = isPortal || selectedLocation.bounds ? null : createCenterMarker(map, selectedLocation, locale);
   }, [isPortal, locale, radius, selectedLocation]);
 
   useEffect(() => {
@@ -234,6 +276,7 @@ export default function MapLibreInventoryMap({
     markerRefs.current.forEach((marker) => marker.remove());
     markerRefs.current = [
       ...createAvailableCityMarkers(map, availableCities, (city) => {
+        lastLocationKeyRef.current = locationKey({ x: city.x, y: city.y });
         onAreaChangeRef.current?.(city);
         map.easeTo({ center: percentToLngLat(city), zoom: DEFAULT_MAP_ZOOM, duration: 500 });
       }, locale),
@@ -260,12 +303,30 @@ export default function MapLibreInventoryMap({
     });
   }, [selectedInventoryId, selectionEnabled]);
 
+  // The view follows a change of location (detected position, a county, a
+  // map click), not a change of selected screen. A screen chosen in the list
+  // used to pull the map back to the search centre.
+  const selectedLocationKey = locationKey(selectedLocation);
+  const lastLocationKeyRef = useRef(selectedLocationKey);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !followSelectedLocation) return;
+    if (lastLocationKeyRef.current === selectedLocationKey) return;
+    lastLocationKeyRef.current = selectedLocationKey;
+    // Where the location follows the selected screen, a pin click must never
+    // move the map beneath the pointer.
     if (pinSelectedIdRef.current === selectedInventoryId) return;
-    map.easeTo({ center: percentToLngLat(selectedLocation), duration: 500 });
-  }, [followSelectedLocation, selectedInventoryId, selectedLocation]);
+    moveToLocation(map, selectedLocation, containerRef.current);
+    // selectedLocation is read through its key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followSelectedLocation, selectedLocationKey]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !viewRequest) return;
+    if (viewRequest.zoom !== undefined) map.easeTo({ center: percentToLngLat(viewRequest.target), zoom: Math.max(map.getZoom(), viewRequest.zoom), duration: 500 });
+    else moveToLocation(map, viewRequest.target, containerRef.current);
+  }, [viewRequest]);
 
   // An offscreen list selection comes into view. A pin click only changes
   // selection; it must never move the map beneath the pointer.
@@ -289,8 +350,18 @@ export default function MapLibreInventoryMap({
   function selectSearchResult(result: MapSearchResult) {
     setSearchQuery(result.label);
     setSearchOpen(false);
+    if (result.source === "place" && result.place) {
+      // A county fits its boundary; a street result centres at street scale.
+      const target: MapPoint = result.bounds ? { x: result.x, y: result.y, bounds: result.bounds } : { x: result.x, y: result.y };
+      lastLocationKeyRef.current = locationKey(target);
+      setViewRequest({ target, zoom: result.bounds ? undefined : STREET_ZOOM, nonce: Date.now() });
+      if (onLocationChange) onLocationChange(result.place);
+      else if (!result.bounds) onAreaChange?.({ x: result.x, y: result.y });
+      return;
+    }
+    lastLocationKeyRef.current = locationKey({ x: result.x, y: result.y });
     onAreaChange?.({ x: result.x, y: result.y });
-    mapRef.current?.easeTo({ center: percentToLngLat(result), zoom: Math.max(mapRef.current.getZoom(), 13), duration: 500 });
+    setViewRequest({ target: { x: result.x, y: result.y }, zoom: 13, nonce: Date.now() });
   }
 
   function runSearch() {
@@ -306,7 +377,7 @@ export default function MapLibreInventoryMap({
           aria-label={t("Map search")}
           ref={searchInputRef}
           value={searchQuery}
-          placeholder={t("Search address, device, or landmark")}
+          placeholder={t(streetSearch ? "Search address, county, or screen" : "Search county, region, or screen")}
           onChange={(event) => { setSearchQuery(event.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
           onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); runSearch(); } }}
@@ -318,8 +389,8 @@ export default function MapLibreInventoryMap({
         {searchOpen && searchQuery.trim() ? (
           <div className="map-search-results">
             {searchResults.length ? searchResults.map((result) => (
-              <button key={result.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectSearchResult(result)}>
-                <strong>{result.label}</strong><span>{t(result.detail)}</span>
+              <button key={`${result.source}-${result.id}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectSearchResult(result)}>
+                <strong>{result.label}</strong><span>{searchResultDetail(result, t)}</span>
               </button>
             )) : <span className="map-search-empty">{t("No map matches")}</span>}
           </div>
@@ -340,6 +411,7 @@ export default function MapLibreInventoryMap({
           followSelectedLocation={followSelectedLocation}
           availableCities={availableCities}
           variant={variant}
+          viewRequest={viewRequest}
         />
       ) : null}
       {mapStatus !== "loading" ? <div className="map-legend" aria-label={t("Map legend")}>
@@ -391,16 +463,27 @@ function cityMarkerAriaLabel(city: AvailableCity, locale: Locale = "en") {
   return translate(locale, city.inventoryCount === 1 ? "{city}: {count} available device. Zoom in to view devices." : "{city}: {count} available devices. Zoom in to view devices.", { city: city.label, count: city.inventoryCount });
 }
 
-function findMapSearchResults(query: string, inventory: InventoryItem[]) {
+function findDeviceSearchResults(query: string, inventory: InventoryItem[]): MapSearchResult[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
-  const candidates: MapSearchResult[] = [
-    ...locations.map((location) => ({ ...location, detail: "Location" })),
-    ...inventory.map((item) => ({ id: item.id, label: item.name, detail: [item.address, ...(item.tags ?? [])].join(" - "), x: item.x, y: item.y })),
-  ];
-  return candidates
+  return inventory
+    .map((item) => ({ id: item.id, label: item.name, detail: [item.address, ...(item.tags ?? [])].join(" - "), x: item.x, y: item.y, source: "device" as const }))
     .filter((candidate) => `${candidate.label} ${candidate.detail}`.toLowerCase().includes(normalized))
     .slice(0, 6);
+}
+
+function searchResultDetail(result: MapSearchResult, t: (message: string, variables?: Record<string, string | number>) => string) {
+  if (result.source === "device") return t(result.detail);
+  if (result.level === "province") return t("Province");
+  if (result.level === "county") return t("{kind}, Ontario", { kind: t(result.detail) });
+  return result.detail;
+}
+
+// Street results open close enough to read street names.
+const STREET_ZOOM = 15;
+
+function locationKey(point: MapPoint) {
+  return `${point.x.toFixed(4)}:${point.y.toFixed(4)}:${point.bounds?.join(",") ?? ""}`;
 }
 
 function FallbackMap({
@@ -417,7 +500,8 @@ function FallbackMap({
   availableCities,
   variant = "workspace",
   followSelectedLocation = true,
-}: Props & { availableCities: AvailableCity[]; onDeviceMarkerVisibilityChange: (visible: boolean) => void }) {
+  viewRequest,
+}: Props & { availableCities: AvailableCity[]; onDeviceMarkerVisibilityChange: (visible: boolean) => void; viewRequest?: ViewRequest | null }) {
   const { locale, t } = useI18n();
   const isPortal = variant === "portal";
   const selectionEnabled = !isPortal;
@@ -431,11 +515,11 @@ function FallbackMap({
     moved: boolean;
   } | null>(null);
   const [size, setSize] = useState({ width: 640, height: 560 });
-  const [zoom, setZoom] = useState(initialZoom ?? initialRasterZoom);
-  const [center, setCenter] = useState<LngLat>(() => {
+  const [zoom, setZoom] = useState(initialZoom ?? (selectedLocation.bounds ? zoomForBounds(selectedLocation.bounds, { width: 640, height: 560 }) : initialRasterZoom));
+  const [center, setCenter] = useState<LngLat>(() => selectedLocation.bounds ? boundsCenter(selectedLocation.bounds) : (() => {
     const [lng, lat] = percentToLngLat(selectedLocation);
     return { lng, lat };
-  });
+  })());
   const centerRef = useRef(center);
   const visibleIds = new Set(visibleInventory.map((item) => item.id));
   const centerWorld = lngLatToWorld(center.lng, center.lat, zoom);
@@ -451,12 +535,41 @@ function FallbackMap({
     onDeviceMarkerVisibilityChange(deviceMarkersVisible);
   }, [deviceMarkersVisible, onDeviceMarkerVisibilityChange]);
 
+  // Follow a change of location, not a change of selected screen.
+  const selectedLocationKey = locationKey(selectedLocation);
+  const lastLocationKey = useRef(selectedLocationKey);
   useEffect(() => {
     if (!followSelectedLocation) return;
+    if (lastLocationKey.current === selectedLocationKey) return;
+    lastLocationKey.current = selectedLocationKey;
     if (pinSelectedIdRef.current === selectedInventoryId) return;
-    const [lng, lat] = percentToLngLat(selectedLocation);
+    showLocation(selectedLocation);
+    // selectedLocation is read through its key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followSelectedLocation, selectedLocationKey]);
+
+  useEffect(() => {
+    if (!viewRequest) return;
+    lastLocationKey.current = locationKey(viewRequest.target);
+    if (viewRequest.zoom !== undefined) {
+      const [lng, lat] = percentToLngLat(viewRequest.target);
+      setMapCenter({ lng, lat });
+      setZoom((current) => Math.max(current, Math.min(maxRasterZoom, Math.round(viewRequest.zoom!))));
+    } else showLocation(viewRequest.target);
+    // Runs once per request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewRequest]);
+
+  function showLocation(location: MapPoint) {
+    if (location.bounds) {
+      setMapCenter(boundsCenter(location.bounds));
+      setZoom(zoomForBounds(location.bounds, size));
+      return;
+    }
+    const [lng, lat] = percentToLngLat(location);
     setMapCenter({ lng, lat });
-  }, [followSelectedLocation, selectedInventoryId, selectedLocation]);
+    setZoom((current) => (shouldShowDeviceMarkers(current) ? current : DEFAULT_MAP_ZOOM));
+  }
 
   // Only an offscreen list selection moves the viewport; clicking any pin
   // leaves its position unchanged, even at the edge of the map.
@@ -659,7 +772,7 @@ function FallbackMap({
           />
         ))}
       </div>
-      {!isPortal ? (
+      {!isPortal && !selectedLocation.bounds ? (
         <div
           className="fallback-radius"
           style={{
@@ -679,7 +792,7 @@ function FallbackMap({
         <button className="raster-control" type="button" onClick={() => zoomBy(1)} aria-label={t("Zoom in")}>+</button>
         <button className="raster-control" type="button" onClick={() => zoomBy(-1)} aria-label={t("Zoom out")}>-</button>
       </div>
-      {!isPortal ? <div className="fallback-center" style={markerStyle(selectedLocation, viewportOrigin, zoom)} /> : null}
+      {!isPortal && !selectedLocation.bounds ? <div className="fallback-center" style={markerStyle(selectedLocation, viewportOrigin, zoom)} /> : null}
       {!deviceMarkersVisible ? availableCities.map((city) => (
         <button
           aria-label={cityMarkerAriaLabel(city, locale)}
@@ -822,7 +935,48 @@ function syncMapMarkerVisibility(map: MapLibreMap, onChange: (visible: boolean) 
 
 function syncMapData(map: MapLibreMap, selectedLocation: MapPoint, radius: number) {
   const source = map.getSource("radius-area") as GeoJSONSource | undefined;
-  source?.setData(radiusFeature(selectedLocation, radius));
+  // A region lists every screen inside it, so no distance circle is drawn.
+  source?.setData(selectedLocation.bounds ? { type: "FeatureCollection", features: [] } : radiusFeature(selectedLocation, radius));
+}
+
+function regionPadding(container: HTMLElement | null) {
+  const shortestSide = Math.min(container?.clientWidth || 560, container?.clientHeight || 560);
+  return clamp(Math.round(shortestSide * 0.06), 16, 40);
+}
+
+function fitRegion(map: MapLibreMap, bounds: GeoBounds, container: HTMLElement | null, duration = 500) {
+  map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: regionPadding(container), duration, maxZoom: 12 });
+}
+
+// A region fits its bounds. A point keeps the current zoom at city scale, and
+// from a province or county view it opens the 30 km operating radius.
+function moveToLocation(map: MapLibreMap, location: MapPoint, container: HTMLElement | null) {
+  if (location.bounds) {
+    fitRegion(map, location.bounds, container);
+    return;
+  }
+  if (shouldShowDeviceMarkers(map.getZoom())) {
+    map.easeTo({ center: percentToLngLat(location), duration: 500 });
+    return;
+  }
+  const camera = map.cameraForBounds(radiusBounds(location, DEFAULT_MAP_VIEW_RADIUS_KM), { padding: regionPadding(container), maxZoom: 11 });
+  map.easeTo({ center: camera?.center ?? percentToLngLat(location), zoom: Math.max(camera?.zoom ?? DEFAULT_MAP_ZOOM, DEVICE_MARKER_MIN_ZOOM), duration: 500 });
+}
+
+function boundsCenter(bounds: GeoBounds): LngLat {
+  const north = lngLatToWorld(bounds[0], bounds[3], 0);
+  const south = lngLatToWorld(bounds[2], bounds[1], 0);
+  return worldToLngLat((north.x + south.x) / 2, (north.y + south.y) / 2, 0);
+}
+
+// The fallback map has whole zoom levels only. Pick the largest that fits.
+function zoomForBounds(bounds: GeoBounds, size: { width: number; height: number }) {
+  const topLeft = lngLatToWorld(bounds[0], bounds[3], 0);
+  const bottomRight = lngLatToWorld(bounds[2], bounds[1], 0);
+  const width = Math.max(1e-9, bottomRight.x - topLeft.x);
+  const height = Math.max(1e-9, bottomRight.y - topLeft.y);
+  const fit = Math.log2(Math.min((size.width * 0.9) / width, (size.height * 0.9) / height));
+  return clamp(Math.floor(fit), minRasterZoom, 12);
 }
 
 function createInventoryMarkers(

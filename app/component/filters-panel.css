@@ -252,3 +252,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+.filter-help {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 400;
+  line-height: 1.35;
+}

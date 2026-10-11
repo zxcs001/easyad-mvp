@@ -27,6 +27,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.cjs ./scripts/migrate.cjs
+# The Alert Ready listener runs from the same image as its own task: node scripts/naad-listener.cjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/naad-listener.cjs ./scripts/naad-listener.cjs
 
 USER nextjs
 EXPOSE 3000

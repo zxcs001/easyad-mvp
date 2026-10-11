@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import BookingView from "../app/component/booking-view";
 import type { InventoryItem } from "../app/data";
@@ -211,4 +212,115 @@ test("legacy static-format inventory also omits loop-time metrics", () => {
   expect(screen.queryByText("Your time each cycle")).not.toBeInTheDocument();
   expect(screen.queryByText("Time still free")).not.toBeInTheDocument();
   expect(screen.queryByText("Time already booked")).not.toBeInTheDocument();
+});
+
+function StatefulBooking({ item = baseItem, initial = draft, availability = null, onSubmit = vi.fn().mockResolvedValue(true) }: { item?: InventoryItem; initial?: BookingDraft; availability?: import("../app/lib/booking-schedule").ScreenAvailability | null; onSubmit?: () => Promise<boolean> }) {
+  const [current, setCurrent] = useState<BookingDraft>(initial);
+  return (
+    <>
+      <output data-testid="draft">{JSON.stringify(current)}</output>
+      <BookingView item={item} inventory={[item]} draft={current} bookings={[]} setDraft={setCurrent} hasCapacityConflict={() => false} onSubmit={onSubmit} onCancel={vi.fn()} canBuy loadAvailability={async () => availability} />
+    </>
+  );
+}
+
+const readDraft = () => JSON.parse(screen.getByTestId("draft").textContent ?? "{}") as BookingDraft;
+
+test("a length preset sets the end date from the start date", () => {
+  render(<StatefulBooking />);
+
+  fireEvent.click(screen.getByRole("button", { name: "2 weeks" }));
+
+  expect(readDraft()).toMatchObject({ start: "2026-07-10", end: "2026-07-23" });
+  expect(screen.getByRole("button", { name: "2 weeks" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("picking a calendar day moves the start and keeps the run length", () => {
+  render(<StatefulBooking />);
+
+  fireEvent.click(screen.getByRole("button", { name: /July 14: Space open/ }));
+
+  expect(readDraft()).toMatchObject({ start: "2026-07-14", end: "2026-07-16" });
+});
+
+test("time-of-day slots narrow the booking, change the price, and return to all day when cleared", () => {
+  render(<StatefulBooking />);
+  // 500 a day x 1.25 x 3 days.
+  expect(screen.getByText("Total cost").nextSibling).toHaveTextContent("1,875");
+
+  fireEvent.click(screen.getByRole("button", { name: /Morning/ }));
+  expect(readDraft().dayparts).toEqual(["morning"]);
+  expect(screen.getByRole("button", { name: /All day/ })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByText("Total cost").nextSibling).toHaveTextContent("469");
+  expect(screen.getByText("On screen each day").nextSibling).toHaveTextContent("4 hours");
+
+  fireEvent.click(screen.getByRole("button", { name: /Morning/ }));
+  expect(readDraft().dayparts).toEqual([]);
+  expect(screen.getByRole("button", { name: /All day/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a billboard has no time-of-day slots", () => {
+  render(<StatefulBooking item={{ ...baseItem, format: "static", deliveryMode: "static" }} />);
+
+  expect(screen.queryByRole("group", { name: "Time of day" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Time of day")).not.toBeInTheDocument();
+});
+
+test("budget-first planning sets the dates the budget pays for and blocks a budget below one day", async () => {
+  render(<StatefulBooking />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Start from a budget" }));
+  // The budget starts from the current quote, so the dates stay.
+  expect(screen.getByLabelText("Your budget (CAD)")).toHaveValue(1875);
+
+  fireEvent.change(screen.getByLabelText("Your budget (CAD)"), { target: { value: "5000" } });
+  // 625 a day: eight whole days, from July 10 to July 17.
+  await waitFor(() => expect(readDraft()).toMatchObject({ start: "2026-07-10", end: "2026-07-17" }));
+  expect(screen.getByText(/Your budget covers 8 days/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeEnabled();
+
+  fireEvent.change(screen.getByLabelText("Your budget (CAD)"), { target: { value: "100" } });
+  expect(screen.getByText(/This budget does not cover one day/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeDisabled();
+
+  // Fewer hours make the same budget last.
+  fireEvent.click(screen.getByRole("button", { name: /Overnight/ }));
+  await waitFor(() => expect(screen.getByText(/Your budget covers 1 day/)).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeEnabled();
+});
+
+test("a full screen offers the next open dates of the same length", async () => {
+  const availability = {
+    inventoryId: baseItem.id, deliveryMode: "digital" as const, timeZone: "America/Toronto", slotSeconds: 6, loopSeconds: 120, capacitySeconds: 12,
+    availableFrom: baseItem.availableFrom, availableTo: baseItem.availableTo,
+    commitments: [{ start: "2026-07-01", end: "2026-07-14", seconds: 12 }],
+  };
+  render(<StatefulBooking availability={availability} />);
+
+  await waitFor(() => expect(screen.getByText(/This screen is full for these dates/)).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /July 12: Full/ })).toBeInTheDocument();
+  expect(screen.getByText(/Next open dates/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Use these dates" }));
+
+  expect(readDraft()).toMatchObject({ start: "2026-07-15", end: "2026-07-17" });
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeEnabled();
+});
+
+test("a full evening leaves the morning open", async () => {
+  const availability = {
+    inventoryId: baseItem.id, deliveryMode: "digital" as const, timeZone: "America/Toronto", slotSeconds: 6, loopSeconds: 120, capacitySeconds: 12,
+    availableFrom: baseItem.availableFrom, availableTo: baseItem.availableTo,
+    commitments: [{ start: "2026-07-01", end: "2026-07-31", seconds: 12, dayparts: ["evening" as const] }],
+  };
+  render(<StatefulBooking availability={availability} initial={{ ...draft, dayparts: ["evening"] }} />);
+
+  await waitFor(() => expect(screen.getByText(/This screen is full at these times/)).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole("button", { name: /Evening/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Morning/ }));
+
+  expect(readDraft().dayparts).toEqual(["morning"]);
+  expect(screen.getByRole("button", { name: "Create campaign" })).toBeEnabled();
 });

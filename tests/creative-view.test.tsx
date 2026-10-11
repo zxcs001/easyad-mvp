@@ -112,6 +112,47 @@ describe("CreativeView", () => {
     expect(screen.getByRole("button", { name: "Submit upload for review" })).toBeDisabled();
   });
 
+  test("a ready-made design opens on plain fields that rebuild the preview, with HTML as the advanced option", async () => {
+    const user = userEvent.setup();
+    const preview = vi.fn(previewResponse);
+    vi.stubGlobal("fetch", preview);
+    render(<CreativeHarness onSubmit={vi.fn()} />);
+
+    expect(screen.getByRole("textbox", { name: "Business name" })).toHaveValue("Pine & Port");
+    expect(screen.getByText("Edit the HTML instead (advanced)").closest("details")).not.toHaveAttribute("open");
+    // A ready-made design asks for no safe-zone or distortion numbers.
+    expect(screen.queryByText(/Safe zone:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Glance test" })).toHaveTextContent("4 of 4 pass");
+
+    const headline = screen.getByRole("textbox", { name: "Headline" });
+    await user.clear(headline);
+    await user.type(headline, "Every single thing in our store is on sale today");
+    expect(screen.getByRole("region", { name: "Glance test" })).toHaveTextContent("1 of 4 pass");
+    await waitForPreview(preview, "EVERY SINGLE THING IN OUR STORE IS ON SALE <em>TODAY</em>");
+
+    await user.click(screen.getByRole("button", { name: "Fresh this week." }));
+    expect(headline).toHaveValue("Fresh this\nweek.");
+    await waitForPreview(preview, "FRESH THIS<br><em>WEEK.</em>");
+  });
+
+  test("hand-edited HTML disables the fields until the person goes back to them", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", previewResponse);
+    render(<CreativeHarness onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByText("Edit the HTML instead (advanced)"));
+    const editor = screen.getByRole("textbox", { name: "Template HTML" });
+    await user.clear(editor);
+    await user.type(editor, "<h1>Mine</h1>");
+    expect(screen.getByText("You changed the HTML by hand, so these fields no longer control the ad.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Headline" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Glance test" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use the fields again" }));
+    expect(screen.getByRole("textbox", { name: "Headline" })).toBeEnabled();
+    expect((screen.getByRole("textbox", { name: "Template HTML" }) as HTMLTextAreaElement).value).toContain("GOOD<br>THINGS");
+  });
+
   test("locks the new campaign selected by the previous step", () => {
     vi.stubGlobal("fetch", previewResponse);
     render(<CreativeHarness onSubmit={vi.fn()} lockBookingSelection />);
@@ -255,6 +296,10 @@ describe("CreativeView", () => {
     expect(cancel).toBeEnabled();
   });
 });
+
+async function waitForPreview(preview: ReturnType<typeof vi.fn>, fragment: string) {
+  await vi.waitFor(() => expect(preview.mock.calls.some(([, init]) => typeof init?.body === "string" && (JSON.parse(init.body) as { html: string }).html.includes(fragment))).toBe(true));
+}
 
 function CreativeHarness({ onSubmit, onCancel, lockBookingSelection = false, items = inventory, campaigns = bookings }: { onSubmit: Parameters<typeof CreativeView>[0]["onSubmit"]; onCancel?: Parameters<typeof CreativeView>[0]["onCancel"]; lockBookingSelection?: boolean; items?: InventoryItem[]; campaigns?: Booking[] }) {
   const [creativeDraft, setCreativeDraft] = useState(draft);

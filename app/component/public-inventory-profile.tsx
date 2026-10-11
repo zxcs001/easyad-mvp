@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { InventoryAdvertiserResource, MediaResource, formats } from "../data";
 import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../lib/db";
 import { isDigitalInventory } from "../lib/inventory-delivery";
+import { isReservedInstitutionScreen } from "../lib/screen-use-policy";
 import { money } from "../utils";
 import DeviceScreen, { ScaledDevicePreview } from "./device-screen";
 import LocalDateTime from "./local-date-time";
@@ -30,6 +31,7 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
   const template = resolveDeviceTemplate(undefined, inventory.displayTemplate);
   const templateLabel = deviceTemplates.find((entry) => entry.id === template)?.label ?? "Full screen";
   const city = deriveScreenCity(inventory.address);
+  const reserved = isReservedInstitutionScreen(inventory);
   const deviceSlides: DeviceMediaSlide[] = approvedDeviceResources
     .filter((resource) => resource.mediaType === "image" || resource.mediaType === "video")
     .map((resource) => ({
@@ -68,11 +70,15 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
         </div>
       </header>
 
+      {/* A screen reserved for its institution is not for sale. Its public
+          page shows what plays, not a rate card. */}
       <section className="public-device-summary">
         <PublicMetric locale={locale} label="Format" value={t(spec.label)} />
-        <PublicMetric locale={locale} label="Daily rate" value={money(inventory.price, locale)} />
-        <PublicMetric locale={locale} label="Impressions" value={formatNumber(inventory.impressions)} />
-        <PublicMetric locale={locale} label="Audience" value={t(inventory.audience)} />
+        {reserved ? <PublicMetric locale={locale} label="Screen use" value={t("Institution use only")} /> : <>
+          <PublicMetric locale={locale} label="Daily rate" value={money(inventory.price, locale)} />
+          <PublicMetric locale={locale} label="Impressions" value={formatNumber(inventory.impressions)} />
+          <PublicMetric locale={locale} label="Audience" value={t(inventory.audience)} />
+        </>}
       </section>
       <DeviceApiGuide deviceId={inventory.id} deviceName={inventory.name} mediaCount={previewSlides.length} />
       {inventory.tags?.length ? <section className="public-device-section public-device-tags"><div className="public-section-heading"><span className="eyebrow">{t("Device tags")}</span></div><div className="device-tag-list">{inventory.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div></section> : null}

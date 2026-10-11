@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isRoleValue, isViewValue } from "./roles";
-import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, locations } from "./data";
+import { ApprovalEvent, Booking, Creative, DeviceAlert, FormatKey, InventoryItem, MediaResource, Role, Transaction, View, formats } from "./data";
+import { ONTARIO_LOCATION_ID, isRegionLocationId, loadRegionBoundaries, normalizeLocationId, ontarioLocation, regionContains, regionLocation, regionLocations, type RegionBoundaries } from "./lib/geo/regions";
 import BookingView from "./component/booking-view";
 import CampaignSpacesView from "./component/campaign-spaces-view";
 import CampaignWorkspace from "./component/campaign-workspace";
 import CreativeView from "./component/creative-view";
-import { defaultCreativeHtml } from "./creative-templates";
+import { effectiveTemplateHtml } from "./quick-ad";
 import ContentLibraryView from "./component/content-library-view";
 import { Sidebar, Topbar } from "./component/dashboard-shell";
 import DiscoverView from "./component/discover-view";
@@ -17,10 +18,13 @@ import InstitutionTeamView from "./component/institution-team-view";
 import FleetOperations from "./component/fleet-operations";
 import InstitutionNetworkView, { type EmergencyOverrideDraft } from "./component/institution-network-view";
 import EmergencyUpdatesView from "./component/emergency-updates-view";
+import InstitutionAdvertisingView from "./component/institution-advertising-view";
+import { showsAdvertisingArea, type ScreenUse } from "./lib/screen-use-policy";
 import Portal from "./component/portal";
 import { EmptyState } from "./component/shared-ui";
 import { BillingView, ReportsView } from "./component/reports-billing-views";
 import type { BookingDraft, CreativeDraft, Filters, MapPoint } from "./types";
+import type { DaypartId } from "./lib/booking-schedule";
 import { CURRENT_LOCATION_ID, MANUAL_LOCATION_ID, creativeDraftForFormat, defaultBookingDates, defaultFilters, estimateSpend, exceedsLoopCapacity, geoToMapPoint, isKnownLocationId, mapDistanceKm, overlaps } from "./utils";
 import type { DbUser } from "./lib/db";
 import { canAccessInstitutionWorkspace } from "./roles";
@@ -55,6 +59,8 @@ export default function OohApp({
   initialBookingId,
   initialCreativeSubmitted = false,
   featureFlags = { campaign_model_v2: false, agency_workspace: false, static_fulfillment: false, payments: false },
+  fleetToolsEnabled = false,
+  playerControlEnabled = false,
   surface = "marketplace",
 }: {
   currentUser?: DbUser | null;
@@ -80,6 +86,10 @@ export default function OohApp({
   initialBookingId?: string;
   initialCreativeSubmitted?: boolean;
   featureFlags?: FeatureFlags;
+  /** FEATURE_FLEET_OPERATIONS. Adds the Fleet tools page for owners, operators and Super Admin. */
+  fleetToolsEnabled?: boolean;
+  /** FEATURE_PLAYER_CONTROL. Shows the Player connection tab in the command centre. */
+  playerControlEnabled?: boolean;
   surface?: "marketplace" | "government";
 }) {
   const { t } = useI18n();
@@ -143,6 +153,8 @@ export default function OohApp({
     if (surface === "government") url.searchParams.delete("role");
     else url.searchParams.set("role", role);
     url.searchParams.set("view", view);
+    // The command centre keeps its open tab in ?panel=; other views have none.
+    if (view !== "network") url.searchParams.delete("panel");
     if (bookingId) url.searchParams.set("bookingId", bookingId);
     else url.searchParams.delete("bookingId");
     if (url.href !== window.location.href) window.history.pushState(window.history.state, "", url);
@@ -188,9 +200,17 @@ export default function OohApp({
     window.addEventListener("beforeunload", protectDraft);
     return () => window.removeEventListener("beforeunload", protectDraft);
   }, [campaignCreationActive]);
-  const [selectedLocationId, setSelectedLocationId] = useState(
-    initialLocationId && isKnownLocationId(initialLocationId) ? initialLocationId : "thunder-bay",
-  );
+  // No saved location: show Ontario first, then move to the visitor's own
+  // location if the browser shares it.
+  const [selectedLocationId, setSelectedLocationIdState] = useState(() => {
+    const requested = normalizeLocationId(initialLocationId);
+    return requested && isKnownLocationId(requested) ? requested : ONTARIO_LOCATION_ID;
+  });
+  const selectedLocationIdRef = useRef(selectedLocationId);
+  selectedLocationIdRef.current = selectedLocationId;
+  // Once the person picks a location, a late geolocation answer must not replace it.
+  const locationChosenRef = useRef(Boolean(initialLocationId && initialLocationId !== CURRENT_LOCATION_ID) || Boolean(initialArea));
+  const [locating, setLocating] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<MapPoint | null>(
     initialArea && initialLocationId && [CURRENT_LOCATION_ID, MANUAL_LOCATION_ID].includes(initialLocationId)
       ? { id: initialLocationId, label: initialLocationId === MANUAL_LOCATION_ID ? "Selected map area" : "Current location", ...initialArea }
@@ -243,39 +263,90 @@ export default function OohApp({
     document.title = `${t(documentTitleByView[view])} — ${t(surface === "government" ? "Civic Screen Operations" : "EasyAD Platform")}`;
   }, [surface, t, view]);
 
-  useEffect(() => {
-    if (initialArea || initialLocationId !== CURRENT_LOCATION_ID) return;
-    if (!("geolocation" in navigator)) {
-      setSelectedLocationId("thunder-bay");
+  // Ask for the visitor's location the first time a map view opens on the
+  // marketplace. Without it (denied, unsupported, timed out) the map stays on
+  // Ontario. The institution workspace centres on its own fleet instead.
+  const geolocationRequestedRef = useRef(false);
+  const wantsGeolocation = surface === "marketplace" && !initialArea && (!initialLocationId || initialLocationId === CURRENT_LOCATION_ID) && ["portal", "discover", "booking"].includes(view);
+  function requestCurrentLocation({ fromUser = false } = {}) {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      if (selectedLocationIdRef.current === CURRENT_LOCATION_ID) setSelectedLocationIdState(ONTARIO_LOCATION_ID);
       return;
     }
-
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setLocating(false);
+        if (!fromUser && locationChosenRef.current) return;
         setCurrentLocation({
           id: CURRENT_LOCATION_ID,
           label: "Current location",
+          level: "point",
           ...geoToMapPoint(position.coords.latitude, position.coords.longitude),
         });
-        setSelectedLocationId(CURRENT_LOCATION_ID);
+        setSelectedLocationIdState(CURRENT_LOCATION_ID);
       },
       () => {
-        setSelectedLocationId("thunder-bay");
+        setLocating(false);
+        if (selectedLocationIdRef.current === CURRENT_LOCATION_ID) setSelectedLocationIdState(ONTARIO_LOCATION_ID);
       },
-      { enableHighAccuracy: true, maximumAge: 300000, timeout: 8000 },
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
     );
-  }, [initialLocationId]);
+  }
+  useEffect(() => {
+    if (!wantsGeolocation || geolocationRequestedRef.current) return;
+    geolocationRequestedRef.current = true;
+    requestCurrentLocation();
+    // requestCurrentLocation reads refs only; it does not need to re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsGeolocation]);
 
-  const locationOptions = useMemo(() => currentLocation ? [currentLocation, ...locations] : locations, [currentLocation]);
-  const selectedLocation =
+  function setSelectedLocationId(id: string) {
+    locationChosenRef.current = true;
+    if (id === CURRENT_LOCATION_ID && currentLocation?.id !== CURRENT_LOCATION_ID) {
+      setSelectedLocationIdState(CURRENT_LOCATION_ID);
+      requestCurrentLocation({ fromUser: true });
+      return;
+    }
+    setSelectedLocationIdState(id);
+  }
+
+  // A search result: a region is selected by its id; a point (a street result
+  // or a device) becomes the search centre.
+  function selectSearchLocation(location: MapPoint) {
+    locationChosenRef.current = true;
+    if (isRegionLocationId(location.id)) {
+      setSelectedLocationIdState(normalizeLocationId(location.id)!);
+      return;
+    }
+    setCurrentLocation({ ...location, id: MANUAL_LOCATION_ID, level: "point", bounds: undefined });
+    setSelectedLocationIdState(MANUAL_LOCATION_ID);
+  }
+
+  const locationOptions = useMemo(() => currentLocation ? [currentLocation, ...regionLocations] : regionLocations, [currentLocation]);
+  const selectedLocation: MapPoint =
     [CURRENT_LOCATION_ID, MANUAL_LOCATION_ID].includes(selectedLocationId) && currentLocation
       ? currentLocation
-      : locations.find((location) => location.id === selectedLocationId) ?? locations[0];
+      : regionLocation(selectedLocationId) ?? ontarioLocation;
+  const selectedRegion = selectedLocation.bounds ? selectedLocation : null;
+
+  // County boundaries load only once a region filters the list. Until then
+  // the bounding box stands in.
+  const [regionBoundaries, setRegionBoundaries] = useState<RegionBoundaries | null>(null);
+  useEffect(() => {
+    if (!selectedRegion || regionBoundaries) return;
+    let cancelled = false;
+    void loadRegionBoundaries().then((boundaries) => { if (!cancelled) setRegionBoundaries(boundaries); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [regionBoundaries, selectedRegion]);
+
   const visibleInventory = useMemo(
     () =>
       inventory
-        .map((item) => ({ ...item, distance: mapDistanceKm(selectedLocation, item) }))
-        .filter((item) => item.distance <= filters.radius)
+        // A region lists every screen inside it, so the distance (from the
+        // region's centre) only orders the list and is not shown.
+        .map((item) => ({ ...item, distance: mapDistanceKm(selectedLocation, item), withinArea: selectedRegion ? regionContains(selectedRegion, item, regionBoundaries) : undefined }))
+        .filter((item) => item.withinArea ?? item.distance <= filters.radius)
         .filter((item) => filters.format === "all" || item.format === filters.format)
         .filter((item) => item.impressions >= filters.minImpressions)
         .filter((item) => item.traffic >= filters.minTraffic)
@@ -284,8 +355,9 @@ export default function OohApp({
         .filter((item) => filters.competitor === "all" || item.competitor === filters.competitor)
         .filter((item) => !filters.selectedTags.length || filters.selectedTags.every((tag) => item.tags?.includes(tag)))
         .filter((item) => item.price <= filters.priceMax)
-        .sort((a, b) => a.distance - b.distance),
-    [filters, inventory, selectedLocation],
+        .sort((a, b) => a.distance - b.distance)
+        .map(({ withinArea, ...item }) => ({ ...item, distance: withinArea === undefined ? item.distance : Number.NaN })),
+    [filters, inventory, regionBoundaries, selectedLocation, selectedRegion],
   );
   // Only Find screens and Request dates choose from the filtered list. Inventory
   // and the other management views list every device, and used to search the
@@ -306,6 +378,11 @@ export default function OohApp({
     ? managedUsers.find((user) => user.id === networkSelectedInventory.institutionId && user.role === "institutional")
     : null;
   const networkInstitutionName = currentUser?.role === "admin" ? selectedInstitution?.name ?? "the selected institution" : currentUser?.name ?? "this institution";
+  const isGovernmentSurface = surface === "government";
+  // The institution workspace shows commercial views only once a screen is
+  // open to private-sector advertising, or advertising history remains.
+  const showAdvertising = isGovernmentSurface && showsAdvertisingArea(institutionNetworkInventory, bookings);
+  const showFleetTools = fleetToolsEnabled && ["admin", "institutional", "operator"].includes(currentUser?.role ?? "");
 
   function launchPortal(nextRole: Role, nextView: View) {
     if (!currentUser) return;
@@ -321,16 +398,19 @@ export default function OohApp({
     setFilters((current) => ({ ...current, format }));
   }
 
-  function hasCapacityConflict(inventoryId: string, start: string, end: string, adSlots = 1, excludeId = "") {
+  function hasCapacityConflict(inventoryId: string, start: string, end: string, adSlots = 1, excludeId = "", dayparts: DaypartId[] = []) {
     const item = inventory.find((unit) => unit.id === inventoryId);
     if (!item) return true;
     if (isStaticInventory(item)) return !isInventoryAvailableForDates(item, start, end);
-    return exceedsLoopCapacity(item, bookings, start, end, adSlots, excludeId);
+    return exceedsLoopCapacity(item, bookings, start, end, adSlots, excludeId, dayparts);
   }
 
   async function submitBooking(file?: File | null) {
     if (!canBuyAds || !selectedInventory) return false;
-    if (hasCapacityConflict(selectedInventory.id, bookingDraft.start, bookingDraft.end, bookingDraft.adSlots)) return false;
+    // Time-of-day slots apply to digital screens only. A draft keeps them while
+    // the person browses, so a billboard request drops them here.
+    const dayparts = isStaticInventory(selectedInventory) ? [] : bookingDraft.dayparts ?? [];
+    if (hasCapacityConflict(selectedInventory.id, bookingDraft.start, bookingDraft.end, bookingDraft.adSlots, "", dayparts)) return false;
     const body = new FormData();
     if (file) body.set("file", file);
     body.set("inventoryId", selectedInventory.id);
@@ -339,6 +419,7 @@ export default function OohApp({
     body.set("start", bookingDraft.start);
     body.set("end", bookingDraft.end);
     body.set("adSlots", String(bookingDraft.adSlots));
+    if (dayparts.length) body.set("dayparts", dayparts.join(","));
     const response = await fetch("/api/bookings", {
       method: "POST",
       body,
@@ -463,10 +544,14 @@ export default function OohApp({
     if (isStaticInventory(item) && source !== "upload") throw new Error("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.");
     if (source === "upload" && !file) throw new Error("Choose a media file before submitting your creative.");
     const draft = creativeDraftForFormat(creativeDraft, item.format);
-    const { htmlByTopic, ...creativeFields } = draft;
+    const { htmlByTopic: _html, fieldsByTopic: _fields, ...creativeFields } = draft;
+    // A ready-made design is laid out inside the format's safe zone and is
+    // never scaled, so it carries the format's own values, not slider input.
     const body = source === "upload" && file ? creativeUploadForm(draft, file) : JSON.stringify({
       ...creativeFields,
-      html: htmlByTopic?.[draft.template] ?? defaultCreativeHtml[draft.template],
+      safeZone: Math.max(draft.safeZone, formats[draft.format].safeZone),
+      distortion: 0,
+      html: effectiveTemplateHtml(draft),
     });
     const response = await fetch(`/api/bookings/${bookingId}/creative`, {
       method: "POST",
@@ -555,6 +640,24 @@ export default function OohApp({
       return { value: payload.item };
     } catch {
       return { error: "Unable to save display settings. Try again." };
+    }
+  }
+
+  async function setScreenUse(id: string, use: ScreenUse) {
+    if (!canAccessInstitutionWorkspace(currentUser?.role)) return { error: "Institution account or Super Admin access required" };
+    const current = inventory.find((item) => item.id === id);
+    try {
+      const response = await fetch(`/api/institution/screens/${encodeURIComponent(id)}/use`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ use, version: current?.fleetVersion }),
+      });
+      const payload = await response.json().catch(() => ({})) as { item?: InventoryItem; error?: string };
+      if (!response.ok || !payload.item) return { error: payload.error ?? "Screen use could not be changed" };
+      setInventory((items) => items.map((item) => item.id === id ? payload.item! : item));
+      return { value: payload.item };
+    } catch {
+      return { error: "Unable to reach the screen service. Try again." };
     }
   }
 
@@ -668,8 +771,9 @@ export default function OohApp({
   }
 
   function selectMapArea(point: { x: number; y: number }) {
-    setCurrentLocation({ id: MANUAL_LOCATION_ID, label: "Selected map area", x: point.x, y: point.y });
-    setSelectedLocationId(MANUAL_LOCATION_ID);
+    locationChosenRef.current = true;
+    setCurrentLocation({ id: MANUAL_LOCATION_ID, label: "Selected map area", level: "point", x: point.x, y: point.y });
+    setSelectedLocationIdState(MANUAL_LOCATION_ID);
   }
 
   function renderDashboardView() {
@@ -677,9 +781,12 @@ export default function OohApp({
       case "emergency":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return <EmptyInventoryPanel canManage={false} />;
         return <EmergencyUpdatesView institutionId={currentUser?.role === "institutional" ? currentUser.id : ""} institutionName={currentUser?.name ?? ""} institutions={currentUser?.role === "admin" ? managedUsers.filter(user => user.role === "institutional").map(({ id, name }) => ({ id, name })) : []} onCreate={createEmergencyOverride} onEnd={endEmergencyOverride} />;
+      case "fleet":
+        if (!showFleetTools) return null;
+        return <FleetOperations />;
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
-        return <InstitutionNetworkView institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
+        return <InstitutionNetworkView playerControlEnabled={playerControlEnabled} institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
       case "discover":
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
@@ -690,6 +797,8 @@ export default function OohApp({
             setSelectedLocationId={setSelectedLocationId}
             selectedLocation={selectedLocation}
             onAreaChange={selectMapArea}
+            onLocationChange={selectSearchLocation}
+            locating={locating}
             mapZoom={initialMapZoom}
             locationOptions={locationOptions}
             selectedInventory={selectedInventory}
@@ -744,7 +853,7 @@ export default function OohApp({
       case "resources":
         return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
-        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} />;
+        if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} institutionMode={isGovernmentSurface} />;
         return (
           <InventoryView
             inventory={inventory}
@@ -762,11 +871,13 @@ export default function OohApp({
             canManage={canManageInventory}
             canDelete={canDeleteInventory}
             approvalRequired={currentUser?.role === "operator"}
+            institutionMode={isGovernmentSurface}
           />
         );
       case "calendar":
         return <CalendarView inventory={inventory} bookings={bookings} />;
       case "approvals":
+        if (isGovernmentSurface) return <ApprovalsView mode="content" bookings={[]} inventory={inventory} creatives={[]} mediaResources={mediaResources} canReviewDeviceContent={canAccessInstitutionWorkspace(currentUser?.role)} approvalHistory={[]} hasConflict={() => false} updateBooking={updateBooking} updateMediaApproval={updateMediaApproval} />;
         return <ApprovalsView bookings={bookings} inventory={inventory} creatives={creatives} mediaResources={mediaResources} canReviewDeviceContent={canAccessInstitutionWorkspace(currentUser?.role)} approvalHistory={approvalHistory} hasConflict={(inventoryId, start, end, excludeId) => hasCapacityConflict(inventoryId, start, end, bookings.find((booking) => booking.id === excludeId)?.adSlots ?? 1, excludeId)} updateBooking={updateBooking} updateMediaApproval={updateMediaApproval} />;
       case "accounts":
         if (currentUser?.role === "institutional") return <InstitutionTeamView institution={currentUser} operators={institutionOperators} onCreateOperator={createInstitutionOperator} onDeleteOperator={deleteInstitutionOperator} />;
@@ -776,6 +887,25 @@ export default function OohApp({
         return <ReportsView bookings={bookings} inventory={inventory} transactions={transactions} onRunDelivery={runDeliveryTick} canRunDelivery={canManageInventory} isAdvertiser={role === "advertiser"} />;
       case "billing":
         return <BillingView bookings={bookings} transactions={transactions} onSettle={settleInvoice} canManage={canManageInventory} isAdvertiser={role === "advertiser"} paymentsEnabled={featureFlags.payments} />;
+      case "advertising":
+        if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
+        return (
+          <InstitutionAdvertisingView
+            inventory={institutionNetworkInventory}
+            bookings={bookings}
+            creatives={creatives}
+            transactions={transactions}
+            approvalHistory={approvalHistory}
+            paymentsEnabled={featureFlags.payments}
+            hasConflict={(inventoryId, start, end, excludeId) => { const booking = bookings.find((entry) => entry.id === excludeId); return hasCapacityConflict(inventoryId, start, end, booking?.adSlots ?? 1, excludeId, booking?.dayparts ?? []); }}
+            updateBooking={updateBooking}
+            updateMediaApproval={updateMediaApproval}
+            onSettle={settleInvoice}
+            onRunDelivery={runDeliveryTick}
+            onOpenCommandCentre={(id) => { setSelectedInventoryId(id); navigateToView("network"); }}
+            onEditScreen={(id) => { setSelectedInventoryId(id); navigateToView("inventory"); }}
+          />
+        );
       default:
         return null;
     }
@@ -797,11 +927,10 @@ export default function OohApp({
 
   return (
     <div className={`shell${surface === "government" ? " government-shell" : ""}${navCollapsed ? " is-rail" : ""}`}>
-      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} />
+      <Sidebar role={role} view={view} setRole={setRole} setView={navigateToView} currentUser={currentUser} surface={surface} collapsed={navCollapsed} onToggleCollapsed={toggleNavCollapsed} navigationLocked={campaignCreationActive} showAdvertising={showAdvertising} showFleetTools={showFleetTools} />
       <main className="workspace">
         <Topbar view={view} visibleCount={role === "advertiser" ? visibleInventory.length : inventory.length} inventory={inventory} bookings={bookings} role={role} surface={surface} campaignCreationLocked={campaignCreationActive} />
         {renderDashboardView()}
-        {["network","inventory","accounts"].includes(view)&&["admin","institutional","operator"].includes(currentUser?.role??"")?<FleetOperations/>:null}
       </main>
     </div>
   );
@@ -816,8 +945,10 @@ function newInventoryTemplate(): InventoryItem {
     name: "",
     operator: "",
     format: "digital",
-    x: 50,
-    y: 50,
+    // The location picker opens on southern Ontario, not the middle of the
+    // continent. The owner still pins the exact spot.
+    x: ontarioLocation.x,
+    y: ontarioLocation.y,
     // Start blank so the linear setup flow collects real device data instead
     // of carrying placeholder values into the review step or public page.
     address: "",
@@ -875,6 +1006,8 @@ const documentTitleByView: Record<View, string> = {
   accounts: "Account management",
   reports: "Campaign analytics",
   billing: "Payments and billing",
+  advertising: "Private-sector advertising",
+  fleet: "Fleet tools",
 };
 
 function EmptyInventoryPanel({ canManage }: { canManage: boolean }) {

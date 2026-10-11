@@ -20,7 +20,9 @@ export type View =
   | "approvals"
   | "accounts"
   | "reports"
-  | "billing";
+  | "billing"
+  | "advertising"
+  | "fleet";
 
 export type DisplayTemplate = "fullscreen" | "weather" | "public-info" | "transit" | "community";
 
@@ -136,6 +138,9 @@ export type DeviceAlert = {
   expiresAt: string;
   endedAt: string | null;
   image?: { url: string; mimeType: string; originalName: string; sizeBytes: number } | null;
+  /** "alert-ready" when relayed from the official NAAD System feed. */
+  source?: "institution" | "alert-ready";
+  officialAlertKey?: string | null;
 };
 
 export type Booking = {
@@ -146,6 +151,8 @@ export type Booking = {
   start: string;
   end: string;
   adSlots: number;
+  /** Time-of-day slots in Toronto time. Absent or empty means all day. */
+  dayparts?: import("./lib/booking-schedule").DaypartId[];
   creativeStatus: "not submitted" | "approved" | "pending review" | "needs changes";
   status: "pending approval" | "creative review" | "approved" | "scheduled" | "live" | "completed" | "rejected" | "cancelled";
   spend: number;
@@ -218,6 +225,7 @@ export type InventoryAdvertiserResource = Creative & {
   start: string;
   end: string;
   bookingStatus: Booking["status"];
+  dayparts?: Booking["dayparts"];
 };
 
 export const formats = {
@@ -254,11 +262,4 @@ export const formats = {
   priceMultiplier: number;
 }>;
 
-export const locations = [
-  { id: "thunder-bay", label: "Thunder Bay, ON", x: 67.29, y: 40.95 },
-  { id: "downtown", label: "Downtown Port Arthur", x: 67.29, y: 40.88 },
-  { id: "airport", label: "Thunder Bay Airport", x: 67.17, y: 41.05 },
-  { id: "university", label: "Lakehead University", x: 67.32, y: 40.94 },
-  { id: "retail", label: "Intercity Retail District", x: 67.33, y: 40.99 },
-  { id: "waterfront", label: "Marina Park Waterfront", x: 67.28, y: 40.88 },
-];
+// Map locations (Ontario and its counties) live in app/lib/geo/regions.ts.

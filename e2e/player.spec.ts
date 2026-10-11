@@ -55,6 +55,7 @@ test("paired Chrome screen updates without reload, acknowledges revisions, recov
     const page = await display.newPage();
     const dashboard = await owner.newPage();
     await dashboard.goto("/government?view=network");
+    await dashboard.getByRole("tab", { name: "Player connection" }).click();
     const control = dashboard.getByRole("region", { name: "Player connection" });
     await expect(control).toBeVisible();
     await control.getByRole("button", { name: "Create pairing code" }).click();

@@ -1,28 +1,65 @@
 import type { PoolClient } from "pg";
 import type { PlayerSlide } from "../player-types";
 import { isFeatureEnabled } from "./feature-flags";
+import { effectiveDayparts, parseDayparts, SCHEDULE_TIME_ZONE, type DaypartId } from "./booking-schedule";
 export class ScheduleError extends Error {
     readonly status = 409;
 }
 export type Allocation = {
-    model: "fixed-slot-v1";
+    /** fixed-slot-v1 plays all day on UTC dates. daypart-slot-v1 plays in chosen local time-of-day slots on local dates. */
+    model: "fixed-slot-v1" | "daypart-slot-v1";
     slotSeconds: number;
     slots: number;
     loopSeconds: number;
     startDate: string;
     endDate: string;
-    timezone: "UTC";
+    timezone: "UTC" | typeof SCHEDULE_TIME_ZONE;
     operatingHours: "00:00-24:00";
-    dayparts: [
-    ];
+    /** Empty means all day. */
+    dayparts: DaypartId[];
 };
-export function allocation(startDate: string, endDate: string, slotSeconds: number, loopSeconds: number, slots = 1): Allocation {
+export function allocation(startDate: string, endDate: string, slotSeconds: number, loopSeconds: number, slots = 1, dayparts: readonly DaypartId[] = []): Allocation {
     for (const date of [startDate, endDate])
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)
             throw new ScheduleError("Valid UTC schedule dates are required");
     if (endDate < startDate || !Number.isInteger(slots) || slots < 1 || slotSeconds < 2 || loopSeconds < slotSeconds * slots)
         throw new ScheduleError("Invalid digital allocation");
-    return { model: "fixed-slot-v1", slotSeconds, slots, loopSeconds, startDate, endDate, timezone: "UTC", operatingHours: "00:00-24:00", dayparts: [] };
+    const slotsOfDay = parseDayparts([...dayparts]);
+    if (!slotsOfDay)
+        throw new ScheduleError("Unknown time-of-day slot");
+    // All day keeps the original model, so an existing booking and a new
+    // all-day booking have one representation and one playback rule.
+    if (!slotsOfDay.length)
+        return { model: "fixed-slot-v1", slotSeconds, slots, loopSeconds, startDate, endDate, timezone: "UTC", operatingHours: "00:00-24:00", dayparts: [] };
+    return { model: "daypart-slot-v1", slotSeconds, slots, loopSeconds, startDate, endDate, timezone: SCHEDULE_TIME_ZONE, operatingHours: "00:00-24:00", dayparts: slotsOfDay };
+}
+type CommitmentRow = {
+    id: string;
+    start_date: string;
+    end_date: string;
+    seconds: number;
+    loop_seconds: number;
+    dayparts: unknown;
+};
+// Every confirmed digital commitment on a screen: campaign placements and
+// legacy bookings. The capacity check and the public availability calendar
+// read the same rows, so the calendar never offers time the check refuses.
+export async function listDigitalCommitments(client: PoolClient, inventoryId: string, exclude: string[] = []) {
+    const result = await client.query<CommitmentRow>(`
+    SELECT p.id,p.start_date,p.end_date,
+      COALESCE((p.schedule_snapshot->>'slotSeconds')::int,i.image_interval)*COALESCE((p.schedule_snapshot->>'slots')::int,1) seconds,
+      COALESCE((p.schedule_snapshot->>'loopSeconds')::int,i.max_loop_seconds) loop_seconds,
+      COALESCE(p.schedule_snapshot->'dayparts','[]'::jsonb) dayparts
+    FROM placements p JOIN inventory i ON i.id=p.inventory_id JOIN campaigns c ON c.id=p.campaign_id
+    WHERE p.inventory_id=$1 AND p.delivery_mode='digital' AND p.status IN ('confirmed','ready_for_fulfillment','live')
+      AND c.status<>'archived' AND p.id NOT LIKE 'PLC-LEGACY-%' AND NOT(p.id=ANY($2::text[]))
+    UNION ALL SELECT b.id,b.start_date,b.end_date,
+      COALESCE((b.schedule_snapshot->>'slotSeconds')::int,i.image_interval)*b.ad_slots,
+      COALESCE((b.schedule_snapshot->>'loopSeconds')::int,i.max_loop_seconds),
+      COALESCE(b.schedule_snapshot->'dayparts',to_jsonb(b.dayparts),'[]'::jsonb)
+    FROM bookings b JOIN inventory i ON i.id=b.inventory_id
+    WHERE b.inventory_id=$1 AND b.status IN ('approved','scheduled','live') AND NOT(b.id=ANY($2::text[]))`, [inventoryId, exclude]);
+    return result.rows.map(row => ({ ...row, seconds: Number(row.seconds), loop_seconds: Number(row.loop_seconds), dayparts: parseDayparts(row.dayparts) ?? [] }));
 }
 // Caller holds the inventory row lock. All commitments (including legacy) share this check.
 export async function checkDigitalCapacity(client: PoolClient, inventoryId: string, requested: Allocation, exclude: string[] = []) {
@@ -30,30 +67,20 @@ export async function checkDigitalCapacity(client: PoolClient, inventoryId: stri
     if(policy&&(!policy.advertising_opt_in||policy.content_visibility==="private"))throw new ScheduleError("Owner advertising participation is required");
     const capacity=requested.loopSeconds-Number(policy?.reserved_seconds??0);
     if(requested.slots*requested.slotSeconds>capacity)throw new ScheduleError("Reserved institutional airtime leaves insufficient capacity");
-    const result = await client.query<{
-        id: string;
-        start_date: string;
-        end_date: string;
-        seconds: number;
-        loop_seconds: number;
-    }>(`
-    SELECT p.id,p.start_date,p.end_date,
-      COALESCE((p.schedule_snapshot->>'slotSeconds')::int,i.image_interval)*COALESCE((p.schedule_snapshot->>'slots')::int,1) seconds,
-      COALESCE((p.schedule_snapshot->>'loopSeconds')::int,i.max_loop_seconds) loop_seconds
-    FROM placements p JOIN inventory i ON i.id=p.inventory_id JOIN campaigns c ON c.id=p.campaign_id
-    WHERE p.inventory_id=$1 AND p.delivery_mode='digital' AND p.status IN ('confirmed','ready_for_fulfillment','live')
-      AND c.status<>'archived' AND p.id NOT LIKE 'PLC-LEGACY-%' AND NOT(p.id=ANY($2::text[]))
-    UNION ALL SELECT b.id,b.start_date,b.end_date,
-      COALESCE((b.schedule_snapshot->>'slotSeconds')::int,i.image_interval)*b.ad_slots,
-      COALESCE((b.schedule_snapshot->>'loopSeconds')::int,i.max_loop_seconds)
-    FROM bookings b JOIN inventory i ON i.id=b.inventory_id
-    WHERE b.inventory_id=$1 AND b.status IN ('approved','scheduled','live') AND NOT(b.id=ANY($2::text[]))`, [inventoryId, exclude]);
-    const overlapping = result.rows.filter(row => row.start_date <= requested.endDate && row.end_date >= requested.startDate);
+    const rows = await listDigitalCommitments(client, inventoryId, exclude);
+    const overlapping = rows.filter(row => row.start_date <= requested.endDate && row.end_date >= requested.startDate);
     const boundaries = new Set([requested.startDate, ...overlapping.map(row => row.start_date).filter(date => date >= requested.startDate)]);
+    const requestedSlots = effectiveDayparts(requested.dayparts);
     for (const date of boundaries) {
         const active = overlapping.filter(row => row.start_date <= date && row.end_date >= date);
-        if (active.some(row => Number(row.loop_seconds) !== requested.loopSeconds) || active.reduce((sum, row) => sum + Number(row.seconds), requested.slots * requested.slotSeconds) > capacity)
+        if (active.some(row => row.loop_seconds !== requested.loopSeconds))
             throw new ScheduleError("Device loop capacity is full or its confirmed loop configuration differs");
+        // Each time-of-day slot has its own loop. Bookings in different slots never share airtime.
+        for (const slot of requestedSlots) {
+            const used = active.filter(row => effectiveDayparts(row.dayparts).includes(slot)).reduce((sum, row) => sum + row.seconds, 0);
+            if (used + requested.slots * requested.slotSeconds > capacity)
+                throw new ScheduleError("Device loop capacity is full or its confirmed loop configuration differs");
+        }
     }
 }
 export async function reserveCampaign(client: PoolClient, campaignId: string) {

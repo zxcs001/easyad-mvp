@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const body = await request.json().catch(() => ({}));
   const plays = clampPlays(body.plays);
   const status = body.status === "missed" ? "missed" : "verified";
-  const impressionsPerPlay = expectedImpressions(item, booking.start, booking.end, booking.adSlots) / Math.max(1, expectedPlays(booking.start, booking.end));
+  const impressionsPerPlay = expectedImpressions(item, booking.start, booking.end, booking.adSlots, booking.dayparts ?? []) / Math.max(1, expectedPlays(booking.start, booking.end, booking.dayparts ?? []));
   const impressions = status === "verified" ? Math.round(plays * impressionsPerPlay) : 0;
 
   const log = await createPopLog({

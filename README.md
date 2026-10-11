@@ -131,9 +131,29 @@ The public `/government/about` route introduces Civic Screen Operations for loca
 
 The public landing page links to this workspace from the middle of the page; it is intentionally absent from the top navigation. Signed-out visitors are routed to the dedicated government sign-in, while advertiser and operator accounts receive an access boundary. Super Admin can create Institution accounts and can enter the Civic Screen Operations dashboard in addition to the standard admin workspace.
 
+### Screen use: institution only or open to advertising
+
+Each institution screen has a screen use. `Institution use only` is the default for a new screen. Only the institution's content plays, the marketplace does not list the screen, and the workspace shows no rate, occupancy, audience, booking dates, or billing for it. The owner can choose `Open to private-sector advertising` for a screen in the Command centre (`Change screen use`). Then local businesses can book time on it, and the owner reviews each booking.
+
+- The choice uses the existing `inventory.advertising_opt_in` column. No migration is necessary.
+- `PUT /api/institution/screens/{id}/use` with `{ "use": "institution" | "advertising", "version"?: number }` changes it. Only the owning Institution account or a Super Admin can call it. It does not need `FEATURE_FLEET_OPERATIONS`.
+- The API refuses advertising on a private screen, and it refuses any change while advertising bookings or placements are active on the screen. Each change writes a `fleet_audit` row.
+- The `Advertising` entry in the institution navigation holds screens and rates, booking review, booking calendar, performance, and billing. It appears only when a screen is open to advertising or advertising history remains. The old `view=calendar`, `view=reports` and `view=billing` links open it.
+- Institution accounts go to `/government` from every marketplace route, including `/`. The advertising assistant does not show on `/government` routes.
+
 Authorized institutional staff can create time-limited AMBER, evacuation, or public-safety screen overrides for selected published devices. These overrides replace regular content only on the application's owned screens—they do not issue an alert through Alert Ready, wireless emergency alerts, police systems, or another official public-alert network.
 
 Run `npm run db:migrate` after deployment so the additive `device_alerts` table and media approval state are available.
+
+### Alert Ready relay
+
+`FEATURE_ALERT_READY=true` relays official Alert Ready alerts (the NAAD System CAP-CP feed run by Pelmorex) to institution screens inside each alert's area. Run the listener as its own long-running process:
+
+```bash
+ALERT_READY_INGEST_TOKEN=<32+ random characters> APP_ORIGIN=https://your-public-domain.example node scripts/naad-listener.cjs
+```
+
+The same token goes in the web app's environment. Each institution chooses Off, Ask me first (default) or Show automatically on the Emergency updates page. Show automatically needs the Pelmorex signing certificate in `ALERT_READY_SIGNING_CERTS`; without it every alert waits for a person. The listener is not yet tested against the live feed: the release gates (Pelmorex terms, network access to TCP 8080, the certificate) are in [ADR 0010](docs/adr/0010-alert-ready-relay.md).
 
 ## Colour and Status Encoding
 
@@ -182,6 +202,13 @@ Add a French entry in [`app/i18n/fr-additional.ts`](app/i18n/fr-additional.ts) w
 
 The collapsed sidebar rail lives in `app/component/dashboard-shell.css` inside `@media (min-width: 901px)`. The sidebar turns into a top bar at 900px, not at 1180px. An earlier rule assumed 1180px, forced the shell to one column between 901px and 1180px, and the collapsed rail then filled the whole screen with its toggle hidden. Measure a breakpoint in the running layout before writing a rule against it.
 
+### Map location and search
+
+- **Start location.** The marketplace maps (portal and Find screens) open on Ontario. The first time one of these views opens, the browser asks for the visitor's location. If the visitor shares it, the map moves to it and lists screens within the chosen distance. If the request is denied, is not supported or takes more than 8 seconds, the map stays on Ontario. A location in the link (`?location=`) or a map click always wins over a late answer. The institution workspace does not ask: its map centres on the institution's own screens.
+- **Locations.** `app/lib/geo/regions.ts` holds Ontario (`location=on`) and its 49 census divisions (counties, regions, districts and single-tier cities, for example `location=on-simcoe`). A region lists every screen inside its boundary, so the distance filter is disabled. A point (current location or a map click) filters by distance. The old Thunder Bay ids (`thunder-bay`, `downtown`, `airport`, `university`, `retail`, `waterfront`) open the Thunder Bay District.
+- **Boundaries.** `scripts/build-ontario-regions.cjs` generates `app/lib/geo/ontario-regions.ts` (names, centres, bounds) and `app/lib/geo/ontario-boundaries.ts` (boundaries simplified to about 1 km). The source is the Statistics Canada 2021 census division cartographic boundary file. The boundary file loads on demand, only when a region filters the list.
+- **Search.** The map search bar finds the province, the 49 county-level divisions and matching screens. Search is built from providers (`app/lib/geo/search.ts`). To add street-level results, set `NEXT_PUBLIC_STREET_SEARCH_ENDPOINT` to an app route that takes `?q=` and returns `{ "results": [{ "label", "detail", "lat", "lng", "bounds"? }] }`. The route calls the geocoder and keeps its key on the server. A street result centres the map at street scale and becomes the distance-search centre. No street provider ships yet.
+
 Map marker and tile positions in `app/component/maplibre-inventory-map.tsx` are rounded to a tenth of a pixel. The browser shortens an inline style to six significant digits, so an unrounded float in server HTML reads back as a different value and causes a hydration mismatch.
 
 Discover uses two columns. The filters are one horizontal bar above the map and the result list. The selected screen's detail floats over the map. `.discover-grid` in [`app/component/discover-view.css`](app/component/discover-view.css) is declared twice; the lower rule wins on source order and holds the layout. Keep the column count in every media query equal to the column count in `grid-template-areas`, or a phantom track appears and the map collapses.
@@ -192,7 +219,23 @@ The floating card sits inside `.detail-dock`, which uses `contain: size`. Keep i
 
 Known limit: public screens show "ON" instead of "Thunder Bay, ON". `deriveScreenCity` in [`app/component/device-templates.ts`](app/component/device-templates.ts) keeps only the last address part. The profile page, the public playback page and the Discover preview share it, so the fix is one line, but it changes what physical screens display.
 
+Results report responses as well as delivery: each booking can have a QR code and short link (`/go/{code}`), counted by EasyAD with no personal data, and a promo code whose use the advertiser reports. `/report/{bookingId}` is a printable one-page report. See [Results reporting](docs/RESULTS_REPORTING.md).
+
 The advertiser buying flow shows a three-step indicator in the top bar: Find screens, Book dates, Make an ad. Booking already takes the ad picture, so a person can buy screen time in two steps. Make an ad is a separate task for a campaign that is already booked, and it stays locked until one exists.
+
+### Booking schedule: quick dates, budget and time of day
+
+The Request dates step has one **When it runs** block. The helpers are pure functions in [`app/lib/booking-schedule.ts`](app/lib/booking-schedule.ts), and the fields are in [`app/component/booking-schedule-fields.tsx`](app/component/booking-schedule-fields.tsx).
+
+- **Quick lengths.** `1 week`, `2 weeks` and `4 weeks` set the end date from the start date. A changed start date keeps the run length.
+- **Availability calendar.** Five weeks of days: space open, few spots left, full and not available. Each state has a shape and a label as well as a colour. A click on a day moves the start there. The calendar reads `GET /api/inventory/{id}/availability`, which returns confirmed loop time with dates and slots only, and no advertiser names.
+- **Next open dates.** When the chosen dates are full or in the past, the form offers the nearest run of the same length that fits, with a **Use these dates** button.
+- **Start from a budget.** The person types a budget in CAD. The form sets the end date to the most whole days the budget pays for, and shows the total and what is left. A budget below one day blocks the request and says why.
+- **Time of day.** Digital screens only. Morning, Midday, Afternoon drive, Evening and Overnight, in Toronto time. A slot costs its share of the daily rate, and all five cost the daily rate. Each slot has its own loop capacity. The rule, the prices and the playback behaviour are in [ADR 0009](docs/adr/0009-time-of-day-booking.md).
+
+The booking API takes the slots as a `dayparts` form field (comma-separated, for example `morning,evening`). Run `npm run db:migrate` after deployment so the `bookings.dayparts` column exists.
+
+Make an ad opens a ready-made design on plain fields, not on HTML. [`app/quick-ad.ts`](app/quick-ad.ts) holds the fields of each design, the headline ideas, `composeQuickAdHtml` (fields to the design's markup, every value escaped) and the glance test. The default fields build exactly the HTML in `defaultCreativeHtml`, and a test holds that equal. The HTML editor is still there behind **Edit the HTML instead (advanced)**; hand-edited HTML wins over the fields until the person chooses **Use the fields again**. The server still sanitizes whatever HTML arrives.
 
 Discover shows three filters by default and keeps the rest behind **More filters**, which remembers what you open (ADR 0008 stage 1). The control always shows how many hidden filters are active, and an active hidden filter opens the group, so disclosure never hides capability.
 
@@ -245,4 +288,8 @@ Campaigns now expose quote cost lines, persisted artwork approvals and placement
 
 ## Institutional fleet pilot (P4)
 
-Enable `FEATURE_FLEET_OPERATIONS=true` with authenticated player control for the authorized pilot. Owners can group screens, schedule reusable announcements, assign department scope, set privacy and advertising policy, and inspect per-player alert reports. See [P4 verification and rollout gates](docs/INSTITUTIONAL_FLEET_BASELINE.md) and [fleet policy decisions](docs/adr/0006-institutional-fleet-policy.md). Institutional SSO/MFA provider selection is deferred until requirements are confirmed before broader rollout.
+Enable `FEATURE_FLEET_OPERATIONS=true` with authenticated player control for the authorized pilot. Owners can group screens, schedule reusable announcements, assign department scope, set privacy and advertising policy, and inspect per-player alert reports.
+
+These bulk tools have their own page, **Fleet tools** (`/government?view=fleet`, or `view=fleet` in the marketplace workspace for operators and Super Admin). The sidebar shows the entry only while the flag is on, and only to institution accounts, operators and Super Admin. Step 1 chooses the screens. Step 2 is a tab list with one task each: Screen policy (owner only), Announcements, Editor access (when the institution has operators), Alert delivery and Audit history. The tools used to sit under the Command centre, Screens and People and access pages, which made each of them several screens long.
+
+The Command centre keeps the map, the selected screen and the emergency override. The selected screen's content and its player connection share one tab list; `?panel=player` opens the Player connection tab, so a reload or a shared link keeps it. The screen list under the map scrolls inside the panel for a large fleet. See [P4 verification and rollout gates](docs/INSTITUTIONAL_FLEET_BASELINE.md) and [fleet policy decisions](docs/adr/0006-institutional-fleet-policy.md). Institutional SSO/MFA provider selection is deferred until requirements are confirmed before broader rollout.

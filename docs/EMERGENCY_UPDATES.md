@@ -24,7 +24,11 @@ Photo alerts show the instructions immediately, then prepare and cache only the 
 
 Offline screens cannot receive new messages until reconnecting. They receive the currently active message if it has not expired. Cached emergency text obeys the offline manifest lease and alert expiry; offline expiry may leave the screen without normal media until a fresh manifest is available. Delivery time depends on connectivity and the player running. Network failures retry with bounded backoff.
 
-This feature distributes manually entered institution messages to owned screens. It does not issue an official public alert or ingest an external AMBER/weather feed.
+This feature distributes manually entered institution messages to owned screens. It does not issue an official public alert.
+
+## Alert Ready relay
+
+With `FEATURE_ALERT_READY=true`, the page also shows an **Alert Ready** panel. Official CAP-CP alerts from the NAAD System (the feed behind Alert Ready) arrive through `scripts/naad-listener.cjs` and `POST /api/alert-ready/ingest`. Each alert is matched to the institution's published digital screens inside its area. The institution chooses Off, Ask me first (default) or Show automatically. Show automatically acts only on Broadcast Immediately alerts whose NAAD signature verifies against `ALERT_READY_SIGNING_CERTS`. Updates and cancels end the screen messages they replace. Relayed messages appear in the delivery list with an Alert Ready tag, and the player names the source. The decision, the matching rules and the release gates are in [ADR 0010](adr/0010-alert-ready-relay.md).
 
 ## Local browser verification — September 30, 2026
 

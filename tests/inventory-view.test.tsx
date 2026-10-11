@@ -296,3 +296,53 @@ test("a physical billboard exposes only date-derived Available or Unavailable st
   fireEvent.change(screen.getByLabelText("Availability end"), { target: { value: "2099-01-01" } });
   expect(screen.getByText("Physical billboard status: Available")).toBeInTheDocument();
 });
+
+function renderInstitutionInventory(record: InventoryItem) {
+  return render(
+    <InventoryView
+      inventory={[record]}
+      selectedId={record.id}
+      select={vi.fn()}
+      item={record}
+      newItem={{ ...record, id: "", name: "" }}
+      mediaResources={[]}
+      addInventory={vi.fn().mockResolvedValue(true)}
+      deleteInventory={vi.fn()}
+      saveInventory={vi.fn().mockResolvedValue(true)}
+      updateInventoryApproval={vi.fn()}
+      uploadMedia={vi.fn().mockResolvedValue(true)}
+      deleteMediaResource={vi.fn().mockResolvedValue(undefined)}
+      canManage
+      canDelete={false}
+      institutionMode
+    />,
+  );
+}
+
+test("a reserved institution screen shows no rate, occupancy, or audience fields", () => {
+  renderInstitutionInventory({ ...item, deliveryMode: "digital", institutionId: "USR-CIVIC", advertisingOptIn: false });
+
+  expect(screen.getByRole("heading", { name: "Screens" })).toBeInTheDocument();
+  expect(screen.getAllByText("Institution use only").length).toBeGreaterThan(0);
+  for (const label of ["Daily rate", "Occupancy (%)", "Audience", "Impressions", "Availability start"]) {
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+  }
+  expect(screen.queryByText("Rate")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Image loop interval (seconds)")).toBeInTheDocument();
+});
+
+test("an institution screen open to advertising shows its advertising details", () => {
+  renderInstitutionInventory({ ...item, institutionId: "USR-CIVIC", advertisingOptIn: true });
+
+  expect(screen.getByText("Advertising details")).toBeInTheDocument();
+  expect(screen.getByLabelText("Daily rate")).toBeInTheDocument();
+});
+
+test("creating an institution screen skips pricing and booking dates", async () => {
+  const user = userEvent.setup();
+  renderInstitutionInventory({ ...item, institutionId: "USR-CIVIC", advertisingOptIn: false });
+
+  await user.click(screen.getByRole("button", { name: "Add screen" }));
+  expect(screen.getByText("Identify the screen")).toBeInTheDocument();
+  expect(screen.queryByText("Set price and availability")).not.toBeInTheDocument();
+});

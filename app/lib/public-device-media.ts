@@ -2,6 +2,7 @@ import type { InventoryAdvertiserResource, InventoryItem, MediaResource } from "
 import type { PoolClient } from "pg";
 import { getInventory, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "./db";
 import { isDigitalInventory } from "./inventory-delivery";
+import { addDays, isScheduledNow, type DaypartId } from "./booking-schedule";
 
 export type PublicDeviceMediaItem = {
   id: string;
@@ -18,6 +19,8 @@ export type PublicDeviceMediaItem = {
   campaign: string | null;
   startsOn: string | null;
   endsOn: string | null;
+  /** Time-of-day slots in Toronto time. Absent means all day. */
+  dayparts?: DaypartId[];
 };
 
 export type ActiveDeviceMedia = {
@@ -37,6 +40,9 @@ export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate(
   ]);
   const result=buildActiveDeviceMedia(inventory, deviceResources, advertiserResources, asOf, through);
   if(!authenticated)result.items=result.items.filter(i=>i.source!=="device"||(!i.startsOn||Date.parse(i.startsOn)<=Date.now())&&(!i.endsOn||Date.parse(i.endsOn)>Date.now()));
+  // The public page and API show what plays now, so a time-of-day booking shows only inside its slots.
+  // The paired player receives every booking and applies the same rule itself, offline as well.
+  if(!authenticated)result.items=result.items.filter(i=>!i.dayparts?.length||isScheduledNow({startDate:i.startsOn??"",endDate:i.endsOn??"",dayparts:i.dayparts},Date.now()));
   return result;
 }
 
@@ -69,7 +75,7 @@ export function buildActiveDeviceMedia(
     .filter((resource) => resource.status === "approved"
       && activeBookingStatuses.has(resource.bookingStatus)
       && resource.start <= through
-      && resource.end >= asOf
+      && (resource.end >= asOf || Boolean(resource.dayparts?.length && resource.end >= addDays(asOf, -1)))
       && Boolean(resource.publicUrl)
       && Boolean(resource.mimeType && supportedMimeTypes.has(resource.mimeType)))
     .map((resource) => ({
@@ -86,6 +92,7 @@ export function buildActiveDeviceMedia(
       campaign: resource.campaign,
       startsOn: resource.start,
       endsOn: resource.end,
+      ...(resource.dayparts?.length ? { dayparts: resource.dayparts } : {}),
     }));
 
   const items = [...deviceItems, ...advertiserItems]

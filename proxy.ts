@@ -52,7 +52,10 @@ export function hasValidMutationOrigin(request: NextRequest) {
 }
 
 export function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/api/") && unsafeMethods.has(request.method)) {
+  // The Alert Ready listener is a server, not a browser: it sends no Origin and
+  // authenticates with a bearer token checked by the route itself.
+  const machineEndpoint = request.nextUrl.pathname === "/api/alert-ready/ingest";
+  if (request.nextUrl.pathname.startsWith("/api/") && unsafeMethods.has(request.method) && !machineEndpoint) {
     if (!hasValidMutationOrigin(request)) {
       return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
     }

@@ -1,0 +1,22 @@
+// Fleet tools page and the tabbed command centre.
+export const frFleetTools: Record<string, string> = {
+  "Fleet tools": "Outils du parc",
+  "Many screens at once": "Plusieurs écrans à la fois",
+  "Step 1": "Étape 1",
+  "Choose screens": "Choisir les écrans",
+  "Step 2: choose a task": "Étape 2 : choisir une tâche",
+  "Fleet tasks": "Tâches du parc",
+  "Screen policy": "Politique des écrans",
+  "Announcements": "Annonces",
+  "Editor access": "Accès des éditeurs",
+  "Alert delivery": "Diffusion des alertes",
+  "Audit history": "Historique d’audit",
+  "Checking a screen in step 1 copies its current policy here.": "Cocher un écran à l’étape 1 copie ici sa politique actuelle.",
+  "Choose at least one screen in step 1 first.": "Choisissez d’abord au moins un écran à l’étape 1.",
+  "No screens match this filter.": "Aucun écran ne correspond à ce filtre.",
+  "No emergency overrides have been sent to these screens yet.": "Aucune diffusion d’urgence n’a encore été envoyée à ces écrans.",
+  "No fleet changes recorded yet.": "Aucune modification du parc enregistrée pour l’instant.",
+  "Fleet tools are switched off": "Les outils du parc sont désactivés",
+  "Ask your platform administrator to turn on fleet operations for this workspace.": "Demandez à l’administrateur de la plateforme d’activer la gestion du parc pour cet espace.",
+  "Selected screen details": "Détails de l’écran sélectionné",
+};

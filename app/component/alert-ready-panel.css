@@ -1,0 +1,240 @@
+/* Official Alert Ready relay on the Emergency updates page. */
+.alert-ready {
+  gap: 12px;
+  display: grid;
+}
+
+.alert-ready .panel-heading {
+  margin-bottom: 0;
+}
+
+.alert-ready .panel-heading .status {
+  align-items: center;
+  gap: 5px;
+  display: inline-flex;
+}
+
+.alert-ready .panel-heading .status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.alert-ready-intro {
+  margin: 0;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.alert-ready-heartbeat {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: .74rem;
+}
+
+.alert-ready-modes {
+  border: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.alert-ready-modes legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.alert-ready-modes label {
+  cursor: pointer;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 10px 12px;
+  display: grid;
+}
+
+.alert-ready-modes label.selected {
+  background: var(--soft-green);
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.alert-ready-modes input {
+  accent-color: var(--green);
+  margin: 2px 0 0;
+}
+
+.alert-ready-modes strong,
+.alert-ready-modes small {
+  display: block;
+}
+
+.alert-ready-modes strong {
+  font-size: .82rem;
+}
+
+.alert-ready-modes small {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: .74rem;
+  line-height: 1.4;
+}
+
+.alert-ready-caution {
+  color: var(--state-warning-ink);
+  background: var(--state-warning-surface);
+  border: 1px solid var(--state-warning-ink);
+  border-radius: var(--radius-sm);
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  font-size: .8rem;
+  font-weight: 600;
+  display: flex;
+}
+
+.alert-ready-caution svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.alert-ready-empty {
+  color: var(--muted);
+  margin: 0;
+  font-size: .8rem;
+}
+
+.alert-ready-list {
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.alert-ready-list > li {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 8px;
+  padding: 12px;
+  display: grid;
+}
+
+.alert-ready-list > li.is-showing {
+  border-color: var(--state-danger);
+  box-shadow: inset 4px 0 0 var(--state-danger);
+}
+
+.alert-ready-item-head {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  display: grid;
+}
+
+.alert-ready-item-head strong,
+.alert-ready-item-head small {
+  display: block;
+}
+
+.alert-ready-item-head small {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: .74rem;
+}
+
+.alert-ready-icon {
+  color: var(--muted);
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  display: grid;
+}
+
+.is-showing .alert-ready-icon {
+  color: var(--state-danger-ink);
+}
+
+.alert-ready-tags {
+  flex-wrap: wrap;
+  gap: 6px;
+  display: flex;
+}
+
+.alert-ready-tags span {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  font-size: .72rem;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.alert-ready-tags span.is-verified {
+  color: var(--state-success-ink);
+  background: var(--state-success-surface);
+  border-color: var(--state-success-ink);
+}
+
+.alert-ready-tags svg {
+  width: 13px;
+  height: 13px;
+}
+
+.alert-ready-list details summary {
+  cursor: pointer;
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.alert-ready-list details ul {
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.alert-ready-list details li {
+  font-size: .78rem;
+}
+
+.alert-ready-list details small {
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.alert-ready-actions {
+  gap: 8px;
+  display: flex;
+}
+
+.alert-ready-actions:empty {
+  display: none;
+}
+
+@media (max-width: 780px) {
+  .alert-ready-modes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .alert-ready-item-head {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .alert-ready-item-head .status {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "../../../lib/auth";
 import { creativeTemplateTopics, defaultCreativeHtml, isCreativeTemplateTopic } from "../../../creative-templates";
 import { renderCreativeDocument, sanitizeCreativeHtml } from "../../../lib/creative-template";
+import { cleanDestination, responseQrSvg } from "../../../lib/responses";
 
 export async function GET() {
   if (!(await getCurrentUser())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,7 +19,13 @@ export async function POST(request: NextRequest) {
   if (!isCreativeTemplateTopic(body.template)) return NextResponse.json({ error: "Unknown template topic" }, { status: 422 });
   try {
     const sanitizedHtml = sanitizeCreativeHtml(body.html);
-    return NextResponse.json({ sanitizedHtml, document: renderCreativeDocument(body.template, sanitizedHtml) }, { headers: { "Cache-Control": "no-store" } });
+    // The preview QR shows placement and size. The real one carries the
+    // booking's short link and is made when the ad is submitted.
+    let qrSvg: string | undefined;
+    if (typeof body.responseUrl === "string" && body.responseUrl.trim()) {
+      try { qrSvg = await responseQrSvg(cleanDestination(body.responseUrl)); } catch { qrSvg = undefined; }
+    }
+    return NextResponse.json({ sanitizedHtml, document: renderCreativeDocument(body.template, sanitizedHtml, { qrSvg }) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid template HTML" }, { status: 422 });
   }

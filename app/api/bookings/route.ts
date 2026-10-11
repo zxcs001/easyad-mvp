@@ -8,6 +8,7 @@ import { isInventoryAvailableForDates, isValidAvailabilityDate } from "../../lib
 import { isDigitalInventory, isStaticInventory } from "../../lib/inventory-delivery";
 import { deleteStoredMedia, storeMedia } from "../../lib/media-storage";
 import { inspectMediaUpload } from "../../lib/uploads";
+import { parseDayparts } from "../../lib/booking-schedule";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -45,12 +46,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Choose a start date today or later. Campaigns cannot start in the past." }, { status: 422 });
   }
   const adSlots = cleanAdSlots(body.adSlots);
+  const dayparts = parseDayparts(body.dayparts);
+  if (!dayparts) return NextResponse.json({ error: "Choose time-of-day slots from the list: morning, midday, afternoon, evening, or overnight." }, { status: 400 });
+  if (dayparts.length && !isDigitalInventory(item)) {
+    return NextResponse.json({ error: "Time-of-day slots apply to digital screens only. A billboard shows your ad all day." }, { status: 422 });
+  }
 
   if (isStaticInventory(item) && !isInventoryAvailableForDates(item, start, end)) {
     return NextResponse.json({ error: "Physical billboard is unavailable for those dates" }, { status: 409 });
   }
 
-  if (isDigitalInventory(item) && exceedsLoopCapacity(item, await listBookings(), start, end, adSlots)) {
+  if (isDigitalInventory(item) && exceedsLoopCapacity(item, await listBookings(), start, end, adSlots, "", dayparts)) {
     return NextResponse.json({ error: "Device loop capacity is full for those dates" }, { status: 409 });
   }
 
@@ -62,9 +68,10 @@ export async function POST(request: NextRequest) {
     start,
     end,
     adSlots,
+    ...(dayparts.length ? { dayparts } : {}),
     creativeStatus: upload ? "pending review" : "not submitted",
     status: upload ? "creative review" : "pending approval",
-    spend: estimateSpend(item, start, end, adSlots),
+    spend: estimateSpend(item, start, end, adSlots, dayparts),
     paid: false,
     pop: 0,
   };
@@ -123,6 +130,7 @@ async function readBookingSubmission(request: NextRequest) {
       start: String(form.get("start") ?? ""),
       end: String(form.get("end") ?? ""),
       adSlots: String(form.get("adSlots") ?? "1"),
+      dayparts: String(form.get("dayparts") ?? ""),
     },
     upload: inspected && file instanceof File ? { ...inspected, originalName: file.name } : null,
   };

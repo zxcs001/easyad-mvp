@@ -7,6 +7,7 @@ import { isCreativeSubmissionAllowed, money, reservedLoopSeconds } from "../util
 import { EmptyState, Meter, PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
 import { isDigitalInventory } from "../lib/inventory-delivery";
+import { daypartSummary } from "./daypart-summary";
 
 export default function CampaignSpacesView({
   bookings,
@@ -45,7 +46,7 @@ export default function CampaignSpacesView({
               <div className="table-row" key={booking.id}>
                 <span><strong>{booking.campaign}</strong><small>{booking.advertiser} - {money(booking.spend, locale)}</small></span>
                 <span>{item?.name ?? booking.inventoryId}<small>{item?.address ?? t("Inventory record")}</small></span>
-                <span>{booking.start}<small>{booking.end}</small></span>
+                <span>{booking.start}<small>{booking.end}</small>{booking.dayparts?.length ? <small>{daypartSummary(booking.dayparts, t)}</small> : null}</span>
                 <span>{isDigital ? <><Meter value={capacityPercent} />{t("{reserved}s of {capacity}s", { reserved: reservedSeconds, capacity })}<small>{t(booking.adSlots === 1 ? "{count} slot" : "{count} slots", { count: booking.adSlots })} {t("at")} {item?.imageInterval ?? 0}s</small></> : <><strong>{t("Static placement")}</strong><small>{t("No playback loop")}</small></>}</span>
                 <span><span className="status">{t(booking.status)}</span></span>
                 <span>{t(booking.creativeStatus)}<small>{t("Submission state")}</small></span>

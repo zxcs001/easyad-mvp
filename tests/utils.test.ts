@@ -117,6 +117,8 @@ test("loop share gives an advertiser its slots, never more than the screen", () 
 test("map and location helpers normalize known spatial values", () => {
   assert.equal(distance({ x: 0, y: 0 }, { x: 3, y: 4 }), 5);
   assert.equal(isKnownLocationId("thunder-bay"), true);
+  assert.equal(isKnownLocationId("on"), true);
+  assert.equal(isKnownLocationId("on-simcoe"), true);
   assert.equal(isKnownLocationId("unknown-place"), false);
 
   const point = geoToMapPoint(48.38, -89.25);
@@ -208,4 +210,26 @@ test("formatRatio returns friendly labels for supported creative ratios", () => 
 test("uploaded filenames are persisted at a maximum of 30 characters", () => {
   assert.equal(truncateFileName("short-name.jpg"), "short-name.jpg");
   assert.equal(truncateFileName("this-is-a-very-long-inventory-creative-name.jpg"), "this-is-a-very-long-inventory-");
+});
+
+test("time-of-day slots price and reserve their share of the day", () => {
+  assert.equal(estimateSpend(inventoryItem, "2026-07-01", "2026-07-03", 1, ["morning", "afternoon"]), 750);
+  const evening = [{
+    id: "BK-EVENING",
+    advertiser: "Evening Advertiser",
+    inventoryId: inventoryItem.id,
+    campaign: "Evening",
+    start: "2026-07-01",
+    end: "2026-07-31",
+    adSlots: 5,
+    dayparts: ["evening" as const],
+    creativeStatus: "approved" as const,
+    status: "scheduled" as const,
+    spend: 1000,
+    paid: false,
+    pop: 0,
+  }];
+  assert.equal(exceedsLoopCapacity(inventoryItem, evening, "2026-07-08", "2026-07-10", 5, "", ["morning"]), false);
+  assert.equal(exceedsLoopCapacity(inventoryItem, evening, "2026-07-08", "2026-07-10", 1, "", ["evening"]), true);
+  assert.equal(exceedsLoopCapacity(inventoryItem, evening, "2026-07-08", "2026-07-10", 1), true);
 });

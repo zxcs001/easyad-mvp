@@ -85,3 +85,14 @@ test("device media includes only approved content active on the requested date",
   assert.equal(resolveDeviceMediaItem(result.items, "MED-API-IMAGE")?.position, 4);
   assert.equal(resolveDeviceMediaItem(result.items, "5"), null);
 });
+
+test("a time-of-day booking that ended yesterday in UTC stays in the list for its Toronto evening", () => {
+  // 2026-07-11 in UTC is still the evening of 2026-07-10 in Toronto until 4 a.m. UTC.
+  const result = buildActiveDeviceMedia(inventory, [], [
+    advertiserCreative({ id: "CRV-EVENING", start: "2026-07-01", end: "2026-07-10", dayparts: ["evening"] }),
+    advertiserCreative({ id: "CRV-ALLDAY", start: "2026-07-01", end: "2026-07-10" }),
+  ], "2026-07-11");
+
+  assert.deepEqual(result.items.map((item) => item.id), ["CRV-EVENING"]);
+  assert.deepEqual(result.items[0].dayparts, ["evening"]);
+});

@@ -1,0 +1,413 @@
+/* Component-owned styles for the booking schedule fields: plan mode, quick
+   lengths, time-of-day slots and the availability calendar. Selection uses
+   border, surface and a check mark together, never colour alone. */
+
+.schedule-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  display: grid;
+}
+
+.schedule-section > h3 {
+  margin: 0;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.schedule-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  display: grid;
+}
+
+.schedule-segmented {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  display: grid;
+}
+
+.schedule-segmented button,
+.schedule-presets button {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: .8rem;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.schedule-segmented button.selected {
+  background: var(--panel);
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+
+.schedule-presets {
+  flex-wrap: wrap;
+  gap: 6px;
+  display: flex;
+}
+
+.schedule-presets button {
+  border-color: var(--control-edge);
+  background: var(--panel);
+  border-radius: 999px;
+  min-height: 32px;
+}
+
+.schedule-presets button.selected {
+  background: var(--soft-green);
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+
+.schedule-segmented button:focus-visible,
+.schedule-presets button:focus-visible,
+.schedule-daypart-grid button:focus-visible,
+.schedule-day:focus-visible,
+.schedule-calendar-nav:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.schedule-budget-result {
+  border-left: 3px solid var(--green);
+  background: var(--soft-green);
+  color: var(--green-dark);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin: 0;
+  padding: 9px 11px;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.schedule-budget-hint {
+  color: var(--muted);
+  margin: 0;
+  font-size: .76rem;
+}
+
+/* Time of day */
+
+.schedule-dayparts {
+  border: 0;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.schedule-dayparts legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.schedule-dayparts > small {
+  color: var(--muted);
+  font-size: .74rem;
+}
+
+.schedule-daypart-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  display: grid;
+}
+
+.schedule-daypart-grid button {
+  text-align: left;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-sm);
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px 10px;
+  display: grid;
+}
+
+.schedule-daypart-grid button:hover {
+  border-color: var(--ink);
+}
+
+.schedule-daypart-grid button.selected {
+  background: var(--soft-green);
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.schedule-daypart-grid strong,
+.schedule-daypart-grid small {
+  display: block;
+}
+
+.schedule-daypart-grid strong {
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.schedule-daypart-grid small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+  font-size: .72rem;
+}
+
+.schedule-daypart-mark {
+  border: 1px solid var(--control-edge);
+  border-radius: 4px;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  display: grid;
+}
+
+.schedule-daypart-grid button.selected .schedule-daypart-mark {
+  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+}
+
+/* Calendar */
+
+.schedule-calendar {
+  gap: 8px;
+  display: grid;
+}
+
+.schedule-calendar[aria-busy="true"] .schedule-calendar-grid {
+  opacity: .55;
+}
+
+.schedule-calendar-head {
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.schedule-calendar-head strong {
+  font-variant-numeric: tabular-nums;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.schedule-calendar-head > div {
+  gap: 4px;
+  display: flex;
+}
+
+.schedule-calendar-nav {
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  display: grid;
+}
+
+.schedule-calendar-nav:disabled {
+  opacity: .4;
+}
+
+.schedule-calendar-grid {
+  border-collapse: separate;
+  border-spacing: 3px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.schedule-calendar-grid th {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+}
+
+.schedule-calendar-grid td {
+  padding: 0;
+}
+
+.schedule-day {
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  place-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  font-size: .76rem;
+  font-weight: 500;
+  display: grid;
+  position: relative;
+}
+
+.schedule-day:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.schedule-day.is-limited {
+  background: var(--state-warning-surface);
+  color: var(--state-warning-ink);
+}
+
+.schedule-day.is-full {
+  background: var(--state-danger-surface);
+  color: var(--state-danger-ink);
+  text-decoration: line-through;
+}
+
+.schedule-day.is-unavailable {
+  color: var(--muted);
+  background: repeating-linear-gradient(135deg, var(--bg) 0 4px, var(--panel) 4px 8px);
+  cursor: not-allowed;
+}
+
+.schedule-day.in-range {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+  font-weight: 700;
+}
+
+.schedule-day[aria-pressed="true"] {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.schedule-day.is-today span {
+  text-underline-offset: 3px;
+  text-decoration: underline;
+}
+
+.schedule-day-mark {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+
+i.schedule-day-mark.is-half {
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+
+.schedule-legend {
+  color: var(--muted);
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 0;
+  font-size: .72rem;
+  list-style: none;
+  display: flex;
+}
+
+.schedule-legend li {
+  align-items: center;
+  gap: 5px;
+  display: inline-flex;
+}
+
+.schedule-legend-swatch {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  position: relative;
+}
+
+.schedule-legend-swatch.is-limited {
+  background: var(--state-warning-surface);
+  color: var(--state-warning-ink);
+}
+
+.schedule-legend-swatch.is-full {
+  background: var(--state-danger-surface);
+  color: var(--state-danger-ink);
+}
+
+.schedule-legend-swatch.is-unavailable {
+  background: repeating-linear-gradient(135deg, var(--bg) 0 3px, var(--panel) 3px 6px);
+}
+
+.schedule-legend-swatch.in-range {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.schedule-legend-swatch .schedule-day-mark {
+  top: 2px;
+  right: 2px;
+}
+
+.schedule-calendar-help {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+/* The next open dates, offered where the blocked reason is shown. */
+.schedule-suggestion {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  font-size: .8rem;
+  display: flex;
+}
+
+.schedule-suggestion .secondary-button {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: .78rem;
+}
+
+@media (max-width: 560px) {
+  .schedule-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-suggestion {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .schedule-day {
+    min-height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-calendar[aria-busy="true"] .schedule-calendar-grid {
+    transition: none;
+  }
+}

@@ -1,0 +1,212 @@
+/* Fill-in-the-blanks ad fields and the glance test. */
+.quick-ad {
+  gap: 10px;
+  margin-top: 14px;
+  display: grid;
+}
+
+.quick-ad-notice {
+  color: var(--state-warning-ink);
+  background: var(--state-warning-surface);
+  border: 1px solid var(--state-warning-ink);
+  border-radius: var(--radius-sm);
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  font-size: .8rem;
+  font-weight: 600;
+  display: grid;
+}
+
+.quick-ad-notice svg {
+  width: 18px;
+  height: 18px;
+}
+
+.quick-ad-fields {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+}
+
+.quick-ad-fields:disabled {
+  opacity: .6;
+}
+
+.quick-ad-fields legend {
+  padding: 0 4px;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.quick-ad-field {
+  gap: 5px;
+  font-size: .78rem;
+  font-weight: 560;
+  display: grid;
+}
+
+.quick-ad-fields .is-wide {
+  grid-column: 1 / -1;
+}
+
+.quick-ad-label {
+  font-weight: 560;
+  justify-content: space-between;
+  gap: 8px;
+  display: flex;
+}
+
+.quick-ad-label small,
+.quick-ad-field > small {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 400;
+}
+
+.quick-ad-label small {
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-ad-fields textarea {
+  resize: vertical;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.quick-ad-ideas {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  display: flex;
+}
+
+.quick-ad-ideas > span {
+  color: var(--muted);
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+  font-size: .74rem;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.quick-ad-ideas svg {
+  width: 14px;
+  height: 14px;
+}
+
+.quick-ad-ideas button {
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--control-edge);
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.quick-ad-ideas button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.quick-ad-ideas button:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
+}
+
+.creative-html-advanced {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.creative-html-advanced > summary {
+  cursor: pointer;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+/* Glance test */
+.glance-test {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  gap: 8px;
+  padding: 12px 14px;
+  display: grid;
+}
+
+.glance-test-head {
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.glance-test p {
+  color: var(--muted);
+  margin: 0;
+  font-size: .76rem;
+}
+
+.glance-test ul {
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.glance-test li {
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  font-size: .78rem;
+  display: grid;
+}
+
+.glance-test li svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.glance-test li.pass svg {
+  color: var(--state-success-ink);
+}
+
+.glance-test li.advice svg {
+  color: var(--state-warning-ink);
+}
+
+.glance-test li strong,
+.glance-test li small {
+  display: block;
+}
+
+.glance-test li small {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+@media (max-width: 640px) {
+  .quick-ad-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-ad-notice {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+
+  .quick-ad-notice button {
+    grid-column: 1 / -1;
+  }
+}

@@ -167,3 +167,26 @@ describe("shared inventory map zoom behavior", () => {
     await waitFor(() => expect(pin.style.left).not.toBe(before));
   });
 });
+
+describe("county-level map search", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  });
+
+  test("a county result selects that county with its bounds", async () => {
+    const onLocationChange = vi.fn();
+    render(<MapLibreInventoryMap inventory={inventory} visibleInventory={inventory} selectedInventoryId="" selectedLocation={{ x: 50, y: 50 }} radius={30} onLocationChange={onLocationChange} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Map search" }), { target: { value: "simcoe" } });
+    fireEvent.click(await screen.findByRole("button", { name: /Simcoe County/ }));
+
+    expect(onLocationChange).toHaveBeenCalledWith(expect.objectContaining({ id: "on-simcoe", level: "county", bounds: expect.any(Array) }));
+  });
+
+  test("a region draws no distance circle or search centre", () => {
+    const { container } = render(<MapLibreInventoryMap inventory={inventory} visibleInventory={inventory} selectedInventoryId="" selectedLocation={{ x: 50, y: 50, bounds: [-95.154, 41.73, -74.343, 56.859] }} radius={30} />);
+
+    expect(container.querySelector(".fallback-radius")).not.toBeInTheDocument();
+    expect(container.querySelector(".fallback-center")).not.toBeInTheDocument();
+  });
+});

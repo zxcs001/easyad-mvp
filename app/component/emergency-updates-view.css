@@ -46,3 +46,17 @@
 @media (max-width: 600px) { .emergency-delivery-list { grid-template-columns: 1fr; } .emergency-record-head { flex-direction: column; } }
 /* Delivery status panel notes (bare paragraphs in the panel). */
 .emergency-updates > .panel > p:not(.form-error) { color: var(--muted); margin: 0 0 8px; font-size: .84rem; line-height: 1.55; }
+
+/* A relayed official alert names its source before the headline. */
+.emergency-official-tag {
+  color: var(--state-danger-ink);
+  background: var(--state-danger-surface);
+  border: 1px solid var(--state-danger-ink);
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-right: 8px;
+  padding: 1px 8px;
+  font-size: .68rem;
+  font-weight: 700;
+  display: inline-block;
+}

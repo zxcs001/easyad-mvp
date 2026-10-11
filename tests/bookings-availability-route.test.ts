@@ -180,3 +180,61 @@ function bookingRequestWithoutCreative(start: string, end: string) {
   form.set("adSlots", "1");
   return new NextRequest("http://localhost/api/bookings", { method: "POST", body: form });
 }
+
+function daypartRequest(dayparts: string, start = "2026-08-10", end = "2026-08-11") {
+  const form = new FormData();
+  form.set("inventoryId", staticBillboard.id);
+  form.set("campaign", "Evening Campaign");
+  form.set("start", start);
+  form.set("end", end);
+  form.set("adSlots", "1");
+  form.set("dayparts", dayparts);
+  return new NextRequest("http://localhost/api/bookings", { method: "POST", body: form });
+}
+
+test("a digital booking stores its time-of-day slots and pays only their share of the daily rate", async () => {
+  mocks.getInventory.mockResolvedValue({ ...staticBillboard, format: "digital", deliveryMode: "digital" });
+
+  const response = await POST(daypartRequest("evening,morning"));
+
+  assert.equal(response.status, 201);
+  const booking = mocks.createBookingRecord.mock.calls[0][0] as { dayparts: string[]; spend: number };
+  assert.deepEqual(booking.dayparts, ["morning", "evening"]);
+  // 500 a day x 1.25 digital multiplier x 2 days x (0.25 + 0.15).
+  assert.equal(booking.spend, 500);
+});
+
+test("every slot is stored as all day at the full rate", async () => {
+  mocks.getInventory.mockResolvedValue({ ...staticBillboard, format: "digital", deliveryMode: "digital" });
+
+  const response = await POST(daypartRequest("morning,midday,afternoon,evening,overnight"));
+
+  assert.equal(response.status, 201);
+  const booking = mocks.createBookingRecord.mock.calls[0][0] as { dayparts?: string[]; spend: number };
+  assert.equal(booking.dayparts, undefined);
+  assert.equal(booking.spend, 1250);
+});
+
+test("an unknown time-of-day slot is refused", async () => {
+  mocks.getInventory.mockResolvedValue({ ...staticBillboard, format: "digital", deliveryMode: "digital" });
+
+  const response = await POST(daypartRequest("brunch"));
+
+  assert.equal(response.status, 400);
+  assert.equal(mocks.createBookingRecord.mock.calls.length, 0);
+});
+
+test("a billboard refuses time-of-day slots because it shows the ad all day", async () => {
+  const response = await POST(daypartRequest("morning"));
+
+  assert.equal(response.status, 422);
+  assert.equal(mocks.createBookingRecord.mock.calls.length, 0);
+});
+
+test("a full evening does not block a morning booking on the same screen", async () => {
+  mocks.getInventory.mockResolvedValue({ ...staticBillboard, format: "digital", deliveryMode: "digital", imageInterval: 6, maxLoopSeconds: 6 });
+  mocks.listBookings.mockResolvedValue([{ id: "BK-EVENING", advertiser: "Other", inventoryId: staticBillboard.id, campaign: "Evening", start: "2026-08-01", end: "2026-08-31", adSlots: 1, dayparts: ["evening"], creativeStatus: "approved", status: "approved", spend: 1, paid: false, pop: 0 }] as never);
+
+  assert.equal((await POST(daypartRequest("evening"))).status, 409);
+  assert.equal((await POST(daypartRequest("morning"))).status, 201);
+});

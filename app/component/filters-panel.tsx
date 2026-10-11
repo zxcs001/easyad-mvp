@@ -12,6 +12,7 @@ import { defaultFilters } from "../utils";
 type LocationOption = {
   id: string;
   label: string;
+  level?: "province" | "county" | "street" | "point";
 };
 
 type FiltersPanelProps = {
@@ -21,6 +22,7 @@ type FiltersPanelProps = {
   setSelectedLocationId: (id: string) => void;
   locationOptions: LocationOption[];
   inventory: InventoryItem[];
+  locating?: boolean;
 };
 
 const collapsedTagCount = 12;
@@ -32,6 +34,7 @@ export default function FiltersPanel({
   setSelectedLocationId,
   locationOptions,
   inventory,
+  locating = false,
 }: FiltersPanelProps) {
   const { formatNumber, locale, t } = useI18n();
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -65,6 +68,10 @@ export default function FiltersPanel({
       return !open;
     });
   }
+  const pointOptions = locationOptions.filter((location) => !location.level || location.level === "point" || location.level === "street");
+  const provinceOptions = locationOptions.filter((location) => location.level === "province");
+  const countyOptions = locationOptions.filter((location) => location.level === "county");
+  const regionSelected = [...provinceOptions, ...countyOptions].some((location) => location.id === selectedLocationId);
   const audiences = ["all", ...Array.from(new Set(inventory.map((item) => item.audience)))];
   const allTags = useMemo(
     () => Array.from(new Set(inventory.flatMap((item) => item.tags ?? []))).sort((a, b) => a.localeCompare(b)),
@@ -90,13 +97,15 @@ export default function FiltersPanel({
       <label>
         {t("Location")}
         <select className="select" name="location" value={selectedLocationId} onChange={(event) => setSelectedLocationId(event.target.value)}>
-          {selectedLocationId === CURRENT_LOCATION_ID && !locationOptions.some((location) => location.id === CURRENT_LOCATION_ID) ? (
-            <option value={CURRENT_LOCATION_ID}>{t("Detecting current location")}</option>
-          ) : null}
-          {selectedLocationId === MANUAL_LOCATION_ID && !locationOptions.some((location) => location.id === MANUAL_LOCATION_ID) ? (
-            <option value={MANUAL_LOCATION_ID}>{t("Selected map area")}</option>
-          ) : null}
-          {locationOptions.map((location) => <option key={location.id} value={location.id}>{t(location.label)}</option>)}
+          <optgroup label={t("Near you")}>
+            {pointOptions.some((location) => location.id === CURRENT_LOCATION_ID) ? null : <option value={CURRENT_LOCATION_ID}>{t(locating ? "Detecting current location" : "Use my current location")}</option>}
+            {selectedLocationId === MANUAL_LOCATION_ID && !pointOptions.some((location) => location.id === MANUAL_LOCATION_ID) ? (
+              <option value={MANUAL_LOCATION_ID}>{t("Selected map area")}</option>
+            ) : null}
+            {pointOptions.map((location) => <option key={location.id} value={location.id}>{t(location.label)}</option>)}
+          </optgroup>
+          {provinceOptions.length ? <optgroup label={t("Province")}>{provinceOptions.map((location) => <option key={location.id} value={location.id}>{t(location.label)}</option>)}</optgroup> : null}
+          {countyOptions.length ? <optgroup label={t("Counties and regions")}>{countyOptions.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}</optgroup> : null}
         </select>
       </label>
       <div className="filter-pair">
@@ -104,6 +113,8 @@ export default function FiltersPanel({
         name="radius"
         label={t("Distance")}
         value={filters.radius}
+        disabled={regionSelected}
+        help={regionSelected ? t("Every screen in the selected area is listed.") : undefined}
         onChange={(radius) => setFilters((current) => ({ ...current, radius }))}
         options={[8, 10, 15, 20, 25, 30].map((km) => ({ value: km, label: t("Within {count} km", { count: km }) }))}
       />
@@ -223,21 +234,25 @@ export default function FiltersPanel({
 // A short list of buckets in a native select is one row, and it reads as a
 // choice rather than a measurement. The stored value stays numeric, so the
 // filtering logic is unchanged.
-function NumberSelect({ label, value, onChange, name, options }: {
+function NumberSelect({ label, value, onChange, name, options, disabled = false, help }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   name?: string;
   options: Array<{ value: number; label: string }>;
+  disabled?: boolean;
+  help?: string;
 }) {
   const nearest = options.reduce((best, option) =>
     Math.abs(option.value - value) < Math.abs(best.value - value) ? option : best, options[0]);
+  const helpId = help && name ? `${name}-help` : undefined;
   return (
     <label>
       {label}
-      <select className="select" name={name} value={String(nearest.value)} onChange={(event) => onChange(Number(event.target.value))}>
+      <select aria-describedby={helpId} className="select" disabled={disabled} name={name} value={String(nearest.value)} onChange={(event) => onChange(Number(event.target.value))}>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
+      {help ? <small className="filter-help" id={helpId}>{help}</small> : null}
     </label>
   );
 }

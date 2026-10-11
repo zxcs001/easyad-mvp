@@ -40,3 +40,23 @@ test("announcement timestamps include the start and exclude the exact end", () =
     expect(slideEligible(timed, epoch + 6999)).toBe(true);
     expect(slideEligible(timed, epoch + 7000)).toBe(false);
 });
+
+test("a time-of-day booking plays inside its Toronto slots only, and its evidence must too", () => {
+    const evening = allocation("2026-07-15", "2026-07-15", 6, 120, 1, ["evening"]);
+    expect(evening).toMatchObject({ model: "daypart-slot-v1", timezone: "America/Toronto", dayparts: ["evening"] });
+    expect(() => allocation("2026-07-15", "2026-07-15", 6, 120, 1, ["brunch" as never])).toThrow("Unknown time-of-day slot");
+    expect(allocation("2026-07-15", "2026-07-15", 6, 120, 1, ["morning", "midday", "afternoon", "evening", "overnight"]).model).toBe("fixed-slot-v1");
+    const ad = { ...manifest.slides[0], id: "ad", legacyBookingId: "BK-1", allocation: evening, startsOn: "2026-07-15", endsOn: "2026-07-15" };
+    const filler = { ...manifest.slides[0], id: "filler", startsOn: null, endsOn: null };
+    const at = (iso: string) => Date.parse(iso);
+    expect(slideEligible(ad, at("2026-07-15T22:59:59Z"))).toBe(false); // 18:59 EDT
+    expect(slideEligible(ad, at("2026-07-15T23:00:00Z"))).toBe(true); // 19:00 EDT
+    // 22:30 EDT is already 2026-07-16 in UTC. The local date still matches.
+    expect(slideEligible(ad, at("2026-07-16T02:30:00Z"))).toBe(true);
+    const timed = { ...manifest, generatedAt: "2026-07-15T12:00:00.000Z", validUntil: "2026-07-17T12:00:00.000Z", loopSeconds: 120, slides: [ad, filler] };
+    expect(rotationSlides(timed, at("2026-07-15T16:00:00Z")).map((slide) => slide.id)).toEqual(["filler"]);
+    expect(rotationSlides(timed, at("2026-07-16T00:00:00Z")).map((slide) => slide.id)).toEqual(["ad", "filler"]);
+    const play = (startedAt: string, occurredAt: string) => ({ eventId: randomUUID(), sessionId: randomUUID(), sequence: 1, revision: 1, slideId: "ad", assetVersion: "v", startedAt, occurredAt, durationMs: 6000, outcome: "completed" });
+    expect(validatePlayback(play("2026-07-16T00:00:00.000Z", "2026-07-16T00:00:06.000Z"), timed, at("2026-07-16T00:00:07Z")).slide.id).toBe("ad");
+    expect(() => validatePlayback(play("2026-07-15T16:00:00.000Z", "2026-07-15T16:00:06.000Z"), timed, at("2026-07-15T16:00:07Z"))).toThrow("outside its authorized schedule");
+});
