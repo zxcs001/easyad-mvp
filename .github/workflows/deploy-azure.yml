@@ -53,18 +53,28 @@ jobs:
       contents: read
       id-token: write
     env:
-      RESOURCE_GROUP: biblia-llm-rg
-      APP_NAME: easyad-web
-      REGISTRY: bibliaprod2acrsnan4juouezei
-      IMAGE: bibliaprod2acrsnan4juouezei.azurecr.io/easyad-web:${{ github.sha }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP_NAME: ${{ vars.AZURE_APP_NAME }}
+      REGISTRY: ${{ vars.AZURE_REGISTRY }}
+      IMAGE: ${{ vars.AZURE_REGISTRY }}.azurecr.io/easyad-web:${{ github.sha }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     steps:
       - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in RESOURCE_GROUP APP_NAME REGISTRY AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            test -n "${!name}" || { echo "Missing deployment setting $name; check repository secrets and variables." >&2; exit 1; }
+          done
       - name: Log in with main-branch OIDC identity
         uses: azure/login@v2
         with:
-          client-id: 70d0096d-b04e-41bb-92ef-a4170b4a999a
-          tenant-id: e984fc74-9121-4abf-a2d2-3805da9a18b0
-          subscription-id: cc014e27-71e1-4ca7-9c8b-db78c15f365e
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
       - name: Build and push immutable image
         shell: bash
         run: |
@@ -76,22 +86,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az extension add --name containerapp --upgrade --yes
-          mode=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.configuration.activeRevisionsMode -o tsv)
+          resource_url="https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${APP_NAME}"
+          api_version=2024-03-01
+          app=$(az rest --method get --url "$resource_url?api-version=$api_version")
+          mode=$(jq -r '.properties.configuration.activeRevisionsMode' <<< "$app")
           test "$mode" = Single || { echo 'Expected Single revision mode; review traffic configuration.' >&2; exit 1; }
-          revision=$(az containerapp update -g "$RESOURCE_GROUP" -n "$APP_NAME" \
-            --container-name "$APP_NAME" --image "$IMAGE" \
-            --revision-suffix "gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --query properties.latestRevisionName -o tsv)
-          test -n "$revision"
+          jq -e --arg container "$APP_NAME" \
+            '[.properties.template.containers[] | select(.name == $container)] | length == 1' \
+            <<< "$app" > /dev/null
+          suffix="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          revision="${APP_NAME}--${suffix}"
+          patch_file=$(mktemp)
+          trap 'rm -f "$patch_file"' EXIT
+          jq --arg container "$APP_NAME" --arg image "$IMAGE" --arg suffix "$suffix" \
+            '.location as $location | .properties.template | .revisionSuffix = $suffix |
+             (.containers[] | select(.name == $container) | .image) = $image |
+             {location: $location, properties: {template: .}}' <<< "$app" > "$patch_file"
+          az rest --method patch --url "$resource_url?api-version=$api_version" \
+            --body "@$patch_file" --output none
           ready=false
           for attempt in $(seq 1 60); do
-            healthy=$(az containerapp revision show -g "$RESOURCE_GROUP" -n "$APP_NAME" --revision "$revision" --query properties.healthState -o tsv)
-            latest=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.latestReadyRevisionName -o tsv)
-            if [ "$healthy" = Healthy ] && [ "$latest" = "$revision" ]; then ready=true; break; fi
+            latest=$(az rest --method get --url "$resource_url?api-version=$api_version" --query properties.latestReadyRevisionName -o tsv)
+            if [ "$latest" = "$revision" ]; then
+              healthy=$(az rest --method get --url "$resource_url/revisions/$revision?api-version=$api_version" --query properties.healthState -o tsv)
+              if [ "$healthy" = Healthy ]; then ready=true; break; fi
+            fi
             sleep 10
           done
           test "$ready" = true || { echo "Revision $revision did not become ready." >&2; exit 1; }
-          fqdn=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query properties.configuration.ingress.fqdn -o tsv)
+          fqdn=$(az rest --method get --url "$resource_url?api-version=$api_version" --query properties.configuration.ingress.fqdn -o tsv)
           curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 10 --max-time 30 "https://$fqdn/api/health"
           printf 'Deployed `%s` to https://%s\n' "$IMAGE" "$fqdn" >> "$GITHUB_STEP_SUMMARY"

@@ -29,6 +29,16 @@ uploads/
 TEMP_ACCOUNTS.txt
 DEMO_ACCOUNTS.md
 
+# Azure sign-in caches and private deployment/account details
+.azure/
+.azure-deployment/
+azure-credentials.json
+azure-account.json
+azure-account.md
+bootstrap-token.txt
+*.pem
+*.key
+
 # Logs
 logs/
 *.log
