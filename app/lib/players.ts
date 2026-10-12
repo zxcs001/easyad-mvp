@@ -9,6 +9,7 @@ import { isDigitalInventory } from "./inventory-delivery";
 import { resolveDeviceTemplate } from "../component/device-templates";
 import { campaignSlides } from "./digital-schedule";
 import { validatePlayback } from "./playback-validation";
+import { parsePlayerDiagnostics, recoveryKinds, validRecoveryKey, type PlayerDiagnostics, type RecoveryCommand, type RecoveryKind, type FleetPlayerHealth } from "./player-diagnostics";
 export const playerCookie = "easyad_player";
 export class PlayerError extends Error {
     constructor(public status: number, message: string) { super(message); }
@@ -28,6 +29,9 @@ function setting(name: string, fallback: number, min: number, max: number) {
 function offlineLeaseSeconds() { return setting("PLAYER_OFFLINE_LEASE_SECONDS", 86400, 60, 86400); }
 export function hashPlayerSecret(value: string) { return createHash("sha256").update(value).digest("hex"); }
 type PlayerRow = {
+    diagnostics: PlayerDiagnostics | null;
+    diagnostics_at: Date | null;
+    clock_skew_ms: number | null;
     id: string;
     inventory_id: string;
     institution_id: string | null;
@@ -175,6 +179,7 @@ async function manifestContent(inventoryId: string, client: PoolClient) {
                 id: item.id, assetVersion: hashPlayerSecret(`${item.id}:${item.createdAt}:${item.publicUrl}`),
                 title: item.title, subtitle: "", mediaType: item.mediaType, publicUrl: item.source==="device"?`/api/player/assets/${encodeURIComponent(item.id)}`:item.publicUrl, createdAt: item.createdAt,
                 startsOn: item.startsOn, endsOn: item.endsOn,
+                ...(item.source === "device" ? { contentSchedule: item.contentSchedule ?? null } : {}),
                 ...(item.source === "advertiser" ? {
                     legacyBookingId: legacy.rows.find(row => row.id === item.id)?.booking_id,
                         placementId: legacy.rows.find(row => row.id === item.id)?.placement_id ?? undefined,
@@ -267,11 +272,18 @@ export async function heartbeatPlayer(token: string, body: Record<string, unknow
     const errorCodes = ["media_unavailable", "manifest_expired", "connection_lost", "storage_unavailable"];
     if (body.error !== undefined && body.error !== null && !errorCodes.includes(String(body.error)))
         throw new PlayerError(422, "Invalid player status.");
+    let diagnostics: PlayerDiagnostics | undefined;
+    try { if (body.diagnostics !== undefined) diagnostics = parsePlayerDiagnostics(body.diagnostics); }
+    catch { throw new PlayerError(422, "Invalid browser diagnostics."); }
     return transaction(async (client) => {
         const player = await authenticatedPlayer(client, token);
-        await client.query(`UPDATE players SET last_seen_at=NOW(),last_error=COALESCE($2,last_error),
-      last_error_at=CASE WHEN $2::text IS NOT NULL THEN NOW() ELSE last_error_at END WHERE id=$1`, [player.id, body.error ?? null]);
-        return { accepted: true };
+        await client.query(`UPDATE players SET last_seen_at=NOW(),last_error=$2,
+      last_error_at=CASE WHEN $2::text IS NULL THEN NULL WHEN last_error IS DISTINCT FROM $2 THEN NOW() ELSE last_error_at END,
+      diagnostics=COALESCE($3::jsonb,diagnostics),diagnostics_at=CASE WHEN $3::jsonb IS NULL THEN diagnostics_at ELSE NOW() END,
+      clock_skew_ms=CASE WHEN $3::jsonb IS NULL THEN clock_skew_ms ELSE $4 END WHERE id=$1`, [player.id, body.error ?? null, diagnostics ? JSON.stringify(diagnostics) : null, diagnostics ? Date.parse(diagnostics.clientTime) - Date.now() : null]);
+        await expireRecoveryCommands(client, player.id);
+        const command = (await client.query("SELECT * FROM player_recovery_commands WHERE player_id=$1 AND status='queued' ORDER BY requested_at LIMIT 1", [player.id])).rows[0];
+        return { accepted: true, serverTime: new Date().toISOString(), recoveryCommand: command ? mapRecoveryCommand(command) : null };
     });
 }
 export async function acknowledgePlayer(token: string, body: Record<string, unknown>) {
@@ -321,6 +333,7 @@ export async function playerStatus(user: DbUser, inventoryId: string): Promise<P
         const manifest = await currentManifest(client, player);
         return { enabled: true, player: {
                 id: player.id, connection: !player.last_seen_at ? "waiting" : Date.now() - player.last_seen_at.getTime() > playerTiming().staleMs ? "stale" : "online",
+                health: mapPlayerHealth(inventoryId, player, manifest.revision, await recoveryHistory(client, player.id)),
                 lastSeenAt: player.last_seen_at?.toISOString() ?? null, expectedRevision: manifest.revision,
                 receivedRevision: player.received_revision, validatedRevision: player.validated_revision, appliedRevision: player.applied_revision,
                 appliedAt: player.applied_at?.toISOString() ?? null, lastError: player.last_error, lastErrorAt: player.last_error_at?.toISOString() ?? null,
@@ -328,6 +341,64 @@ export async function playerStatus(user: DbUser, inventoryId: string): Promise<P
                     occurred_at: string;
                 }>("SELECT occurred_at FROM digital_delivery_events WHERE player_id=$1 AND provenance='authenticated_player' AND event_type='delivered' ORDER BY occurred_at DESC LIMIT 1", [player.id])).rows[0]?.occurred_at ?? null,
             } };
+    });
+}
+
+type RecoveryRow = { id: string; kind: RecoveryKind; status: RecoveryCommand["status"]; requested_at: Date; expires_at: Date; finished_at: Date | null; result: string | null };
+function mapRecoveryCommand(row: RecoveryRow): RecoveryCommand {
+    return { id: row.id, kind: row.kind, status: ["queued", "received"].includes(row.status) && row.expires_at.getTime() <= Date.now() ? "expired" : row.status, requestedAt: row.requested_at.toISOString(), expiresAt: row.expires_at.toISOString(), finishedAt: row.finished_at?.toISOString() ?? null, result: row.result };
+}
+async function expireRecoveryCommands(client: PoolClient, playerId: string) {
+    await client.query("UPDATE player_recovery_commands SET status='expired',finished_at=NOW(),result='command_expired' WHERE player_id=$1 AND status IN ('queued','received') AND expires_at<=NOW()", [playerId]);
+}
+async function recoveryHistory(client: PoolClient, playerId: string) {
+    return (await client.query<RecoveryRow>("SELECT * FROM player_recovery_commands WHERE player_id=$1 ORDER BY requested_at DESC,id LIMIT 5", [playerId])).rows.map(mapRecoveryCommand);
+}
+function mapPlayerHealth(inventoryId: string, player: PlayerRow | null, expectedRevision: number, commands: RecoveryCommand[]): FleetPlayerHealth {
+    return { inventoryId, playerId: player?.id ?? null, connection: !player ? "unpaired" : !player.last_seen_at ? "waiting" : Date.now() - player.last_seen_at.getTime() > playerTiming().staleMs ? "stale" : "online", staleMs: playerTiming().staleMs, lastSeenAt: player?.last_seen_at?.toISOString() ?? null, expectedRevision, appliedRevision: player?.applied_revision ?? 0, error: player?.last_error ?? null, diagnostics: player?.diagnostics ?? null, diagnosticsAt: player?.diagnostics_at?.toISOString() ?? null, clockSkewMs: player?.clock_skew_ms == null ? null : Number(player.clock_skew_ms), commands };
+}
+export async function fleetPlayerHealth(inventoryIds: string[]): Promise<FleetPlayerHealth[]> {
+    await initializeDatabase();
+    const players = (await getDb().query<PlayerRow & { inventory_id: string }>("SELECT * FROM players WHERE inventory_id=ANY($1::text[]) AND revoked_at IS NULL", [inventoryIds])).rows;
+    const commands = (await getDb().query<RecoveryRow & { player_id: string }>(`SELECT * FROM (SELECT c.*,row_number() OVER(PARTITION BY player_id ORDER BY requested_at DESC,id) AS rank FROM player_recovery_commands c WHERE player_id=ANY($1::text[])) recent WHERE rank<=5`, [players.map(player => player.id)])).rows;
+    return inventoryIds.map(id => { const player = players.find(row => row.inventory_id === id); return mapPlayerHealth(id, player ?? null, player?.expected_revision ?? 0, commands.filter(command => command.player_id === player?.id).map(mapRecoveryCommand)); });
+}
+export async function queuePlayerRecovery(user: DbUser, inventoryId: string, input: Record<string, unknown>) {
+    await ownedScreen(user, inventoryId);
+    if (!recoveryKinds.includes(input.kind as RecoveryKind) || !validRecoveryKey(input.requestKey) || typeof input.playerId !== "string") throw new PlayerError(422, "Choose a valid recovery action and player.");
+    return transaction(async client => {
+        const inventory = (await client.query<{ institution_id: string | null; format: InventoryItem["format"]; delivery_mode: InventoryItem["deliveryMode"] }>("SELECT institution_id,format,delivery_mode FROM inventory WHERE id=$1 FOR SHARE", [inventoryId])).rows[0];
+        // Ownership may have changed since the initial permission check.
+        if (!inventory || !(user.role === "admin" || (user.role === "institutional" && inventory.institution_id === user.id))) throw new PlayerError(403, "Screen owner access is required.");
+        if (!isDigitalInventory({ format: inventory.format, deliveryMode: inventory.delivery_mode })) throw new PlayerError(422, "Only digital screens can pair a player.");
+        const player = (await client.query<PlayerRow>("SELECT * FROM players WHERE inventory_id=$1 AND revoked_at IS NULL FOR UPDATE", [inventoryId])).rows[0];
+        if (!player || player.id !== input.playerId || player.institution_id !== inventory.institution_id) throw new PlayerError(409, "The paired player changed. Refresh before recovery.");
+        await expireRecoveryCommands(client, player.id);
+        const existing = (await client.query<RecoveryRow>("SELECT * FROM player_recovery_commands WHERE player_id=$1 AND request_key=$2", [player.id, input.requestKey])).rows[0];
+        if (existing) { if (existing.kind !== input.kind) throw new PlayerError(409, "Recovery request was reused for another action."); return { command: mapRecoveryCommand(existing) }; }
+        if ((await client.query("SELECT id FROM player_recovery_commands WHERE player_id=$1 AND status IN ('queued','received')", [player.id])).rowCount) throw new PlayerError(409, "A recovery command is already pending for this player.");
+        const count = (await client.query<{ count: string }>("SELECT COUNT(*) FROM player_recovery_commands WHERE player_id=$1 AND requested_at>NOW()-INTERVAL '10 minutes'", [player.id])).rows[0];
+        if (Number(count.count) >= 5) throw new PlayerError(429, "Too many recovery attempts. Check the device before retrying.");
+        const command = (await client.query<RecoveryRow>("INSERT INTO player_recovery_commands(id,player_id,request_key,kind,requested_by) VALUES($1,$2,$3,$4,$5) RETURNING *", [`REC-${randomUUID()}`, player.id, input.requestKey, input.kind, user.id])).rows[0];
+        await client.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,action,result) VALUES($1,$2,$3,$4,$5,$6,'queued')", [`AUD-${randomUUID()}`, user.id, player.institution_id, inventoryId, command.id, `player_${input.kind}`]);
+        return { command: mapRecoveryCommand(command) };
+    });
+}
+export async function acknowledgeRecovery(token: string, body: Record<string, unknown>) {
+    const results = ["content_refreshed", "cache_rebuilt", "player_reloaded", "recovery_failed", "reload_unavailable"];
+    if (typeof body.commandId !== "string" || !["received", "succeeded", "failed"].includes(String(body.status)) || (body.status !== "received" && !results.includes(String(body.result)))) throw new PlayerError(422, "Invalid recovery result.");
+    return transaction(async client => {
+        const player = await authenticatedPlayer(client, token);
+        await expireRecoveryCommands(client, player.id);
+        const command = (await client.query<RecoveryRow>("SELECT * FROM player_recovery_commands WHERE id=$1 AND player_id=$2 FOR UPDATE", [body.commandId, player.id])).rows[0];
+        if (!command) throw new PlayerError(404, "Recovery command not found.");
+        const successResult = { refresh_content: "content_refreshed", rebuild_cache: "cache_rebuilt", reload_player: "player_reloaded" };
+        if ((body.status === "succeeded" && body.result !== successResult[command.kind]) || (body.status === "failed" && !["recovery_failed", "reload_unavailable"].includes(String(body.result)))) throw new PlayerError(422, "Invalid recovery result.");
+        if (command.status === "expired") throw new PlayerError(409, "Recovery command expired.");
+        if (command.status === body.status && (body.status === "received" || command.result === body.result)) return { accepted: true };
+        if (body.status === "received" ? command.status !== "queued" : command.status !== "received") throw new PlayerError(409, "Recovery command is no longer pending.");
+        await client.query("UPDATE player_recovery_commands SET status=$2,received_at=COALESCE(received_at,NOW()),finished_at=CASE WHEN $2='received' THEN NULL ELSE NOW() END,result=$3 WHERE id=$1", [command.id, body.status, body.status === "received" ? null : body.result]);
+        return { accepted: true };
     });
 }
 

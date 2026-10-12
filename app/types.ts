@@ -33,6 +33,8 @@ export type CreativeDraft = {
   htmlByTopic?: Partial<Record<"retail" | "finance" | "event", string>>;
   /** Fill-in-the-blanks values per design (see app/quick-ad.ts). */
   fieldsByTopic?: Partial<Record<"retail" | "finance" | "event", import("./quick-ad").QuickAdFields>>;
+  /** Validated visual controls, kept independently for each design. */
+  designsByTopic?: Partial<Record<"retail" | "finance" | "event", import("./creative-design").CreativeDesign>>;
   /** Optional page a QR code on a template ad opens. Scans count in Results. */
   responseUrl?: string;
   format: FormatKey;

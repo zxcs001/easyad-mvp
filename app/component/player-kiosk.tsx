@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Maximize, Settings } from "lucide-react";
 import { useI18n } from "../i18n/client";
 import "./player-kiosk.css";
+import { reportWakeLock } from "../lib/kiosk-diagnostics";
 
 type AwakeStatus = "requesting" | "active" | "released" | "unavailable" | "insecure";
 const awakeMessages: Record<AwakeStatus, string> = {
@@ -25,6 +26,7 @@ export default function PlayerKiosk({ children, enabled }: { children: ReactNode
   const surfaceRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { reportWakeLock(active ? awake : "not_requested"); }, [active, awake]);
 
   useEffect(() => {
     // Read the actual address on the client: offline navigation restores the

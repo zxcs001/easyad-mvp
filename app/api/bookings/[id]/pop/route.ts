@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { canManageInventory, canManageInventoryRecord, canReadBooking, getCurrentUser } from "../../../../lib/auth";
 import { createPopLog, getBooking, getBookingOwnerId, getInventory, listPopLogs } from "../../../../lib/db";
 import { expectedImpressions, expectedPlays } from "../../../../utils";
+import { isDemoDeclaration } from "../../../../lib/delivery-report";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -14,7 +15,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const booking = await getBooking(id);
   const inventory = booking ? await getInventory(booking.inventoryId) : null;
   if (!booking || !canReadBooking(user, await getBookingOwnerId(id), inventory)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  return NextResponse.json({ logs: (await listPopLogs(id)).map(log=>({...log,provenance:log.source==="demo-delivery-tick"?"demo":"operator_declaration",impressionsLabel:"estimated"})), provenance: "legacy_operator_or_demo", impressionsLabel: "estimated", note: "Historical verified status is an operator declaration, not authenticated player evidence." });
+  return NextResponse.json({ logs: (await listPopLogs(id)).map(log=>({...log,provenance:isDemoDeclaration(log.id,log.source)?"demo":"operator_declaration",impressionsLabel:"estimated"})), provenance: "legacy_operator_or_demo", impressionsLabel: "estimated", note: "Historical verified status is an operator declaration, not authenticated player evidence." });
 }
 
 // Legacy operator declaration. Counts and derived impressions are not player-measured evidence.

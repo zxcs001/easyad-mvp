@@ -1,4 +1,4 @@
-import {playerTiming} from "./players";
+import {playerTiming, fleetPlayerHealth, queuePlayerRecovery, PlayerError, playersEnabled} from "./players";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { canManageInventoryRecord,canPublishInventoryRecord } from "./auth";
@@ -14,12 +14,26 @@ export async function fleetSnapshot(user:DbUser){
  const screens=await getDb().query("SELECT * FROM inventory WHERE delivery_mode='digital' AND ($1='admin' OR institution_id=$2) ORDER BY building,department,name LIMIT 500",[user.role,user.role==="institutional"?user.id:user.institutionId]);
  const allowed=screens.rows.filter(s=>user.role!=="operator"||!Array.isArray(user.screenScope)||user.screenScope.includes(s.id));
  const ids=allowed.map(s=>s.id);
- const media=await getDb().query("SELECT id,inventory_id,title,approval_status,starts_at,ends_at,revision FROM media_resources WHERE inventory_id=ANY($1::text[]) ORDER BY created_at DESC LIMIT 500",[ids]);
+ const media=await getDb().query("SELECT id,inventory_id,title,approval_status,starts_at,ends_at,recurring_schedule,revision FROM media_resources WHERE inventory_id=ANY($1::text[]) ORDER BY created_at DESC LIMIT 500",[ids]);
  const announcements=await getDb().query("SELECT a.id,a.name,a.media_id FROM fleet_announcements a JOIN media_resources m ON m.id=a.media_id WHERE m.inventory_id=ANY($1::text[]) ORDER BY a.created_at DESC LIMIT 100",[ids]);
  const audit=await getDb().query("SELECT actor_id,target_id,action,revision,result,priority,created_at FROM fleet_audit WHERE target_id=ANY($1::text[]) OR ($2='institutional' AND institution_id=$3) ORDER BY created_at DESC LIMIT 100",[ids,user.role,user.id]);
  const alertDelivery=await getDb().query(`SELECT a.id alert_id,a.status,a.expires_at,i.id inventory_id,p.id player_id,p.last_seen_at,s.received_at,s.applied_at,s.rendered_at,s.restored_at FROM device_alerts a JOIN inventory i ON a.target_device_ids ? i.id LEFT JOIN players p ON p.inventory_id=i.id AND p.revoked_at IS NULL LEFT JOIN player_alert_state s ON s.alert_id=a.id AND s.player_id=p.id WHERE i.id=ANY($1::text[]) ORDER BY a.created_at DESC LIMIT 300`,[ids]);
  const operators=user.role==="institutional"?(await getDb().query("SELECT id,name FROM users WHERE institution_id=$1 AND role='operator' AND status='active' ORDER BY name",[user.id])).rows:[];
- return {operators,staleMs:playerTiming().staleMs,alertDelivery:alertDelivery.rows,screens:allowed,media:media.rows,announcements:announcements.rows,audit:audit.rows,owner:user.role!=="operator"};
+ return {operators,staleMs:playerTiming().staleMs,playerControlEnabled:playersEnabled(),players:await fleetPlayerHealth(ids),alertDelivery:alertDelivery.rows,screens:allowed,media:media.rows,announcements:announcements.rows,audit:audit.rows,owner:user.role!=="operator"};
+}
+export async function bulkPlayerRecovery(user: DbUser, input: Record<string, unknown>) {
+ if (!playersEnabled()) throw new FleetError(404, "Player control is not enabled.");
+ if (!Array.isArray(input.targets) || input.targets.length < 1 || input.targets.length > 100) throw new FleetError(422, "Choose 1 to 100 explicit screen targets");
+ const ids = new Set<string>(), results = [];
+ for (const target of input.targets) {
+  if (!target || typeof target.id !== "string" || target.id.length > 200 || ids.has(target.id)) throw new FleetError(422, "Choose distinct screen targets.");
+  ids.add(target.id);
+ }
+ for (const target of input.targets) {
+  try { const result = await queuePlayerRecovery(user, target.id, { kind: input.kind, requestKey: input.requestKey, playerId: target.playerId }); results.push({ id: target.id, ok: true, command: result.command }); }
+  catch(error) { results.push({ id: target.id, ok: false, status: error instanceof PlayerError ? error.status : 500, error: error instanceof PlayerError ? error.message : "Recovery request failed." }); }
+ }
+ return { results };
 }
 export async function saveAnnouncement(user:DbUser,input:Record<string,unknown>){
  const media=await getDb().query("SELECT inventory_id FROM media_resources WHERE id=$1",[input.mediaId]);
@@ -65,7 +79,7 @@ export async function bulkFleet(user:DbUser,input:Record<string,unknown>){
  if(!sourceScreen||!canManageInventoryRecord(user,sourceScreen)||sourceScreen.institutionId!==screen.institutionId)throw new FleetError(403,"Announcement is outside your institution scope");
  if(sourceScreen.contentVisibility==="private"&&locked.content_visibility!=="private")throw new FleetError(403,"Private content cannot be copied to a public screen");
  const resourceId=`MED-${randomUUID()}`;
- await client.query("INSERT INTO media_resources(id,inventory_id,owner_id,title,original_name,mime_type,media_type,approval_status,size_bytes,storage_path,public_url,created_at,starts_at,ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",[resourceId,id,user.id,source.title,source.original_name,source.mime_type,source.media_type,canPublishInventoryRecord(user,screen)?"approved":"pending review",source.size_bytes,source.storage_path,`/media/${resourceId}`,new Date().toISOString(),new Date(start).toISOString(),new Date(end).toISOString()]);
+ await client.query("INSERT INTO media_resources(id,inventory_id,owner_id,title,original_name,mime_type,media_type,approval_status,size_bytes,storage_path,public_url,created_at,starts_at,ends_at,recurring_schedule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)",[resourceId,id,user.id,source.title,source.original_name,source.mime_type,source.media_type,canPublishInventoryRecord(user,screen)?"approved":"pending review",source.size_bytes,source.storage_path,`/media/${resourceId}`,new Date().toISOString(),new Date(start).toISOString(),new Date(end).toISOString(),JSON.stringify(source.recurring_schedule ?? null)]);
  }else throw new FleetError(422,"Unknown fleet action");
  await client.query("UPDATE inventory SET fleet_version=fleet_version+1 WHERE id=$1",[id]);
  await fleetAudit(user,id,String(input.action),locked.fleet_version+1,"success","ordinary",client);

@@ -7,6 +7,8 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { Booking, InventoryItem } from "../app/data";
 import ResponsesPanel, { campaignOrder, costPerResponse } from "../app/component/responses-panel";
 import CampaignReport from "../app/component/campaign-report";
+import { bookingDelivery } from "../app/lib/delivery-report";
+import { deliveryAllocation } from "./helpers/delivery-fixtures";
 
 const screenItem: InventoryItem = { id: "INV-1", name: "City Hall Screen", operator: "City", format: "digital", x: 50, y: 50, address: "500 Donald St E", price: 15, impressions: 14000, traffic: 1, income: 1, audience: "A", competitor: "Low", occupancy: 0, imageInterval: 6, maxLoopSeconds: 30, availableFrom: "2026-01-01", availableTo: "2099-01-01", measurementSource: "City traffic count" };
 const booking: Booking = { id: "BK-1", advertiser: "Northline Fitness", inventoryId: "INV-1", campaign: "Winter push", start: "2026-10-01", end: "2026-10-10", adSlots: 1, creativeStatus: "approved", status: "live", spend: 300, paid: false, pop: 90 };
@@ -15,8 +17,9 @@ const summary = { bookingId: "BK-1", code: "ABCDEFGH", shortUrl: "https://easyad
 
 afterEach(() => vi.unstubAllGlobals());
 
-test("cost per response counts scans and reported promo use together", () => {
-  expect(costPerResponse(300, { responses: 18, promoRedemptions: 2 })).toBe(15);
+test("cost per scan or visit excludes promo uses that may overlap", () => {
+  expect(costPerResponse(300, { responses: 18, promoRedemptions: 2 })).toBeCloseTo(16.66667);
+  expect(costPerResponse(300, { responses: 0, promoRedemptions: 20 })).toBeNull();
   expect(costPerResponse(300, { responses: 0, promoRedemptions: 0 })).toBeNull();
   expect(costPerResponse(300, undefined)).toBeNull();
 });
@@ -59,7 +62,7 @@ test("an advertiser sees responses per campaign and adds a link to a campaign wi
 
   expect(await screen.findByText("18")).toBeInTheDocument();
   expect(screen.getByText("Uses of SCREEN10 (you report)")).toBeInTheDocument();
-  expect(screen.getByText("$15.00")).toBeInTheDocument();
+  expect(screen.getByText("$16.67")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: /Responses in the last 14 days/ })).toBeInTheDocument();
   expect(screen.getAllByRole("link", { name: "Report (PDF)" })[0]).toHaveAttribute("href", "/report/BK-1");
 
@@ -80,13 +83,14 @@ test("the screen owner sees responses read-only", async () => {
 });
 
 test("the printable report says where every figure comes from", () => {
-  render(<CampaignReport booking={booking} screen={screenItem} response={summary} generatedAt="2026-10-09T12:00:00.000Z" />);
+  const delivery = bookingDelivery({ ...booking, pop: 5 }, screenItem, deliveryAllocation, [{ booking_id: booking.id, creative_id: "art-1", event_type: "delivered", count: 25920, late: false }], [], Date.parse("2026-10-11"));
+  render(<CampaignReport booking={{ ...booking, pop: 5 }} screen={screenItem} response={summary} delivery={delivery} generatedAt="2026-10-11T12:00:00.000Z" />);
   expect(screen.getByRole("heading", { name: "Winter push" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Print or save as PDF" })).toBeInTheDocument();
   expect(screen.getByText(/Audience figure from City traffic count/)).toHaveTextContent("not an audited measurement (COMMB)");
   expect(screen.getByText(/as reported by the advertiser/)).toBeInTheDocument();
   expect(screen.getByText(/Only the time of each scan is stored/)).toBeInTheDocument();
-  // 14,000 a day x one fifth of the loop x 10 days x 90% playback.
-  expect(screen.getByText("Estimated views").nextSibling).toHaveTextContent("25,200");
-  expect(screen.getByText("Cost per response").nextSibling).toHaveTextContent("$15.00");
+  // Authenticated completed intervals drive the estimate, never booking.pop.
+  expect(screen.getAllByText("Estimated views")[0].nextSibling).toHaveTextContent("25,200");
+  expect(screen.getByText("Cost per scan or link visit").nextSibling).toHaveTextContent("$16.67");
 });

@@ -2,9 +2,11 @@ import type { InventoryAdvertiserResource, InventoryItem, MediaResource } from "
 import type { PoolClient } from "pg";
 import { getInventory, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "./db";
 import { isDigitalInventory } from "./inventory-delivery";
+import { contentScheduleEligible, type ContentSchedule } from "./content-schedule";
 import { addDays, isScheduledNow, type DaypartId } from "./booking-schedule";
 
 export type PublicDeviceMediaItem = {
+  contentSchedule?: ContentSchedule | null;
   id: string;
   position: number;
   deviceId: string;
@@ -39,10 +41,11 @@ export async function getActiveDeviceMedia(deviceId: string, asOf = currentDate(
     listInventoryAdvertiserResources(deviceId, asOf, client, through),
   ]);
   const result=buildActiveDeviceMedia(inventory, deviceResources, advertiserResources, asOf, through);
-  if(!authenticated)result.items=result.items.filter(i=>i.source!=="device"||(!i.startsOn||Date.parse(i.startsOn)<=Date.now())&&(!i.endsOn||Date.parse(i.endsOn)>Date.now()));
+  const now = Date.now();
+  if(!authenticated)result.items=result.items.filter(i=>i.source!=="device"||(!i.startsOn||Date.parse(i.startsOn)<=now)&&(!i.endsOn||Date.parse(i.endsOn)>now)&&contentScheduleEligible(i.contentSchedule, now));
   // The public page and API show what plays now, so a time-of-day booking shows only inside its slots.
   // The paired player receives every booking and applies the same rule itself, offline as well.
-  if(!authenticated)result.items=result.items.filter(i=>!i.dayparts?.length||isScheduledNow({startDate:i.startsOn??"",endDate:i.endsOn??"",dayparts:i.dayparts},Date.now()));
+  if(!authenticated)result.items=result.items.filter(i=>!i.dayparts?.length||isScheduledNow({startDate:i.startsOn??"",endDate:i.endsOn??"",dayparts:i.dayparts},now)).map((item,index)=>({...item,position:index+1}));
   return result;
 }
 
@@ -69,6 +72,7 @@ export function buildActiveDeviceMedia(
       campaign: null,
       startsOn: resource.startsAt??null,
       endsOn: resource.endsAt??null,
+      contentSchedule: resource.contentSchedule ?? null,
     }));
 
   const advertiserItems = advertiserResources

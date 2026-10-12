@@ -107,6 +107,7 @@ export type InventoryComment = {
 };
 
 export type MediaResource = {
+  contentSchedule?: import("./lib/content-schedule").ContentSchedule | null;
   startsAt?: string|null; endsAt?: string|null; revision?: number;
   id: string;
   inventoryId: string;

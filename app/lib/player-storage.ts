@@ -35,6 +35,19 @@ export async function clearPlayerCache() {
         db.close();
     }
 }
+
+export async function inspectPlayerStorage() {
+    const db = await database();
+    let assets: Asset[], storedReports: number;
+    try {
+        const tx = db.transaction(["assets", "outbox"]), done = complete(tx);
+        [assets, storedReports] = await Promise.all([request(tx.objectStore("assets").getAll()) as Promise<Asset[]>, request(tx.objectStore("outbox").count())]);
+        await done;
+    } finally { db.close(); }
+    const estimate = await navigator.storage?.estimate?.().catch(() => null);
+    const shellReady = typeof caches !== "undefined" && await caches.open("easyad-player-shell-v1").then(cache => cache.match("/player")).then(Boolean).catch(() => false);
+    return { storageAvailable: true, cacheBytes: assets.reduce((sum, asset) => sum + asset.blob.size, 0), assetCount: assets.length, storedReports, shellReady, usageBytes: estimate?.usage == null ? null : Math.round(estimate.usage), quotaBytes: estimate?.quota == null ? null : Math.round(estimate.quota) };
+}
 async function stored() {
     const db = await database();
     try {
@@ -149,7 +162,7 @@ async function download(url: string, signal: AbortSignal, budget: number) {
     }
     return new Blob(chunks, { type: response.headers.get("content-type") ?? "application/octet-stream" });
 }
-export async function cachePlayerManifest(manifest: PlayerManifest, signal: AbortSignal): Promise<PreparedPlayer> {
+export async function cachePlayerManifest(manifest: PlayerManifest, signal: AbortSignal, redownload = false): Promise<PreparedPlayer> {
     // An emergency only caches its own photo. Ordinary media must never delay it.
     if (manifest.activeAlert) manifest = { ...manifest, slides: [] };
     const old = await stored();
@@ -160,7 +173,7 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
     let bytes = 0;
     if (manifest.activeAlert?.image) {
         const key = `emergency:${manifest.activeAlert.id}`;
-        const cached = old.assets.find(asset => asset.key === key);
+        const cached = redownload ? undefined : old.assets.find(asset => asset.key === key);
         const blob = cached && !cached.invalid && await hash(cached.blob) === cached.checksum ? cached.blob : await download(manifest.activeAlert.image.url, AbortSignal.any([signal, AbortSignal.timeout(12000)]), 5 * 1024 * 1024);
         if (!blob.size) throw new Error("media_unavailable");
         bytes = blob.size;
@@ -169,7 +182,7 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
     for (const slide of manifest.slides) {
         if (assets.some(asset => asset.key === slide.assetVersion))
             continue;
-        const cached = old.assets.find(asset => asset.key === slide.assetVersion);
+        const cached = redownload ? undefined : old.assets.find(asset => asset.key === slide.assetVersion);
         const blob = cached && !cached.invalid && await hash(cached.blob) === cached.checksum ? cached.blob : await download(slide.publicUrl, AbortSignal.any([signal, AbortSignal.timeout(60000)]), PLAYER_STORAGE_BUDGET - bytes);
         bytes += blob.size;
         if (bytes > PLAYER_STORAGE_BUDGET)
@@ -179,6 +192,10 @@ export async function cachePlayerManifest(manifest: PlayerManifest, signal: Abor
         assets.push({ key: slide.assetVersion, blob, checksum, invalid });
     }
     const prepared = await hydrate(manifest, assets, signal);
+    if (redownload && prepared.manifest.slides.some(slide => !slide.publicUrl)) {
+        prepared.release();
+        throw new Error("media_unavailable");
+    }
     // Retain only already-cached ordinary assets; no download, hashing, or
     // decoding of them can hold up an emergency. Verify them when resuming.
     let retained: Asset[] = [];

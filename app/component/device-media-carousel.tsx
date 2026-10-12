@@ -1,12 +1,16 @@
 "use client";
 
 import "./device-media-carousel.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { contentScheduleEligible, type ContentSchedule } from "../lib/content-schedule";
 import useEmblaCarousel from "embla-carousel-react";
 import Fade from "embla-carousel-fade";
 import { useI18n } from "../i18n/client";
 
 export type DeviceMediaSlide = {
+  contentSchedule?: ContentSchedule | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
   id: string;
   title: string;
   subtitle: string;
@@ -19,8 +23,13 @@ const defaultImageInterval = 6;
 const minImageInterval = 2;
 const maxImageInterval = 60;
 
-export default function DeviceMediaCarousel({ inventoryName, imageInterval, slides, interactive = true }: { inventoryName: string; imageInterval: number; slides: DeviceMediaSlide[]; interactive?: boolean }) {
+export default function DeviceMediaCarousel({ inventoryName, imageInterval, slides: candidates, interactive = true }: { inventoryName: string; imageInterval: number; slides: DeviceMediaSlide[]; interactive?: boolean }) {
   const { t } = useI18n();
+  const [clock, setClock] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 500); return () => clearInterval(timer); }, []);
+  // Depend on the eligible IDs, so a clock tick cannot reset the carousel timer.
+  const eligibleIds = candidates.filter(slide => contentScheduleEligible(slide.contentSchedule, clock) && (!slide.startsAt || Date.parse(slide.startsAt) <= clock) && (!slide.endsAt || Date.parse(slide.endsAt) > clock)).map(slide => slide.id).join("\n");
+  const slides = useMemo(() => candidates.filter(slide => eligibleIds.split("\n").includes(slide.id)), [candidates, eligibleIds]);
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: slides.length > 1, align: "start", watchDrag: interactive }, [Fade()]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const effectiveImageInterval = clampInterval(imageInterval);

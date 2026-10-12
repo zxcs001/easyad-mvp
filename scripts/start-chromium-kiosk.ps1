@@ -4,7 +4,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$AppOrigin,
     [string]$BrowserPath,
-    [string]$ProfileDirectory = (Join-Path $env:LOCALAPPDATA 'EasyAD\ChromiumKiosk')
+    [string]$ProfileDirectory = (Join-Path $env:LOCALAPPDATA 'EasyAD\ChromiumKiosk'),
+    [switch]$Watch,
+    [ValidateRange(5, 300)] [int]$RestartDelaySeconds = 10
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,7 +43,23 @@ $arguments = @(
     '--no-default-browser-check',
     "`"$playerUrl`""
 )
-Start-Process -FilePath $BrowserPath -ArgumentList $arguments
+if ($Watch) {
+    # Observe only the process launched for this dedicated profile. Never kill other browsers.
+    $restartTimes = [Collections.Generic.List[DateTime]]::new()
+    Write-Host 'Watching this kiosk process. Ctrl+C stops the watcher; the browser profile is preserved.'
+    while ($true) {
+        $kioskProcess = Start-Process -FilePath $BrowserPath -ArgumentList $arguments -PassThru
+        $kioskProcess.WaitForExit()
+        $cutoff = [DateTime]::UtcNow.AddMinutes(-10)
+        $restartTimes.RemoveAll([Predicate[DateTime]]{ param($time) $time -lt $cutoff }) | Out-Null
+        if ($restartTimes.Count -ge 5) { throw 'Kiosk exited repeatedly. Check the device and close any existing instance using this display profile before restarting the watcher.' }
+        $restartTimes.Add([DateTime]::UtcNow)
+        Write-Host "Kiosk process exited. Relaunching in $RestartDelaySeconds seconds."
+        Start-Sleep -Seconds $RestartDelaySeconds
+    }
+} else {
+    Start-Process -FilePath $BrowserPath -ArgumentList $arguments
+}
 Write-Host "Opened $playerUrl"
 Write-Host "Display profile: $profilePath"
 Write-Host 'Pair this profile once. Reuse the same profile and origin after restarting.'

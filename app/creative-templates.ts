@@ -3,7 +3,7 @@ import type { Creative } from "./data";
 export type CreativeTemplateTopic = Creative["template"];
 
 export const creativeTemplateTopics: CreativeTemplateTopic[] = ["retail", "finance", "event"];
-export const creativeHtmlResponseCsp = "sandbox; default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
+export const creativeHtmlResponseCsp = "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
 export const creativeTemplateExamples: Record<CreativeTemplateTopic, { name: string; description: string }> = {
   retail: { name: "The weekend edit", description: "A bold local shop promotion" },

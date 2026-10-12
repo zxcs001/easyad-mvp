@@ -28,7 +28,13 @@ The equivalent manual command, run in Command Prompt, is:
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --no-first-run --no-default-browser-check --user-data-dir="%LOCALAPPDATA%\EasyAD\ChromiumKiosk" "https://your-easyad-host.example/player?kiosk=1"
 ```
 
-Keep the computer on AC power and configure display/sleep timeouts. For unattended deployment, configure a restricted Windows account and an approved startup/relaunch mechanism. The script only launches the browser; it does not install software or change Windows configuration.
+Keep the computer on AC power and configure display/sleep timeouts. For unattended deployment, configure a restricted Windows account and an approved startup mechanism. The optional watcher relaunches the dedicated browser process after it exits:
+
+```powershell
+.\scripts\start-chromium-kiosk.ps1 -AppOrigin 'https://your-easyad-host.example' -Watch
+```
+
+`-RestartDelaySeconds` defaults to 10 (allowed: 5–300). Five relaunches in ten minutes stop the watcher with a message to inspect the device; Ctrl+C stops watching. Close existing instances using this profile before starting the watcher. It observes the process it starts, preserves its profile and does not kill other browsers. It does not detect a frozen process, install itself at startup or change Windows power/configuration. This Windows execution path needs physical-device qualification; see [fleet diagnostics and recovery](FLEET_DIAGNOSTICS_RECOVERY.md).
 
 Microsoft Edge is Chromium-based, but its native `--edge-kiosk-type=fullscreen` mode uses InPrivate navigation. Pairing cookies, offline media and unsent playback reports therefore do not persist across kiosk sessions. Prefer persistent Chrome/Chromium for this player. If your organization requires Edge/Assigned Access, qualify its storage lifecycle or design separate managed provisioning before relying on restart recovery. See [Microsoft's kiosk documentation](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-configure-kiosk-mode).
 

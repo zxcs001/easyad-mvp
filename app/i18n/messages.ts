@@ -11,6 +11,10 @@ import { frFleetTools } from "./fr-fleet-tools";
 import { frQuickAd } from "./fr-quick-ad";
 import { frAlertReady } from "./fr-alert-ready";
 import { frResults } from "./fr-results";
+import { frDelivery } from "./fr-delivery";
+import { frCreativeEditor } from "./fr-creative-editor";
+import { frContentSchedule } from "./fr-content-schedule";
+import { frKioskDiagnostics } from "./fr-kiosk-diagnostics";
 
 type Variables = Record<string, string | number>;
 type Messages = Record<string, string>;
@@ -75,6 +79,10 @@ const fr: Messages = {
   ...frQuickAd,
   ...frAlertReady,
   ...frResults,
+  ...frDelivery,
+  ...frCreativeEditor,
+  ...frContentSchedule,
+  ...frKioskDiagnostics,
   "Language": "Langue",
   "English": "English",
   "French": "Français",

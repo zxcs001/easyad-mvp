@@ -49,6 +49,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       campaign: item.campaign,
       startsOn: item.startsOn,
       endsOn: item.endsOn,
+      contentSchedule: item.contentSchedule ?? null,
       createdAt: item.createdAt,
       currentlyShowing: true,
       representation: item.mediaType === "image" ? "base64" : "url",

@@ -68,3 +68,16 @@ test("outbox failure stops playback without silently discarding evidence", async
     expect(error).toHaveBeenCalled();
     expect(view.container.querySelector("img")).toBeNull();
 });
+test("cached recurring content starts and cuts off on local hours without a new manifest", async () => {
+    vi.setSystemTime(new Date("2026-10-12T12:59:59Z"));
+    const recurring = { ...manifest, generatedAt: "2026-10-12T12:00:00.000Z", validUntil: "2026-10-13T12:00:00.000Z", slides: [{ ...manifest.slides[0], durationSeconds: 60, contentSchedule: { version: 1 as const, timezone: "America/Toronto", daysOfWeek: [1], startTime: "09:00", endTime: "09:01", startDate: null, endDate: null, paused: false } }] };
+    const view = render(<PlayerRotation manifest={recurring} onError={() => { }} />);
+    expect(view.container.querySelector("img")).toBeNull();
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(view.container.querySelector("img")).not.toBeNull();
+    await act(async () => vi.advanceTimersByTime(500));
+    fireEvent.load(view.container.querySelector("img")!);
+    await act(async () => vi.advanceTimersByTime(59500));
+    expect(view.container.querySelector("img")).toBeNull();
+    expect(mocks.queue.mock.calls[0][1].outcome).toBe("interrupted");
+});

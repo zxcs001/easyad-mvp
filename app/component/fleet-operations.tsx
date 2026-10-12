@@ -4,11 +4,13 @@ import { useI18n } from "../i18n/client";
 import { EmptyState, PanelHeading } from "./shared-ui";
 import { WorkspaceTabs, workspaceTabPanel, type WorkspaceTab } from "./workspace-tabs";
 import "./fleet-operations.css";
+import FleetDiagnostics from "./fleet-diagnostics";
+import type { FleetPlayerHealth } from "../lib/player-diagnostics";
 
 type Screen = { id: string; name: string; building: string; department: string; content_visibility: string; advertising_opt_in: boolean; reserved_seconds: number; restricted_categories: string[]; fleet_version: number };
 type Row = Record<string, any>;
-type Snapshot = { operators: Row[]; screens: Screen[]; media: Row[]; announcements: Row[]; audit: Row[]; alertDelivery: Row[]; staleMs: number; owner: boolean };
-type FleetTab = "policy" | "announcements" | "editors" | "delivery" | "audit";
+type Snapshot = { operators: Row[]; screens: Screen[]; media: Row[]; announcements: Row[]; audit: Row[]; alertDelivery: Row[]; staleMs: number; owner: boolean; players?: FleetPlayerHealth[]; playerControlEnabled?: boolean };
+type FleetTab = "policy" | "announcements" | "editors" | "delivery" | "audit" | "diagnostics";
 
 /**
  * Fleet tools: work on many screens at once. Step 1 chooses the screens; the
@@ -90,6 +92,7 @@ export default function FleetOperations() {
       { id: "announcements" as const, label: "Announcements" },
       ...(data.operators.length ? [{ id: "editors" as const, label: "Editor access" }] : []),
       { id: "delivery" as const, label: "Alert delivery", badge: data.alertDelivery.length || undefined },
+      ...(data.players ? [{ id: "diagnostics" as const, label: "Kiosk diagnostics" }] : []),
       { id: "audit" as const, label: "Audit history" },
     ];
   }, [data]);
@@ -146,6 +149,7 @@ export default function FleetOperations() {
         <p className="fleet-step-label">{t("Step 2: choose a task")}</p>
         <WorkspaceTabs label="Fleet tasks" idPrefix="fleet" tabs={tabs} value={activeTab} onChange={changeTab} />
         <div className="panel fleet-task-panel" {...workspaceTabPanel("fleet", activeTab)}>
+          {activeTab === "diagnostics" && data.players ? <FleetDiagnostics players={data.players} names={Object.fromEntries(data.screens.map(screen => [screen.id,screen.name]))} selected={selected} canRecover={data.owner} enabled={data.playerControlEnabled} staleMs={data.staleMs} onRefresh={() => void load()} /> : null}
           {activeTab === "policy" && data.owner ? (
             <form noValidate onSubmit={(event) => { event.preventDefault(); void post({ action: "settings", targets: targets(), ...policy, restrictedCategories: policy.restrictedCategories.split(",").map((entry) => entry.trim()).filter(Boolean) }); }}>
               <h3>{t("Owner screen policy")}</h3>

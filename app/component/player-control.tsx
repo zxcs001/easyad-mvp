@@ -9,6 +9,7 @@ import { PanelHeading } from "./shared-ui";
 import SecretInput from "./secret-input";
 import AppDialog from "./app-dialog";
 import { toast } from "./toast";
+import FleetDiagnostics from "./fleet-diagnostics";
 
 export default function PlayerControl({ inventoryId, screenName }: { inventoryId: string; screenName: string }) {
   const { t, formatDate } = useI18n();
@@ -69,6 +70,7 @@ export default function PlayerControl({ inventoryId, screenName }: { inventoryId
         <div><dt>{t("Last player error")}</dt><dd>{player.lastError ? t(player.lastError) : t("None reported")}{player.lastErrorAt ? ` · ${date(player.lastErrorAt)}` : ""}</dd></div>
       </dl>
       <button className="ghost-button" type="button" disabled={busy} onClick={() => { setError(""); setDisconnect(true); }}>{t("Disconnect player")}</button>
+      {player.health ? <FleetDiagnostics players={[player.health]} names={{ [inventoryId]: screenName }} canRecover onRefresh={() => setRefresh(value => value + 1)} /> : null}
     </> : status ? <div className="player-pairing">
       <p>{t("Open /player?kiosk=1 on the Android or Windows display and enter a one-time pairing code.")}</p>
       <button className="primary-button" disabled={busy} type="button" onClick={() => void mutate("POST")}>{t(busy ? "Creating code…" : "Create pairing code")}</button>

@@ -1,0 +1,17 @@
+.booking-delivery-summary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px 20px;
+  margin: 16px 0;
+}
+.booking-delivery-summary dt { color: var(--muted); font-size: .76rem; }
+.booking-delivery-summary dd { margin: 4px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.booking-delivery-summary p { color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.booking-delivery-summary summary { cursor: pointer; font-size: .8rem; }
+.delivery-table-scroll { overflow-x: auto; }
+.delivery-table-scroll table { width: 100%; border-collapse: collapse; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.delivery-table-scroll th, .delivery-table-scroll td { text-align: left; border-bottom: 1px solid var(--line); padding: 8px; }
+.delivery-booking { border-top: 1px solid var(--line); padding: 16px 0; }
+.delivery-booking h3 { margin: 0; font-size: .95rem; }
+.delivery-booking > p { margin: 4px 0; color: var(--muted); font-size: .78rem; }
+@media print { .booking-delivery-summary details { display: none; } }

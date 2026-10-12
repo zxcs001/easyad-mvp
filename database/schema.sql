@@ -185,6 +185,24 @@ CREATE TABLE IF NOT EXISTS players (
   last_error_at TIMESTAMPTZ
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_players_active_inventory ON players(inventory_id) WHERE revoked_at IS NULL;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS diagnostics JSONB;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS diagnostics_at TIMESTAMPTZ;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS clock_skew_ms BIGINT;
+CREATE TABLE IF NOT EXISTS player_recovery_commands (
+  id TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  request_key TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('refresh_content','reload_player','rebuild_cache')),
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','received','succeeded','failed','expired')),
+  requested_by TEXT NOT NULL REFERENCES users(id),
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW()+INTERVAL '15 minutes'),
+  received_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  result TEXT,
+  UNIQUE(player_id,request_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_player_recovery_pending ON player_recovery_commands(player_id) WHERE status IN ('queued','received');
 CREATE TABLE IF NOT EXISTS player_pairing_codes (
   inventory_id TEXT PRIMARY KEY REFERENCES inventory(id) ON DELETE CASCADE,
   code_hash TEXT NOT NULL UNIQUE,
@@ -505,6 +523,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS screen_scope JSONB;
 ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS starts_at TEXT;
 ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS ends_at TEXT;
 ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE media_resources ADD COLUMN IF NOT EXISTS recurring_schedule JSONB;
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS content_category TEXT NOT NULL DEFAULT 'general';
 CREATE TABLE IF NOT EXISTS fleet_audit (
  id TEXT PRIMARY KEY, actor_id TEXT, institution_id TEXT, target_id TEXT NOT NULL,

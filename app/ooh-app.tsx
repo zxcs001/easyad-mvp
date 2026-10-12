@@ -544,7 +544,7 @@ export default function OohApp({
     if (isStaticInventory(item) && source !== "upload") throw new Error("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.");
     if (source === "upload" && !file) throw new Error("Choose a media file before submitting your creative.");
     const draft = creativeDraftForFormat(creativeDraft, item.format);
-    const { htmlByTopic: _html, fieldsByTopic: _fields, ...creativeFields } = draft;
+    const { htmlByTopic: _html, fieldsByTopic: _fields, designsByTopic: _designs, ...creativeFields } = draft;
     // A ready-made design is laid out inside the format's safe zone and is
     // never scaled, so it carries the format's own values, not slider input.
     const body = source === "upload" && file ? creativeUploadForm(draft, file) : JSON.stringify({
@@ -552,6 +552,7 @@ export default function OohApp({
       safeZone: Math.max(draft.safeZone, formats[draft.format].safeZone),
       distortion: 0,
       html: effectiveTemplateHtml(draft),
+      ...(draft.designsByTopic?.[draft.template] ? { design: draft.designsByTopic[draft.template] } : {}),
     });
     const response = await fetch(`/api/bookings/${bookingId}/creative`, {
       method: "POST",
@@ -618,11 +619,20 @@ export default function OohApp({
     const response = await fetch(`/api/media/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approvalStatus }),
+      body: JSON.stringify({ approvalStatus, revision: mediaResources.find(resource => resource.id === id)?.revision }),
     });
-    if (!response.ok) return false;
-    const payload = await response.json() as { resource: MediaResource };
+    const payload = await response.json() as { resource: MediaResource; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "Could not approve this content.");
     setMediaResources((current) => current.map((resource) => resource.id === id ? payload.resource : resource));
+    return true;
+  }
+
+  async function saveContentSchedule(id: string, schedule: import("./lib/content-schedule").ContentSchedule | null, revision: number) {
+    const response = await fetch(`/api/media/${encodeURIComponent(id)}/schedule`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schedule, revision }) });
+    const payload = await response.json() as { resource?: MediaResource; error?: string };
+    if (!response.ok || !payload.resource) throw new Error(payload.error ?? "Could not save this schedule.");
+    const updated = payload.resource;
+    setMediaResources(current => current.map(resource => resource.id === id ? updated : resource));
     return true;
   }
 
@@ -786,7 +796,7 @@ export default function OohApp({
         return <FleetOperations />;
       case "network":
         if (!canAccessInstitutionWorkspace(currentUser?.role)) return null;
-        return <InstitutionNetworkView playerControlEnabled={playerControlEnabled} institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
+        return <InstitutionNetworkView playerControlEnabled={playerControlEnabled} institutionName={networkInstitutionName} isSuperAdmin={currentUser?.role === "admin"} inventory={institutionNetworkInventory} mediaResources={institutionNetworkMedia} bookings={bookings} creatives={creatives} alerts={deviceAlerts} selectedId={selectedInventoryId} onSelect={setSelectedInventoryId} onOpenInventory={(id) => { if (id) setSelectedInventoryId(id); setView("inventory"); }} onUploadMedia={async (deviceId, file, title) => { try { return await uploadInventoryMedia(file, title, deviceId) ? { value: true as const } : { error: "Unable to upload this content" }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to upload this content" }; } }} onSaveSettings={saveScreenSettings} onSetPublishState={setInventoryPublishState} onSetScreenUse={setScreenUse} onOpenAdvertising={() => navigateToView("advertising")} onOpenContentSchedules={() => navigateToView("resources")} onCreateAlert={createEmergencyOverride} onEndAlert={endEmergencyOverride} />;
       case "discover":
         if (!selectedInventory) return <EmptyInventoryPanel canManage={canManageInventory} />;
         return (
@@ -849,9 +859,9 @@ export default function OohApp({
           />
         );
       case "creative":
-        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} onCancel={cancelCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} lockBookingSelection={campaignCreationStep === "creative"} />;
+        return <CreativeView draft={creativeDraft} setDraft={setCreativeDraft} draftOwnerId={currentUser?.id} bookings={bookings} inventory={inventory} creatives={creatives} onSubmit={submitCreative} onCancel={cancelCreative} canSubmit={canBuyAds} selectedBookingId={selectedBookingId} setSelectedBookingId={setSelectedBookingId} lockBookingSelection={campaignCreationStep === "creative"} />;
       case "resources":
-        return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
+        return <ContentLibraryView currentUser={currentUser} inventory={inventory} bookings={bookings} creatives={creatives} mediaResources={mediaResources} onSaveSchedule={saveContentSchedule} onDeleteMedia={deleteMediaResource} onOpenCreative={(booking) => { setCampaignCreationState(null); setSelectedBookingId(booking.id); setSelectedInventoryId(booking.inventoryId); setView("creative"); }} onOpenInventory={(inventoryId) => { setSelectedInventoryId(inventoryId); setView("inventory"); }} />;
       case "inventory":
         if (!selectedInventory) return <InventoryView inventory={inventory} selectedId={selectedInventoryId} select={setSelectedInventoryId} item={newInventoryTemplate()} newItem={newInventoryTemplate()} mediaResources={[]} addInventory={addInventory} deleteInventory={deleteInventory} saveInventory={saveInventory} updateInventoryApproval={updateInventoryApproval} uploadMedia={uploadInventoryMedia} deleteMediaResource={deleteMediaResource} canManage={canManageInventory} canDelete={canDeleteInventory} approvalRequired={currentUser?.role === "operator"} institutionMode={isGovernmentSurface} />;
         return (

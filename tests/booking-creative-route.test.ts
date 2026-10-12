@@ -23,6 +23,8 @@ vi.mock("../app/lib/db", () => ({
 vi.mock("../app/lib/media-storage", () => ({ storeMedia: mocks.storeMedia, deleteStoredMedia: mocks.deleteStoredMedia }));
 
 import { POST } from "../app/api/bookings/[id]/creative/route";
+import { POST as preview } from "../app/api/creative/template-preview/route";
+import sharp from "sharp";
 
 const booking = { id: "BK-CREATIVE", inventoryId: "INV-STATIC", start: "2099-01-01", end: "2099-02-01", status: "pending approval", creativeStatus: "not submitted" } as Booking;
 const item = { id: "INV-STATIC", format: "static", deliveryMode: "static" } as InventoryItem;
@@ -105,4 +107,26 @@ test("digital bookings still accept fixed HTML templates", async () => {
   const response = await POST(request, context);
   expect(response.status).toBe(201);
   expect((await response.json()).creative).toMatchObject({ source: "template", format: "digital", fileType: "html" });
+});
+
+test("preview and submitted HTML use the same colours, layout, font and normalized logo", async () => {
+  mocks.getInventory.mockResolvedValue({ ...item, format: "digital", deliveryMode: "digital" });
+  const bytes = await sharp({ create: { width: 64, height: 32, channels: 3, background: "#1456A0" } }).png().toBuffer();
+  const body = { template: "retail", format: "digital", safeZone: 10, distortion: 0, html: '<section class="retail-copy"><h1>Local offer</h1></section>', design: { palette: "custom", background: "#EAF4FF", foreground: "#142C47", accent: "#1456A0", font: "serif", layout: "centered", logoDataUrl: `data:image/png;base64,${bytes.toString("base64")}` } };
+  const makeRequest = (path: string) => new NextRequest(`http://localhost${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const previewResponse = await preview(makeRequest("/api/creative/template-preview"));
+  expect(previewResponse.status).toBe(200);
+  const response = await POST(makeRequest(`/api/bookings/${booking.id}/creative`), context);
+  expect(response.status).toBe(201);
+  const document = (await previewResponse.json()).document;
+  expect(mocks.storeMedia).toHaveBeenCalledWith(expect.stringMatching(/\.html$/), Buffer.from(document), "text/html");
+  expect(mocks.updateBookingRecord).toHaveBeenCalledWith(booking.id, { creativeStatus: "pending review", status: "creative review" });
+});
+
+test.each([{ background: "red;display:none" }, { logoDataUrl: "https://bad.example/logo.png" }, { logoDataUrl: "data:image/png;base64,bm90IGFuIGltYWdl" }])("invalid design settings fail before storage: %j", async design => {
+  mocks.getInventory.mockResolvedValue({ ...item, format: "digital", deliveryMode: "digital" });
+  const response = await POST(new NextRequest("http://localhost/api/bookings/BK-CREATIVE/creative", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: "retail", format: "digital", safeZone: 10, distortion: 0, design }) }), context);
+  expect(response.status).toBe(422);
+  expect(mocks.storeMedia).not.toHaveBeenCalled();
+  expect(mocks.createCreative).not.toHaveBeenCalled();
 });

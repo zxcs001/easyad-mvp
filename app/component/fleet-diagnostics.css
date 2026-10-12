@@ -1,0 +1,15 @@
+.fleet-diagnostics { display: grid; gap: 12px; min-width: 0; }
+.fleet-diagnostics h3, .fleet-diagnostics p { margin: 0; }
+.fleet-diagnostics p, .fleet-diagnostics li { font-size: .78rem; line-height: 1.5; }
+.fleet-diagnostics .diagnostics-attention { display: flex; gap: 8px; align-items: center; }
+.diagnostics-card { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.diagnostics-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.diagnostics-card > ul { margin: 0; padding-left: 18px; }
+.diagnostics-card > ul:empty, .diagnostics-results:empty { display: none; }
+.diagnostics-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 0; }
+.diagnostics-grid dt { font-size: .7rem; color: var(--muted); }
+.diagnostics-grid dd { margin: 3px 0 0; font-size: .78rem; overflow-wrap: anywhere; }
+.diagnostics-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.diagnostics-history { color: var(--muted); }
+.player-control .diagnostics-actions button { border: 1px solid var(--control-edge); background: var(--panel); border-radius: var(--radius-sm); padding: 8px 10px; font: inherit; }
+@media(max-width:600px) { .diagnostics-grid { grid-template-columns: 1fr; } .diagnostics-actions button { flex: 1 1 auto; white-space: normal !important; } }

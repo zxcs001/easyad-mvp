@@ -6,6 +6,7 @@ import { deriveScreenCity, resolveDeviceTemplate } from "../../component/device-
 import { getActiveDeviceAlertForDevice, getPublishedInventory, listInventoryAdvertiserResources, listMediaResources } from "../../lib/db";
 import { isDigitalInventory } from "../../lib/inventory-delivery";
 import { translate } from "../../i18n/messages";
+import PublicDeviceRefresh from "../../component/public-device-refresh";
 
 type DevicePublicPageProps = {
   params: Promise<{ id: string }>;
@@ -27,10 +28,13 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
   const activeAlert = await getActiveDeviceAlertForDevice(inventory.id);
 
   const media=await getActiveDeviceMedia(id);
-  const slides:DeviceMediaSlide[]=(media?.items??[]).map(item=>({id:item.id,title:item.title,subtitle:"",mediaType:item.mediaType,publicUrl:item.publicUrl,createdAt:item.createdAt}));
+  // Upcoming institution content is available to the local clock without a reload at each window.
+  // The inventory's public visibility was checked above; inactive assets remain gated by /media.
+  const resources = await listMediaResources(id);
+  const slides:DeviceMediaSlide[]=[...resources.filter(resource=>resource.approvalStatus==="approved"&&(resource.mediaType==="image"||resource.mediaType==="video")).map(resource=>({id:resource.id,title:resource.title,subtitle:"",mediaType:resource.mediaType as "image"|"video",publicUrl:resource.publicUrl,createdAt:resource.createdAt,contentSchedule:resource.contentSchedule,startsAt:resource.startsAt,endsAt:resource.endsAt})),...(media?.items??[]).filter(item=>item.source==="advertiser").map(item=>({id:item.id,title:item.title,subtitle:"",mediaType:item.mediaType,publicUrl:item.publicUrl,createdAt:item.createdAt}))].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <DeviceScreen
+    <><PublicDeviceRefresh /><DeviceScreen
       inventoryName={inventory.name}
       city={city}
       imageInterval={inventory.imageInterval}
@@ -38,6 +42,6 @@ export default async function DevicePublicPage({ params, searchParams }: DeviceP
       template={template}
       displayLanguage={displayLanguage}
       activeAlert={activeAlert}
-    />
+    /></>
   );
 }

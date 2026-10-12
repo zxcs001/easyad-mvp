@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { PlaybackEvent, PlayerManifest } from "../player-types";
-import { rotationPlan } from "../lib/playback-validation";
+import { rotationPlan, slideEligible } from "../lib/playback-validation";
 import { queuePlayback } from "../lib/player-storage";
 import { useI18n } from "../i18n/client";
 import "./device-media-carousel.css";
+import { reportPlaybackActivity } from "../lib/kiosk-diagnostics";
 // One mounted media element owns playback. Preloads and public previews cannot emit events.
 export default function PlayerRotation({ manifest, onError }: {
     manifest: PlayerManifest;
@@ -27,6 +28,7 @@ export default function PlayerRotation({ manifest, onError }: {
         finish: (outcome: PlaybackEvent["outcome"]) => void;
     } | null>(null);
     const cycleStart = useRef(performance.now());
+    useEffect(() => { if (halted) reportPlaybackActivity("storage_paused"); else if (hidden) reportPlaybackActivity("hidden"); else if (!slide) reportPlaybackActivity("empty"); }, [halted, hidden, slide?.id]);
     useEffect(() => { const change = () => setHidden(document.hidden); document.addEventListener("visibilitychange", change); const tick = setInterval(() => setClock(Date.now()), 500); return () => { document.removeEventListener("visibilitychange", change); clearInterval(tick); }; }, []);
     useEffect(() => {
         if (!slide || hidden || halted || Date.parse(manifest.validUntil) <= Date.now())
@@ -42,8 +44,10 @@ export default function PlayerRotation({ manifest, onError }: {
                 return;
             const last = (turn + 1) % eligible.length === 0;
             const remainder = last && eligible.some(s => s.placementId || s.legacyBookingId) ? Math.max(0, (eligible.find(s => s.allocation)?.allocation?.loopSeconds ?? manifest.loopSeconds ?? 0) * 1000 - (performance.now() - cycleStart.current)) : 0;
+            const wait = Math.max(50, remainder, duration - (started === null ? duration : performance.now() - started));
+            reportPlaybackActivity("waiting", wait);
             nextTimer = setTimeout(() => { if (last)
-                cycleStart.current = performance.now(); setTurn(value => value + 1); }, Math.max(50, remainder, duration - (started === null ? duration : performance.now() - started)));
+                cycleStart.current = performance.now(); setTurn(value => value + 1); }, wait);
         };
         const finish = async (outcome: PlaybackEvent["outcome"]) => {
             if (finished)
@@ -51,7 +55,10 @@ export default function PlayerRotation({ manifest, onError }: {
             finished = true;
             clearTimeout(timer);
             const elapsed = started !== null ? Math.max(0, performance.now() - started) : 0;
+            reportPlaybackActivity(outcome === "failed" ? "media_error" : "waiting");
             if (document.hidden && outcome === "completed")
+                outcome = "interrupted";
+            if (outcome === "completed" && !slideEligible(slide, Date.now() - 1))
                 outcome = "interrupted";
             if (elapsed > duration + 2000 && outcome === "completed")
                 outcome = "interrupted";
@@ -74,6 +81,7 @@ export default function PlayerRotation({ manifest, onError }: {
             if (started !== null || finished || disposed || document.hidden)
                 return;
             started = performance.now();
+            reportPlaybackActivity("playing", duration);
             wall = Date.now();
             clearTimeout(timer);
             timer = setTimeout(() => void finish(slide.mediaType === "video" ? "interrupted" : "completed"), duration);

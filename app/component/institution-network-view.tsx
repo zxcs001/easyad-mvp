@@ -54,6 +54,7 @@ export default function InstitutionNetworkView({
   onSaveSettings,
   onSetScreenUse,
   onOpenAdvertising,
+  onOpenContentSchedules,
   playerControlEnabled = true,
 }: {
   institutionName: string;
@@ -73,6 +74,7 @@ export default function InstitutionNetworkView({
   onSaveSettings?: (id: string, settings: ScreenSettings) => Promise<MutationResult<InventoryItem>>;
   onSetScreenUse?: (id: string, use: ScreenUse) => Promise<MutationResult<InventoryItem>>;
   onOpenAdvertising?: () => void;
+  onOpenContentSchedules?: () => void;
   /** FEATURE_PLAYER_CONTROL. Off hides the Player connection tab. */
   playerControlEnabled?: boolean;
 }) {
@@ -249,6 +251,7 @@ export default function InstitutionNetworkView({
           <div className="network-device-actions">
             <button className="secondary-button" onClick={() => onOpenInventory(selected.id)} type="button"><MonitorUp aria-hidden="true" />{t("Manage device")}</button>
             <button className="secondary-button" onClick={() => setUploadDialog(true)} type="button"><Images aria-hidden="true" />{t(isPublished ? "Publish content" : "Add approved content")}</button>
+            {onOpenContentSchedules && isDigitalInventory(selected) ? <button className="secondary-button" onClick={onOpenContentSchedules} type="button">{t("Content schedules")}</button> : null}
             {onSaveSettings && isDigitalInventory(selected) ? <button className="secondary-button" onClick={() => setSettingsOpen(true)} type="button">{t("Edit display settings")}</button> : null}
             {isPublished && isDigitalInventory(selected) ? <a className="ghost-button" href={`/devices/${selected.id}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open device view")}</a> : <span aria-disabled="true" className="disabled-action">{t("Device view unavailable")}</span>}
             <button className={isPublished ? "warning-button" : "primary-button"} onClick={() => { setDialogError(""); setPublishDialog(true); }} type="button">{t(publishVerb)}</button>
@@ -517,7 +520,7 @@ function emptyAlertDraft(selectedDeviceId: string, published: InventoryItem[]): 
 }
 
 function deviceSlides(selected: InventoryItem, mediaResources: MediaResource[], bookings: Booking[], creatives: Creative[]): DeviceMediaSlide[] {
-  const mediaSlides = mediaResources.filter((resource) => resource.inventoryId === selected.id && resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video")).map((resource) => ({ id: resource.id, title: resource.title, subtitle: resource.originalName, mediaType: resource.mediaType as "image" | "video", publicUrl: resource.publicUrl, createdAt: resource.createdAt }));
+  const mediaSlides = mediaResources.filter((resource) => resource.inventoryId === selected.id && resource.approvalStatus === "approved" && (resource.mediaType === "image" || resource.mediaType === "video")).map((resource) => ({ id: resource.id, title: resource.title, subtitle: resource.originalName, mediaType: resource.mediaType as "image" | "video", publicUrl: resource.publicUrl, createdAt: resource.createdAt, contentSchedule: resource.contentSchedule, startsAt: resource.startsAt, endsAt: resource.endsAt }));
   const today = toDate(new Date()); // local date, not the UTC date
   const bookingMap = new Map(bookings.filter((booking) => booking.inventoryId === selected.id && booking.start <= today && booking.end >= today && ["approved", "scheduled", "live"].includes(booking.status)).map((booking) => [booking.id, booking]));
   const creativeSlides = creatives.filter((creative) => creative.status === "approved" && Boolean(creative.publicUrl) && bookingMap.has(creative.bookingId)).map((creative) => { const booking = bookingMap.get(creative.bookingId)!; return { id: creative.id, title: booking.campaign, subtitle: booking.advertiser, mediaType: creative.mimeType === "text/html" ? "html" as const : creative.mimeType?.startsWith("video/") ? "video" as const : "image" as const, publicUrl: creative.publicUrl!, createdAt: creative.createdAt }; });

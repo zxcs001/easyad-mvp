@@ -2,19 +2,17 @@
 
 import "./reports-billing-views.css";
 import { Booking, InventoryItem, Transaction } from "../data";
-import { deliveredImpressions, money, number, splitRevenue } from "../utils";
-import { BookingsTable, EmptyState, Metric, PanelHeading } from "./shared-ui";
+import { money, splitRevenue } from "../utils";
+import { useEffect, useState } from "react";
+import type { BookingDelivery } from "../lib/delivery-report";
+import BookingDeliverySummary from "./booking-delivery-summary";
+import { EmptyState, Metric, PanelHeading } from "./shared-ui";
 import AsyncButton from "./async-button";
 import { useI18n } from "../i18n/client";
 import ResponsesPanel from "./responses-panel";
 
 export function ReportsView({
-  bookings,
-  inventory,
-  transactions,
-  onRunDelivery,
-  canRunDelivery,
-  isAdvertiser = false,
+  bookings, inventory, onRunDelivery, canRunDelivery, isAdvertiser = false,
 }: {
   isAdvertiser?: boolean;
   bookings: Booking[];
@@ -23,76 +21,82 @@ export function ReportsView({
   onRunDelivery: () => Promise<boolean>;
   canRunDelivery: boolean;
 }) {
-  const { locale, formatNumber, t } = useI18n();
-  const totalImpressions = bookings.reduce((sum, booking) => {
-    const item = inventory.find((unit) => unit.id === booking.inventoryId);
-    return sum + (item ? deliveredImpressions(item, booking) : 0);
-  }, 0);
-  // Proof of play belongs to the flights that have played. A campaign that
-  // starts next month has 0% because it has not run, and averaging that with a
-  // finished campaign's 99% reported half the delivery the screens made.
-  const playedBookings = bookings.filter((booking) => ["completed", "live"].includes(booking.status));
-  const popRate = playedBookings.length
-    ? Math.round(playedBookings.reduce((sum, booking) => sum + booking.pop, 0) / playedBookings.length)
-    : 0;
-  const collected = transactions.filter((transaction) => transaction.status === "paid").reduce((sum, transaction) => sum + transaction.amount, 0);
-  // Cost against what was delivered, so both sides of the division cover the
-  // same flights. Counting a future campaign's spend against no impressions
-  // raised the reported CPM above any real rate card.
-  const playedSpend = playedBookings.reduce((sum, booking) => sum + booking.spend, 0);
-  const playedImpressions = playedBookings.reduce((sum, booking) => {
-    const item = inventory.find((unit) => unit.id === booking.inventoryId);
-    return sum + (item ? deliveredImpressions(item, booking) : 0);
-  }, 0);
-  const cpm = playedImpressions > 0 ? Math.round((playedSpend / playedImpressions) * 1000) : 0;
-  const chartRows = Object.values(bookings.reduce<Record<string, { id: string; name: string; impressions: number }>>((rows, booking) => {
-    const item = inventory.find((unit) => unit.id === booking.inventoryId);
-    if (!item) return rows;
-    const delivered = deliveredImpressions(item, booking);
-    const row = rows[item.id] ?? { id: item.id, name: item.name, impressions: 0 };
-    row.impressions += delivered;
-    rows[item.id] = row;
-    return rows;
-  }, {})).sort((a, b) => b.impressions - a.impressions).slice(0, 6);
-  const chartPeak = chartRows.reduce((peak, row) => Math.max(peak, row.impressions), 0);
+  const { locale, formatNumber, formatDate, t } = useI18n();
+  const [result, setResult] = useState<{ delivery: BookingDelivery[]; asOf: string } | null>(null);
+  const [error, setError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  // Reload when a flight changes, and cancel older requests on unmount/change.
+  const bookingKey = JSON.stringify(bookings);
+  useEffect(() => {
+    const controller = new AbortController();
+    let pending = false;
+    setResult(null);
+    setError(false);
+    async function load() {
+      if (pending) return;
+      pending = true;
+      try {
+        const response = await fetch("/api/delivery", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error();
+        const data = await response.json() as { delivery: BookingDelivery[]; asOf: string };
+        if (!Array.isArray(data.delivery) || !Number.isFinite(Date.parse(data.asOf))) throw new Error();
+        if (!controller.signal.aborted) { setResult(data); setError(false); }
+      } catch {
+        if (!controller.signal.aborted) { setResult(null); setError(true); }
+      } finally { pending = false; }
+    }
+    void load();
+    const timer = window.setInterval(() => { void load(); }, 60000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [bookingKey, revision]);
+
+  const ids = new Set(bookings.map(b => b.id));
+  const rows = (result?.delivery ?? []).filter(d => ids.has(d.bookingId));
+  const byBooking = new Map(rows.map(d => [d.bookingId, d]));
+  const estimates = rows.filter(d => d.estimatedViews !== null);
+  const views = estimates.reduce((sum, d) => sum + d.estimatedViews!, 0);
+  const estimateSpend = estimates.reduce((sum, d) => sum + (bookings.find(b => b.id === d.bookingId)?.spend ?? 0), 0);
+  const cpm = views > 0 ? estimateSpend / views * 1000 : null;
+  const received = result ? formatNumber(rows.reduce((sum, d) => sum + d.player.completed, 0)) : "—";
+  const declared = result ? formatNumber(rows.reduce((sum, d) => sum + d.operator.completed, 0)) : "—";
   return (
     <section className="grid reports-grid">
       <div className="panel span-2">
-        <PanelHeading eyebrow={isAdvertiser ? "Results" : "Campaign analytics and reporting"} title={isAdvertiser ? "How your ads did" : "Performance overview"} />
+        <PanelHeading eyebrow="Results" title={isAdvertiser ? "How your ads did" : "Performance overview"}
+          action={<button className="ghost-button" type="button" onClick={() => setRevision(v => v + 1)}>{t("Refresh delivery")}</button>} />
+        {error ? <p role="alert">{t("Delivery evidence is unavailable. Retry to refresh it.")}</p> : !result ? <p role="status">{t("Loading delivery evidence…")}</p> : null}
         <div className="report-metrics">
-          <Metric label={isAdvertiser ? "Times your ad was seen" : "Delivered impressions"} value={formatNumber(totalImpressions)} />
-          <Metric label={isAdvertiser ? "Confirmed playback" : "Proof-of-play completion"} value={`${popRate}%`} />
-          <Metric label={isAdvertiser ? "Ads running now" : "Active campaigns"} value={bookings.filter((booking) => ["scheduled", "live"].includes(booking.status)).length} />
-          <Metric label={isAdvertiser ? "Cost per 1,000 views" : "Verified CPM"} value={money(cpm, locale)} />
+          <Metric label="Player-reported completed plays" value={received} />
+          <Metric label="Operator-declared completed plays" value={declared} />
+          <Metric label="Estimated views" value={estimates.length ? views > 0 && views < 1 ? "<1" : formatNumber(views, { maximumFractionDigits: 0 }) : "—"} />
+          <Metric label="Estimated CPM" value={cpm === null ? "—" : money(cpm, locale, true)} />
         </div>
-        {/* This chart used to plot inventory.impressions, which is the screen's
-            own audience figure for screens this account may never have booked.
-            Under a "Performance overview" heading that reads as delivered
-            results. It now plots what these bookings actually delivered. */}
-        {chartRows.length ? (
-          <div className="bar-chart">{chartRows.map((row) => <div key={row.id}><span title={row.name}>{row.name}</span><i style={{ height: Math.max(12, row.impressions / Math.max(1, chartPeak) * 150) }} /><small>{formatNumber(row.impressions)}</small></div>)}</div>
-        ) : (
-          // Operators and owners see this page too. The advertiser copy and its
-          // "Find screens" link sent them to a view the server bounces them from.
-          <EmptyState
-            title="No delivery to report yet"
-            copy={isAdvertiser ? "Once a screen owner approves your ad and it starts running, what it delivered appears here." : "Once approved campaigns start running on your screens, what they delivered appears here."}
-            action={isAdvertiser ? <a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a> : undefined}
-          />
-        )}
+        <p className="report-empty-note">{t("Player reports, operator declarations and demo records are kept separate. Estimates are not measured audience views.")}</p>
+        {result ? <>
+          <p className="report-empty-note">{t("Estimates available for {known} of {total} digital bookings; unavailable bookings are excluded from estimated CPM.", { known: estimates.length, total: rows.filter(d => d.digital).length })}</p>
+          <p className="report-empty-note">{t("Evidence as of {date}", { date: formatDate(result.asOf, { dateStyle: "medium", timeStyle: "short" }) })}</p>
+        </> : null}
+      </div>
+      <div className="panel span-2">
+        <PanelHeading eyebrow="Delivery" title="Delivery by booking" />
+        {bookings.length ? bookings.map(b => {
+          const screen = inventory.find(s => s.id === b.inventoryId);
+          const delivery = byBooking.get(b.id);
+          return <article className="delivery-booking" key={b.id}>
+            <h3>{b.campaign}</h3>
+            <p>{b.id} · {screen?.name ?? b.inventoryId} · {b.start} – {b.end}</p>
+            {delivery ? <BookingDeliverySummary delivery={delivery} /> : <p>{t(result ? "Delivery evidence unavailable for this booking." : "Delivery evidence has not loaded.")}</p>}
+            <a className="ghost-button" href={`/report/${encodeURIComponent(b.id)}`} target="_blank" rel="noreferrer">{t("Report (PDF)")}</a>
+          </article>;
+        }) : <EmptyState title="No delivery to report yet" copy="Once approved campaigns start running, their delivery evidence appears here." />}
       </div>
       <ResponsesPanel bookings={bookings} inventory={inventory} canEdit={isAdvertiser} />
-      {canRunDelivery ? (
-      <div className="panel">
-        <PanelHeading
-          eyebrow="PoP logging"
-          title="Delivery logs"
-          action={<AsyncButton className="ghost-button" disabled={!canRunDelivery} onClick={onRunDelivery} successMessage="Demo delivery tick recorded across active campaigns." errorMessage="Could not record demo delivery. Please try again.">{canRunDelivery ? "Demo: Run delivery tick" : "Operator only"}</AsyncButton>}
-        />
-        {bookings.length ? null : <p className="report-empty-note">{t("No delivery logged yet.")}</p>}<div className="pop-list">{bookings.map((booking) => <div key={booking.id}><strong>{booking.id}</strong><span>{booking.campaign}</span><meter min={0} max={100} value={booking.pop} /><small>{t("{percent}% verified - {amount} collected platform-wide", { percent: booking.pop, amount: money(collected, locale) })}</small></div>)}</div>
-      </div>
-      ) : null}
-      <div className="panel span-2"><PanelHeading eyebrow="Campaigns" title={isAdvertiser ? "Every ad you have run" : "Reporting table"} /><BookingsTable bookings={bookings} inventory={inventory} /></div>
+      {canRunDelivery ? <div className="panel span-2">
+        <PanelHeading eyebrow="Demo" title="Demo delivery records"
+          action={<AsyncButton className="ghost-button" onClick={async () => { const ok = await onRunDelivery(); if (ok) setRevision(v => v + 1); return ok; }}
+            successMessage="Demo delivery tick recorded across active campaigns." errorMessage="Could not record demo delivery. Please try again.">Demo: Run delivery tick</AsyncButton>} />
+        <p>{t("Demo records are excluded from playback and audience estimates.")}</p>
+      </div> : null}
     </section>
   );
 }

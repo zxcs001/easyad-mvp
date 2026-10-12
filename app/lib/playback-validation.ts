@@ -1,6 +1,8 @@
 import { isScheduledNow } from "./booking-schedule";
+import { contentScheduleEligible } from "./content-schedule";
 import type { PlaybackEvent, PlayerManifest, PlayerSlide } from "../player-types";
 export function slideEligible(slide: PlayerSlide, now: number) {
+    if (!contentScheduleEligible(slide.contentSchedule, now)) return false;
     // A time-of-day booking plays on local dates, inside its local slots only.
     // The check runs on the player as well, so it keeps working offline.
     const allocation = slide.allocation;
@@ -43,7 +45,10 @@ export function validatePlayback(body: Record<string, unknown>, manifest: Player
     const slide = manifest.slides.find(item => item.id === event.slideId && item.assetVersion === event.assetVersion);
     if (![event.startedAt,event.occurredAt].every(value=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)))throw new Error("Use UTC ISO playback timestamps");
     const start = Date.parse(event.startedAt), end = Date.parse(event.occurredAt);
-    if (!slide || !manifest.published || !Number.isFinite(start) || !Number.isFinite(end) || end < start || start < Date.parse(manifest.generatedAt) - 2000 || end > Date.parse(manifest.validUntil) || end > now + 120000 || start < now - 7 * 86400000 || !slideEligible(slide, start) || !slideEligible(slide, Math.max(start, end - 1)))
+    // The player's 500 ms eligibility clock may observe a cutoff just after it happens.
+    // Record that short interruption, while completed plays still require the whole window.
+    const endsInWindow = slide && (slideEligible(slide, Math.max(start, end - 1)) || (event.outcome === "interrupted" && slideEligible(slide, Math.max(start, end - 1000))));
+    if (!slide || !manifest.published || !Number.isFinite(start) || !Number.isFinite(end) || end < start || start < Date.parse(manifest.generatedAt) - 2000 || end > Date.parse(manifest.validUntil) || end > now + 120000 || start < now - 7 * 86400000 || !slideEligible(slide, start) || !endsInWindow)
         throw new Error("Playback is outside its authorized schedule");
     if (manifest.activeAlert && start < Date.parse(manifest.activeAlert.expiresAt))
         throw new Error("Playback overlaps an emergency override");

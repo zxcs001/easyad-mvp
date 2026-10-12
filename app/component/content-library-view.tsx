@@ -1,7 +1,7 @@
 "use client";
 
 import "./content-library-view.css";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, FileImage, Film, Image as ImageIcon, Layers3, Search, Trash2, X } from "lucide-react";
 import type { Booking, Creative, InventoryItem, MediaResource } from "../data";
 import type { DbUser } from "../lib/db";
@@ -10,6 +10,9 @@ import { useMounted } from "./device-widgets";
 import AsyncButton from "./async-button";
 import { PanelHeading } from "./shared-ui";
 import { useI18n } from "../i18n/client";
+import ContentScheduleEditor, { type SaveContentSchedule } from "./content-schedule-editor";
+import { contentScheduleState } from "../lib/content-schedule";
+import { isDigitalInventory } from "../lib/inventory-delivery";
 
 type LibraryFilter = "all" | "image" | "video" | "template";
 type StatusFilter = "all" | "active" | "review" | "scheduled" | "inactive";
@@ -31,7 +34,7 @@ type LibraryItem = {
   statusLabel: string;
 };
 
-export default function ContentLibraryView({ currentUser, inventory, bookings, creatives, mediaResources, onDeleteMedia, onOpenCreative, onOpenInventory }: {
+export default function ContentLibraryView({ currentUser, inventory, bookings, creatives, mediaResources, onDeleteMedia, onOpenCreative, onOpenInventory, onSaveSchedule }: {
   currentUser?: DbUser | null;
   inventory: InventoryItem[];
   bookings: Booking[];
@@ -40,6 +43,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   onDeleteMedia: (id: string) => Promise<boolean>;
   onOpenCreative: (booking: Booking) => void;
   onOpenInventory: (inventoryId: string) => void;
+  onSaveSchedule?: SaveContentSchedule;
 }) {
   const { formatDate, formatNumber, t } = useI18n();
   // "Added" is a timestamp. Formatted during the server render it used the
@@ -51,7 +55,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   const [typeFilter, setTypeFilter] = useState<LibraryFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const items = useMemo(() => buildLibraryItems(inventory, bookings, creatives, mediaResources), [inventory, bookings, creatives, mediaResources]);
+  const [clock, setClock] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 15000); return () => clearInterval(timer); }, []);
+  const items = useMemo(() => buildLibraryItems(inventory, bookings, creatives, mediaResources, clock), [inventory, bookings, creatives, mediaResources, clock]);
   // The empty state said "No matching resources, adjust the search or filters"
   // even when nothing was searched or filtered, to an account with no content.
   const filtering = query.trim() !== "" || typeFilter !== "all" || statusFilter !== "all";
@@ -63,6 +69,9 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
   }, [items, query, statusFilter, typeFilter]);
   const selected = items.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const canManageDeviceMedia = currentUser?.role === "admin" || currentUser?.role === "operator" || currentUser?.role === "institutional";
+  const selectedResource = selected?.kind === "media" ? mediaResources.find(resource => resource.id === selected.id) : null;
+  const selectedDevice = inventory.find(device => device.id === selectedResource?.inventoryId);
+  const canSchedule = selectedDevice && isDigitalInventory(selectedDevice) && (currentUser?.role === "admin" || selectedDevice.institutionId === (currentUser?.role === "institutional" ? currentUser.id : currentUser?.institutionId) && canManageDeviceMedia && (currentUser?.role !== "operator" || !Array.isArray(currentUser.screenScope) || currentUser.screenScope.includes(selectedDevice.id)));
 
   return <section className="content-cms">
     <div className="cms-summary" aria-label={t("Content status summary")}>
@@ -92,6 +101,7 @@ export default function ContentLibraryView({ currentUser, inventory, bookings, c
             <ResourcePreview item={selected} large />
             <div className="cms-detail-heading"><span className={`status cms-status ${selected.status}`}>{t(selected.statusLabel)}</span><h3>{selected.title}</h3><p>{selected.subtitle}</p></div>
             <dl><Detail label="Device" value={selected.inventoryName} /><Detail label="Resource type" value={t(capitalize(selected.mediaType))} /><Detail label="Added" value={mounted ? formatDate(selected.createdAt) : ""} />{selected.booking ? <><Detail label="Campaign dates" value={`${selected.booking.start} ${t("to")} ${selected.booking.end}`} /><Detail label="Delivery" value={t("{count} verified plays", { count: formatNumber(selected.booking.pop) })} /></> : null}</dl>
+            {selectedResource && canSchedule && onSaveSchedule ? <ContentScheduleEditor key={`${selectedResource.id}:${selectedResource.revision}`} resource={selectedResource} requiresReview={currentUser?.role === "operator"} onSave={onSaveSchedule} /> : null}
             <div className="cms-detail-actions">
               {selected.publicUrl ? <a className="secondary-button" href={selected.publicUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />{t("Open")}</a> : null}
               {selected.booking && isCreativeSubmissionAllowed(selected.booking) && (currentUser?.role === "advertiser" || currentUser?.role === "admin") ? <button className="secondary-button" onClick={() => onOpenCreative(selected.booking!)} type="button">{t("Edit creative")}</button> : null}
@@ -127,14 +137,17 @@ function countStatus(items: LibraryItem[], status: ResourceStatus) {
   return items.filter((item) => item.status === status).length;
 }
 
-export function buildLibraryItems(inventory: InventoryItem[], bookings: Booking[], creatives: Creative[], mediaResources: MediaResource[]): LibraryItem[] {
+export function buildLibraryItems(inventory: InventoryItem[], bookings: Booking[], creatives: Creative[], mediaResources: MediaResource[], now = Date.now()): LibraryItem[] {
   const inventoryById = new Map(inventory.map((item) => [item.id, item]));
   const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
   const mediaItems = mediaResources.map((resource): LibraryItem => {
     const device = inventoryById.get(resource.inventoryId);
     const approved = device?.approvalStatus === "approved";
-    const status = resource.approvalStatus === "pending review" ? "review" : resource.approvalStatus === "rejected" || !approved ? "inactive" : "active";
-    const statusLabel = resource.approvalStatus === "pending review" ? "In review" : resource.approvalStatus === "rejected" ? "Rejected" : approved ? "Published" : "Approved — screen unpublished";
+    const scheduleState = contentScheduleState(resource.contentSchedule, now);
+    const ended = Boolean(resource.endsAt && Date.parse(resource.endsAt) <= now);
+    const waiting = Boolean(resource.startsAt && Date.parse(resource.startsAt) > now);
+    const status = resource.approvalStatus === "pending review" ? "review" : resource.approvalStatus === "rejected" || !approved || ended || ["paused", "ended", "invalid"].includes(scheduleState) ? "inactive" : waiting || scheduleState === "scheduled" ? "scheduled" : "active";
+    const statusLabel = resource.approvalStatus === "pending review" ? "In review" : resource.approvalStatus === "rejected" ? "Rejected" : !approved ? "Approved — screen unpublished" : scheduleState === "paused" ? "Schedule paused" : ended || scheduleState === "ended" ? "Schedule ended" : scheduleState === "invalid" ? "Invalid schedule" : status === "scheduled" ? "Scheduled" : "Published";
     return { id: resource.id, kind: "media", mediaType: resource.mediaType === "video" ? "video" : "image", title: resource.title, subtitle: resource.originalName, publicUrl: resource.publicUrl, mimeType: resource.mimeType, createdAt: resource.createdAt, inventoryId: resource.inventoryId, inventoryName: device?.name ?? resource.inventoryId, booking: null, status, statusLabel };
   });
   const creativeItems = creatives.flatMap((creative): LibraryItem[] => {

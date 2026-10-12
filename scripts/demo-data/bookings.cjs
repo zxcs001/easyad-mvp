@@ -298,7 +298,7 @@ function buildDemoCampaigns({ today = new Date(), seed = 20260918, target = 180 
             plays,
             impressions: Math.round(plays * impressionsPerPlay),
             status: "verified",
-            source: "player-log",
+            source: "demo-seed",
             playedAt: addDays(logDay, chunkDays - 1).toISOString(),
           });
           playsLeft -= plays;

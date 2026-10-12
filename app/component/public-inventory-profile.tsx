@@ -41,6 +41,9 @@ export async function PublicInventoryProfile({ inventoryId, alias = "inventory" 
       mediaType: resource.mediaType === "video" ? "video" : "image",
       publicUrl: resource.publicUrl,
       createdAt: resource.createdAt,
+      contentSchedule: resource.contentSchedule,
+      startsAt: resource.startsAt,
+      endsAt: resource.endsAt,
     }));
   const advertiserSlides: DeviceMediaSlide[] = advertiserResources
     .filter((resource) => Boolean(resource.publicUrl))

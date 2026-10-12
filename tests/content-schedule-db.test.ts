@@ -1,0 +1,81 @@
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
+import { NextRequest } from "next/server";
+import { createPlayerFixtures } from "./helpers/player-fixtures";
+import { closeDb, createMediaResource, getDb, getMediaResource, listMediaResources, resetDatabaseForTests, type DbUser } from "../app/lib/db";
+import { createPairingCode, fetchPlayerManifest, playerAsset, redeemPairingCode } from "../app/lib/players";
+import { getActiveDeviceMedia } from "../app/lib/public-device-media";
+import { getPublicMediaResource } from "../app/lib/db";
+import { slideEligible } from "../app/lib/playback-validation";
+import { bulkFleet } from "../app/lib/fleet";
+import type { ContentSchedule } from "../app/lib/content-schedule";
+
+const state = vi.hoisted(() => ({ user: null as DbUser | null }));
+vi.mock("../app/lib/auth", async importOriginal => ({ ...await importOriginal<typeof import("../app/lib/auth")>(), getCurrentUser: async () => state.user }));
+import { PATCH } from "../app/api/media/[id]/schedule/route";
+import { PATCH as review } from "../app/api/media/[id]/route";
+const available = Boolean(process.env.TEST_DATABASE_URL);
+let fixture: Awaited<ReturnType<typeof createPlayerFixtures>>;
+const rule: ContentSchedule = { version: 1, timezone: "UTC", daysOfWeek: [(new Date().getUTCDay() + 1) % 7], startTime: "00:00", endTime: "24:00", startDate: null, endDate: null, paused: false };
+beforeAll(async () => {
+  if (!available) return;
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  await resetDatabaseForTests();
+  fixture = await createPlayerFixtures("RECURRING");
+  for (const [id, inventoryId] of [["REC-MEDIA", fixture.screen.id], ["REC-STATIC", fixture.staticId]]) await createMediaResource({ id, inventoryId, ownerId: fixture.institution.id, title: "Recurring message", originalName: "message.png", mimeType: "image/png", mediaType: "image", approvalStatus: "approved", sizeBytes: 1, publicUrl: `/media/${id}`, storagePath: "unused-schedule-test.png", createdAt: new Date().toISOString() });
+});
+afterAll(async () => { if (available) await closeDb(); });
+function patch(user: DbUser | null, schedule: unknown, revision = 1, id = "REC-MEDIA") {
+  state.user = user;
+  return PATCH(new NextRequest(`http://localhost/api/media/${id}/schedule`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schedule, revision }) }), { params: Promise.resolve({ id }) });
+}
+test.skipIf(!available)("scope, screen type and malformed recurrence cannot mutate content", async () => {
+  const denied: Array<[DbUser | null, number]> = [[null, 401], [fixture.otherInstitution, 403], [fixture.advertiser, 403], [{ ...fixture.operator, screenScope: [] }, 403]];
+  for (const [user, status] of denied) expect((await patch(user, rule)).status).toBe(status);
+  expect((await patch(fixture.institution, rule, 1, "REC-STATIC")).status).toBe(422);
+  expect((await patch(fixture.institution, rule, 1, "missing")).status).toBe(404);
+  for (const invalid of [undefined, {}, { ...rule, timezone: "Invalid/Zone" }, { ...rule, endDate: "2026-02-30" }, { ...rule, daysOfWeek: [] }]) expect((await patch(fixture.institution, invalid)).status).toBe(422);
+  expect((await getMediaResource("REC-MEDIA"))?.resource).toMatchObject({ revision: 1, contentSchedule: null, approvalStatus: "approved" });
+});
+test.skipIf(!available)("conflicting saves serialize, future rules preload, pause updates the manifest without changing asset identity", async () => {
+  const responses = await Promise.all([patch(fixture.institution, rule), patch(fixture.institution, rule)]);
+  expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+  expect((await getMediaResource("REC-MEDIA"))?.resource).toMatchObject({ revision: 2, contentSchedule: rule, approvalStatus: "approved" });
+  const paired = await redeemPairingCode((await createPairingCode(fixture.institution, fixture.screen.id)).code, "recurring-player");
+  const initial = await fetchPlayerManifest(paired.token);
+  expect(initial.slides).toHaveLength(1);
+  expect(initial.slides[0].contentSchedule).toEqual(rule);
+  expect(slideEligible(initial.slides[0], Date.now())).toBe(false);
+  expect(slideEligible(initial.slides[0], Date.now() + 86400000)).toBe(true);
+  expect(await playerAsset(paired.token, "REC-MEDIA")).toMatchObject({ storage_path: "unused-schedule-test.png" });
+  expect((await getActiveDeviceMedia(fixture.screen.id))?.items).toHaveLength(0);
+  expect(await getPublicMediaResource("REC-MEDIA")).toBeNull();
+  expect((await patch(fixture.admin, { ...rule, paused: true }, 2)).status).toBe(200);
+  const paused = await fetchPlayerManifest(paired.token);
+  expect(paused.revision).toBeGreaterThan(initial.revision);
+  expect(paused.slides[0].assetVersion).toBe(initial.slides[0].assetVersion);
+  expect(slideEligible(paused.slides[0], Date.now() + 86400000)).toBe(false);
+  const audit = await getDb().query("SELECT revision,resource_id FROM fleet_audit WHERE action='media_schedule_updated' ORDER BY created_at");
+  expect(audit.rows).toEqual([{ revision: 2, resource_id: "REC-MEDIA" }, { revision: 3, resource_id: "REC-MEDIA" }]);
+});
+test.skipIf(!available)("operator changes require review; approval preserves recurrence and clearing restores normal availability", async () => {
+  expect((await patch(fixture.operator, { ...rule, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] }, 3)).status).toBe(200);
+  expect((await getMediaResource("REC-MEDIA"))?.resource.approvalStatus).toBe("pending review");
+  expect((await getActiveDeviceMedia(fixture.screen.id))?.items).toHaveLength(0);
+  state.user = fixture.institution;
+  const approve = (revision: number) => review(new NextRequest("http://localhost/api/media/REC-MEDIA", { method: "PATCH", body: JSON.stringify({ approvalStatus: "approved", revision }) }), { params: Promise.resolve({ id: "REC-MEDIA" }) });
+  expect((await approve(3)).status).toBe(409);
+  expect((await getMediaResource("REC-MEDIA"))?.resource.approvalStatus).toBe("pending review");
+  expect((await approve(4)).status).toBe(200);
+  expect((await getActiveDeviceMedia(fixture.screen.id))?.items).toHaveLength(1);
+  expect(await getPublicMediaResource("REC-MEDIA")).not.toBeNull();
+  const saved = (await getMediaResource("REC-MEDIA"))!.resource;
+  const copied = await bulkFleet(fixture.institution, { action: "schedule", targets: [{ id: fixture.screen.id, version: 1 }], mediaId: saved.id, startsAt: new Date().toISOString(), endsAt: new Date(Date.now() + 60000).toISOString() });
+  expect(copied.succeeded).toBe(1);
+  expect((await listMediaResources(fixture.screen.id)).find(resource => resource.id !== saved.id)?.contentSchedule).toEqual(saved.contentSchedule);
+  expect((await patch(fixture.institution, null, saved.revision)).status).toBe(200);
+  expect((await getMediaResource("REC-MEDIA"))?.resource.contentSchedule).toBeNull();
+  await createMediaResource({ id: "REC-PAUSED", inventoryId: fixture.screen.id, ownerId: fixture.institution.id, title: "Paused message", originalName: "paused.png", mimeType: "image/png", mediaType: "image", approvalStatus: "approved", sizeBytes: 1, publicUrl: "/media/REC-PAUSED", storagePath: "unused-paused.png", createdAt: new Date(Date.now() + 1000).toISOString(), contentSchedule: { ...rule, paused: true } });
+  const active = (await getActiveDeviceMedia(fixture.screen.id))!.items;
+  expect(active.map(item => item.position)).toEqual(active.map((_, index) => index + 1));
+  expect(active.some(item => item.id === "REC-PAUSED")).toBe(false);
+});

@@ -60,12 +60,12 @@ test("edited HTML templates are sanitized, private during review, and displayed 
     await expect(editorPage.getByText("You changed the HTML by hand, so these fields no longer control the ad.")).toBeVisible();
     await expect(editorPage.frameLocator('iframe[title="Template preview"]').locator("h1")).toHaveText("Browser preview");
     await expect(editor).toBeInViewport();
-    const previewBox = await editorPage.locator(".creative-html-preview").boundingBox();
-    const frameBox = await editorPage.locator(".creative-html-preview iframe").boundingBox();
+    const previewBox = await editorPage.locator(".creative-preview-panel > .creative-native-preview").boundingBox();
+    const frameBox = await editorPage.locator(".creative-preview-panel > .creative-native-preview iframe").boundingBox();
     expect(frameBox?.width).toBeGreaterThan((previewBox?.width ?? 0) - 3);
     await editorPage.screenshot({ path: "docs/verification/html-template-editor-phone.png", fullPage: true });
-    // The fields now sit between the preview and the HTML editor, so bring the preview back into view first.
-    await editorPage.locator(".creative-html-preview").scrollIntoViewIfNeeded();
+    // Bring the preview into view before capturing its rendered document.
+    await editorPage.locator(".creative-preview-panel > .creative-native-preview").scrollIntoViewIfNeeded();
     await editorPage.frameLocator('iframe[title="Template preview"]').locator("body").screenshot({ path: "docs/verification/html-template-preview.png" });
     const source = `<section class="content" onclick="alert(1)"><h1 style="color:red">Safe offer</h1><script>alert(1)</script><a href="javascript:alert(1)">Visit us</a><img src="https://bad.example/pixel"></section>`;
     const submitted = await advertiser.request.post(`${origin}/api/bookings/${booking.id}/creative`, { headers: { Origin: origin }, data: {

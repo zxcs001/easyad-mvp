@@ -91,7 +91,7 @@ describe("CreativeView", () => {
 
     render(<CreativeHarness onSubmit={onSubmit} />);
 
-    expect(screen.getByRole("heading", { name: "Fixed template" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Design editor" })).toBeInTheDocument();
     expect((screen.getByRole("textbox", { name: "Template HTML" }) as HTMLTextAreaElement).value).toContain("GOOD<br>THINGS");
     expect(screen.getByText("Choose a ready-made design")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Retail design: The weekend edit" })).toHaveAttribute("aria-current", "true");
@@ -161,6 +161,43 @@ describe("CreativeView", () => {
     expect(screen.getByText("This campaign was created in the previous step.")).toBeInTheDocument();
   });
 
+  test("applies design controls per topic and supports undo and redo", async () => {
+    const user = userEvent.setup();
+    const preview = vi.fn(previewResponse);
+    vi.stubGlobal("fetch", preview);
+    render(<CreativeHarness onSubmit={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Ocean" }));
+    await user.selectOptions(screen.getByLabelText("Layout"), "centered");
+    await user.selectOptions(screen.getByLabelText("Typography"), "serif");
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByLabelText("Typography")).toHaveValue("template");
+    await user.click(screen.getByRole("button", { name: "Redo" }));
+    expect(screen.getByLabelText("Typography")).toHaveValue("serif");
+    await user.click(screen.getByRole("link", { name: "Finance design: The next chapter" }));
+    expect(screen.getByLabelText("Layout")).toHaveValue("split");
+    await user.click(screen.getByRole("link", { name: "Retail design: The weekend edit" }));
+    expect(screen.getByLabelText("Layout")).toHaveValue("centered");
+    await vi.waitFor(() => expect(preview.mock.calls.some(([, init]) => typeof init?.body === "string" && JSON.parse(init.body).design?.font === "serif")).toBe(true));
+    const frame = await screen.findByTitle("Template preview");
+    expect(frame).toHaveAttribute("width", "1920");
+    expect(frame).toHaveAttribute("height", "1080");
+  });
+
+  test("a pending logo prevents submission, and a failed upload keeps the editor usable", async () => {
+    const user = userEvent.setup();
+    let finish!: (value: unknown) => void;
+    vi.stubGlobal("fetch", vi.fn((url: string, options?: RequestInit) => url === "/api/creative/logo" ? new Promise(resolve => { finish = resolve; }) : previewResponse(url, options)));
+    render(<CreativeHarness onSubmit={vi.fn()} />);
+    await screen.findByTitle("Template preview");
+    await user.upload(screen.getByLabelText(/Brand logo \(optional\)/), new File(["invalid"], "logo.png", { type: "image/png" }));
+    expect(screen.getByRole("button", { name: "Submit template for review" })).toBeDisabled();
+    await act(async () => finish({ ok: false, json: async () => ({ error: "Choose a valid PNG or JPEG logo." }) }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose a valid PNG or JPEG logo.");
+    expect(screen.getByRole("button", { name: "Submit template for review" })).toBeEnabled();
+    expect(screen.getByRole("textbox", { name: "Headline" })).toBeEnabled();
+  });
+
   test("keeps edits per topic and sends edited HTML to the preview service", async () => {
     const user = userEvent.setup();
     const preview = vi.fn(previewResponse);
@@ -187,7 +224,7 @@ describe("CreativeView", () => {
     render(<CreativeHarness onSubmit={onSubmit} items={[{ ...inventory[0], format: "static", deliveryMode: "static" }]} />);
 
     expect(screen.getByRole("heading", { name: "Upload media" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fixed template" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Design editor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Template HTML" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Format")).toHaveValue("Static Billboard");
     expect(screen.getByLabelText("Format")).toHaveAttribute("readonly");
@@ -216,9 +253,9 @@ describe("CreativeView", () => {
     expect(screen.getByLabelText("Width")).toHaveAttribute("readonly");
     expect(screen.getByLabelText("Height")).toHaveValue(1080);
     expect(screen.getByLabelText("Height")).toHaveAttribute("readonly");
-    expect(screen.getByRole("button", { name: "Fixed template" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Design editor" })).toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Campaign" }), "BK-STATIC");
-    expect(screen.queryByRole("button", { name: "Fixed template" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Design editor" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Width")).toHaveValue(5760);
     expect(screen.getByRole("button", { name: "Submit upload for review" })).toBeDisabled();
   });

@@ -1,0 +1,5 @@
+import type { Booking, InventoryItem } from "../../app/data";
+import type { Allocation } from "../../app/lib/digital-schedule";
+export const deliveryScreen: InventoryItem = { id: "INV-1", name: "City Hall Screen", operator: "City", format: "digital", x: 50, y: 50, address: "500 Donald St E", price: 15, impressions: 14000, traffic: 1, income: 1, audience: "A", competitor: "Low", occupancy: 0, imageInterval: 6, maxLoopSeconds: 30, availableFrom: "2026-01-01", availableTo: "2099-01-01", measurementSource: "City traffic count" };
+export const deliveryBooking: Booking = { id: "BK-1", advertiser: "Northline Fitness", inventoryId: "INV-1", campaign: "Winter push", start: "2026-10-01", end: "2026-10-10", adSlots: 1, creativeStatus: "approved", status: "live", spend: 300, paid: false, pop: 5 };
+export const deliveryAllocation: Allocation = { model: "fixed-slot-v1", slotSeconds: 6, slots: 1, loopSeconds: 30, startDate: "2026-10-01", endDate: "2026-10-10", timezone: "UTC", operatingHours: "00:00-24:00", dayparts: [] };

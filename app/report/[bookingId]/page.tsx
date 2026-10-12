@@ -3,6 +3,7 @@ import { getCurrentUser } from "../../lib/auth";
 import { responseSummaries } from "../../lib/responses";
 import { responseAccess } from "../../lib/responses-access";
 import CampaignReport from "../../component/campaign-report";
+import { bookingDeliveries } from "../../lib/delivery-report-db";
 
 type PageProps = { params: Promise<{ bookingId: string }> };
 
@@ -16,6 +17,9 @@ export default async function CampaignReportPage({ params }: PageProps) {
   if (!user) redirect(`/login?returnTo=${encodeURIComponent(`/report/${bookingId}`)}`);
   const access = await responseAccess(user, bookingId);
   if (!access || !access.inventory) notFound();
-  const [response] = await responseSummaries([bookingId]);
-  return <CampaignReport booking={access.booking} screen={access.inventory} response={response ?? null} generatedAt={new Date().toISOString()} />;
+  const asOf = new Date();
+  const [[response], [delivery]] = await Promise.all([
+    responseSummaries([bookingId]), bookingDeliveries([access.booking], [access.inventory], asOf),
+  ]);
+  return <CampaignReport booking={access.booking} screen={access.inventory} delivery={delivery} response={response ?? null} generatedAt={asOf.toISOString()} />;
 }

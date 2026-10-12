@@ -11,7 +11,7 @@ import { EmptyState, PanelHeading } from "./shared-ui";
 
 /** Responses an ad produced: QR scans and link visits counted by EasyAD, and promo-code use the advertiser reports. */
 export function costPerResponse(spend: number, summary: Pick<ResponseSummary, "responses" | "promoRedemptions"> | undefined) {
-  const total = (summary?.responses ?? 0) + (summary?.promoRedemptions ?? 0);
+  const total = summary?.responses ?? 0;
   return total > 0 ? spend / total : null;
 }
 
@@ -36,14 +36,17 @@ export default function ResponsesPanel({ bookings, inventory, canEdit }: { booki
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/responses", { cache: "no-store" });
       if (!response.ok) throw new Error();
       setResponses(((await response.json()) as { responses: ResponseSummary[] }).responses);
+      setLoadFailed(false);
     } catch {
-      setResponses([]);
+      setResponses(null);
+      setLoadFailed(true);
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -60,13 +63,15 @@ export default function ResponsesPanel({ bookings, inventory, canEdit }: { booki
   const byBooking = new Map((responses ?? []).map((entry) => [entry.bookingId, entry]));
   const rows = campaignOrder(bookings, byBooking);
   const visible = showAll ? rows : rows.slice(0, VISIBLE_CAMPAIGNS);
-  const totalResponses = (responses ?? []).reduce((sum, entry) => sum + entry.responses + entry.promoRedemptions, 0);
+  const totalResponses = (responses ?? []).reduce((sum, entry) => sum + entry.responses, 0);
 
   return (
     <div className="panel span-2 responses-panel">
-      <PanelHeading eyebrow={canEdit ? "Results" : "Responses"} title={canEdit ? "What your ads made people do" : "Responses to ads on your screens"} action={<span className="status">{t("{count} responses", { count: formatNumber(totalResponses) })}</span>} />
+      <PanelHeading eyebrow={canEdit ? "Results" : "Responses"} title={canEdit ? "What your ads made people do" : "Responses to ads on your screens"} action={<span className="status">{responses === null ? "—" : t("{count} scans and visits", { count: formatNumber(totalResponses) })}</span>} />
       <p className="responses-intro">{t("A QR code or short link on an ad counts every scan. EasyAD stores only the time of each scan, never who scanned. Promo-code use is the number you report.")}</p>
+      <p className="responses-intro">{t("Scans and link visits can repeat. Promo uses may overlap with scans and are reported separately.")}</p>
       {error ? <p className="form-error" role="alert">{t(error)}</p> : null}
+      {loadFailed ? <p role="alert">{t("Response counts are unavailable.")} <button type="button" className="ghost-button" onClick={() => { void load(); }}>{t("Retry")}</button></p> : null}
       {!rows.length ? <EmptyState title="No campaigns yet" copy="Book a screen first. Each campaign then gets its own QR code and link." action={canEdit ? <a className="primary-button" href="/?role=advertiser&view=discover">{t("Find screens near you")}</a> : undefined} /> : (
         <ul className="responses-list">
           {visible.map((booking) => {
@@ -81,13 +86,13 @@ export default function ResponsesPanel({ bookings, inventory, canEdit }: { booki
                   {summary ? <>
                     <span className="responses-figure"><strong>{formatNumber(summary.responses)}</strong><small>{t("QR scans and link visits")}</small></span>
                     <span className="responses-figure"><strong>{summary.promoCode ? formatNumber(summary.promoRedemptions) : "—"}</strong><small>{summary.promoCode ? t("Uses of {code} (you report)", { code: summary.promoCode }) : t("No promo code")}</small></span>
-                    <span className="responses-figure"><strong>{cost === null ? "—" : money(cost, locale, true)}</strong><small>{t("Cost per response")}</small></span>
+                    <span className="responses-figure"><strong>{cost === null ? "—" : money(cost, locale, true)}</strong><small>{t("Cost per scan or link visit")}</small></span>
                     <span className="responses-spark" role="img" aria-label={t("Responses in the last 14 days: {counts}", { counts: summary.daily.map((day) => day.count).join(", ") })}>
                       {summary.daily.map((day) => <i key={day.date} title={`${formatDate(`${day.date}T12:00:00`, { month: "short", day: "numeric" })}: ${day.count}`} style={{ height: `${Math.max(6, (day.count / peak) * 100)}%` }} className={day.count ? "" : "is-zero"} />)}
                     </span>
-                  </> : <span className="responses-none">{t("No QR code or link yet.")}</span>}
+                  </> : <span className="responses-none">{t(responses === null ? (loadFailed ? "Response counts are unavailable." : "Loading responses…") : "No QR code or link yet.")}</span>}
                   <span className="responses-actions">
-                    {canEdit ? <button type="button" className="secondary-button" onClick={() => setEditing(editing === booking.id ? null : booking.id)}><Link2 aria-hidden="true" />{t(summary ? "Edit link" : "Add a QR code or link")}</button> : null}
+                    {canEdit && responses !== null ? <button type="button" className="secondary-button" onClick={() => setEditing(editing === booking.id ? null : booking.id)}><Link2 aria-hidden="true" />{t(summary ? "Edit link" : "Add a QR code or link")}</button> : null}
                     {summary ? <a className="ghost-button" href={`/api/bookings/${encodeURIComponent(booking.id)}/responses/qr`} download><Download aria-hidden="true" />{t("QR code")}</a> : null}
                     <a className="ghost-button" href={`/report/${encodeURIComponent(booking.id)}`} target="_blank" rel="noreferrer"><FileText aria-hidden="true" />{t("Report (PDF)")}</a>
                   </span>

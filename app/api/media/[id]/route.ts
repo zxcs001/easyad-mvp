@@ -22,8 +22,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (body.approvalStatus !== "approved" && body.approvalStatus !== "rejected") {
     return NextResponse.json({ error: "Choose approve or reject" }, { status: 400 });
   }
-  const resource = await updateMediaApprovalStatus(id, body.approvalStatus,user.id);
-  if (!resource) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+  if (body.revision !== undefined && (!Number.isSafeInteger(body.revision) || body.revision < 1)) return NextResponse.json({ error: "Reload this resource before editing its schedule." }, { status: 422 });
+  const resource = await updateMediaApprovalStatus(id, body.approvalStatus,user.id,body.revision);
+  if (!resource) return NextResponse.json({ error: body.revision === undefined ? "Resource not found" : "This content changed. Reload before saving its schedule." }, { status: body.revision === undefined ? 404 : 409 });
   return NextResponse.json({ resource });
 }
 

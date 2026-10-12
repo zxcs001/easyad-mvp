@@ -8,6 +8,7 @@ import { ApprovalEvent, Booking, Creative, DeviceAlert, DeviceAlertType, Display
 import { isLocale, type Locale } from "../i18n/config";
 import { expectedPlays, splitRevenue } from "../utils";
 import { isDigitalInventory } from "./inventory-delivery";
+import { contentScheduleEligible, type ContentSchedule } from "./content-schedule";
 
 type UserRow = {
   screen_scope?: string[]|null;
@@ -99,6 +100,7 @@ type ApprovalEventRow = {
 };
 
 type MediaRow = {
+  recurring_schedule: ContentSchedule | null;
   starts_at: string|null; ends_at:string|null; revision:number;
   id: string;
   inventory_id: string;
@@ -188,6 +190,7 @@ type InventoryAdvertiserResourceRow = CreativeRow & {
 };
 
 type PublicMediaRow = {
+  recurring_schedule?: ContentSchedule | null;
   original_name: string | null;
   mime_type: string | null;
   storage_path: string;
@@ -750,7 +753,7 @@ export async function createCreative(creative: Omit<Creative, "id" | "createdAt"
 
 export async function getPublicMediaResource(id: string) {
   const media = await row<PublicMediaRow>(`
-    SELECT media_resources.original_name, media_resources.mime_type, media_resources.storage_path
+    SELECT media_resources.original_name, media_resources.mime_type, media_resources.storage_path, media_resources.recurring_schedule
     FROM media_resources
     JOIN inventory ON inventory.id = media_resources.inventory_id
     WHERE media_resources.id = $1
@@ -758,7 +761,7 @@ export async function getPublicMediaResource(id: string) {
       AND inventory.approval_status = 'approved' AND inventory.content_visibility='public'
       AND (media_resources.starts_at IS NULL OR media_resources.starts_at::timestamptz <= NOW()) AND (media_resources.ends_at IS NULL OR media_resources.ends_at::timestamptz > NOW())
   `, [id]);
-  if (media) return {
+  if (media && contentScheduleEligible(media.recurring_schedule)) return {
     originalName: media.original_name ?? "media-resource",
     mimeType: media.mime_type ?? "application/octet-stream",
     storagePath: media.storage_path,
@@ -883,19 +886,36 @@ export async function createMediaResource(resource: MediaResource & { storagePat
   await database.query("SELECT id FROM inventory WHERE id=$1 FOR SHARE",[resource.inventoryId]);
   await database.query(`
     INSERT INTO media_resources
-    (id, inventory_id, owner_id, title, original_name, mime_type, media_type, approval_status, size_bytes, storage_path, public_url, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  `, [resource.id, resource.inventoryId, resource.ownerId, resource.title, resource.originalName, resource.mimeType, resource.mediaType, resource.approvalStatus, resource.sizeBytes, resource.storagePath, resource.publicUrl, resource.createdAt]);
+    (id, inventory_id, owner_id, title, original_name, mime_type, media_type, approval_status, size_bytes, storage_path, public_url, created_at, starts_at, ends_at, recurring_schedule)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
+  `, [resource.id, resource.inventoryId, resource.ownerId, resource.title, resource.originalName, resource.mimeType, resource.mediaType, resource.approvalStatus, resource.sizeBytes, resource.storagePath, resource.publicUrl, resource.createdAt, resource.startsAt ?? null, resource.endsAt ?? null, JSON.stringify(resource.contentSchedule ?? null)]);
   if(process.env.FEATURE_FLEET_OPERATIONS==="true")await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,action,revision,result) SELECT $1,$2,institution_id,id,'media_uploaded',1,'success' FROM inventory WHERE id=$3",[`AUD-${randomUUID()}`,resource.ownerId,resource.inventoryId]);
-  await database.query("COMMIT");return resource;
+  await database.query("COMMIT");return { ...resource, revision: 1, contentSchedule: resource.contentSchedule ?? null };
   }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
 }
 
-export async function updateMediaApprovalStatus(id:string,approvalStatus:MediaResource["approvalStatus"],actorId?:string){
- await ensureSchema();const database=await getPool().connect();try{await database.query("BEGIN");const result=await database.query<MediaRow>("UPDATE media_resources SET approval_status=$1,revision=revision+1 WHERE id=$2 RETURNING *",[approvalStatus,id]);const media=result.rows[0];
+export async function updateMediaApprovalStatus(id:string,approvalStatus:MediaResource["approvalStatus"],actorId?:string,expectedRevision?:number){
+ await ensureSchema();const database=await getPool().connect();try{await database.query("BEGIN");const result=await database.query<MediaRow>("UPDATE media_resources SET approval_status=$1,revision=revision+1 WHERE id=$2 AND ($3::integer IS NULL OR revision=$3) RETURNING *",[approvalStatus,id,expectedRevision??null]);const media=result.rows[0];
  if(media&&actorId&&process.env.FEATURE_FLEET_OPERATIONS==="true")await database.query("INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,action,revision,result) SELECT $1,$2,institution_id,id,$3,$4,$5,'success' FROM inventory WHERE id=$6",[`AUD-${randomUUID()}`,actorId,id,`media_${approvalStatus}`,media.revision,media.inventory_id]);
  await database.query("COMMIT");return media?mapMedia(media):null;
  }catch(e){await database.query("ROLLBACK");throw e;}finally{database.release();}
+}
+
+export async function updateMediaSchedule(id: string, schedule: ContentSchedule | null, revision: number, actorId: string, requireApproval: boolean) {
+  await ensureSchema();
+  const database = await getPool().connect();
+  try {
+    await database.query("BEGIN");
+    const result = await database.query<MediaRow>(`UPDATE media_resources SET recurring_schedule=$2::jsonb,
+      approval_status=CASE WHEN $4 THEN 'pending review' ELSE approval_status END, revision=revision+1
+      WHERE id=$1 AND revision=$3 RETURNING *`, [id, JSON.stringify(schedule), revision, requireApproval]);
+    const media = result.rows[0];
+    if (media) await database.query(`INSERT INTO fleet_audit(id,actor_id,institution_id,target_id,resource_id,action,revision,result)
+      SELECT $1,$2,institution_id,id,$3,'media_schedule_updated',$4,'success' FROM inventory WHERE id=$5`, [`AUD-${randomUUID()}`, actorId, id, media.revision, media.inventory_id]);
+    await database.query("COMMIT");
+    return media ? mapMedia(media) : null;
+  } catch (error) { await database.query("ROLLBACK"); throw error; }
+  finally { database.release(); }
 }
 
 export async function listDeviceAlerts(institutionId?: string, asOf = new Date().toISOString()) {
@@ -1288,6 +1308,7 @@ function mapApprovalEvent(entry: ApprovalEventRow): ApprovalEvent {
 
 function mapMedia(entry: MediaRow): MediaResource {
   return {
+    contentSchedule: entry.recurring_schedule ?? null,
     startsAt:entry.starts_at,endsAt:entry.ends_at,revision:entry.revision,
     id: entry.id,
     inventoryId: entry.inventory_id,

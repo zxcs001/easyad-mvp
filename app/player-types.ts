@@ -2,6 +2,7 @@ import type { DeviceAlert, DisplayTemplate } from "./data";
 import type { Locale } from "./i18n/config";
 
 export type PlayerSlide = {
+  contentSchedule?: import("./lib/content-schedule").ContentSchedule | null;
   placementId?: string;
   legacyBookingId?: string;
   creativeVersionId?: string;
@@ -40,6 +41,7 @@ export type PlayerTiming = { pollMs: number; heartbeatMs: number; staleMs: numbe
 export type PlayerStatus = {
   enabled: boolean;
   player: null | {
+    health?: import("./lib/player-diagnostics").FleetPlayerHealth;
     id: string;
     connection: "waiting" | "online" | "stale";
     lastSeenAt: string | null;

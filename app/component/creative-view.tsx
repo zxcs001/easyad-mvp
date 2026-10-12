@@ -13,10 +13,13 @@ import LocalDateTime from "./local-date-time";
 import { isStaticInventory } from "../lib/inventory-delivery";
 import { effectiveTemplateHtml } from "../quick-ad";
 import { GlanceTest, QuickAdEditor } from "./quick-ad-editor";
+import CreativeDesignControls from "./creative-design-controls";
+import CreativePreview, { CreativeCanvas } from "./creative-preview";
+import { useCreativeDraft } from "./use-creative-draft";
 
 export default function CreativeView({
   draft: inputDraft,
-  setDraft,
+  setDraft: setInputDraft,
   bookings,
   inventory,
   creatives,
@@ -26,6 +29,7 @@ export default function CreativeView({
   selectedBookingId,
   setSelectedBookingId,
   lockBookingSelection = false,
+  draftOwnerId,
 }: {
   draft: CreativeDraft;
   setDraft: Dispatch<SetStateAction<CreativeDraft>>;
@@ -38,6 +42,7 @@ export default function CreativeView({
   selectedBookingId: string;
   setSelectedBookingId: (id: string) => void;
   lockBookingSelection?: boolean;
+  draftOwnerId?: string;
 }) {
   const { t } = useI18n();
   const [preferredSource, setSourceMode] = useState<Creative["source"]>("template");
@@ -48,6 +53,9 @@ export default function CreativeView({
   const selectedBooking = selectedBookingId ? eligibleBookings.find((booking) => booking.id === selectedBookingId) : eligibleBookings[0];
   const cancellationBookingId = selectedBooking?.id ?? selectedBookingId;
   const selectedInventory = inventory.find((item) => item.id === selectedBooking?.inventoryId);
+  const history = useCreativeDraft(inputDraft, setInputDraft, selectedBooking?.id ?? "", draftOwnerId);
+  const setDraft = history.setDraft;
+  const [logoPending, setLogoPending] = useState(false);
   const requiresUpload = selectedInventory ? isStaticInventory(selectedInventory) : inputDraft.format === "static";
   const sourceMode = requiresUpload ? "upload" : preferredSource;
   const draft = selectedInventory ? creativeDraftForFormat(inputDraft, selectedInventory.format) : inputDraft;
@@ -55,7 +63,8 @@ export default function CreativeView({
   const handEdited = draft.htmlByTopic?.[draft.template] !== undefined;
   const [htmlEditorOpen, setHtmlEditorOpen] = useState(handEdited);
   const responseUrl = (draft.responseUrl ?? "").trim();
-  const previewKey = `${draft.template}\u0000${templateHtml}\u0000${responseUrl}`;
+  const design = draft.designsByTopic?.[draft.template];
+  const previewKey = `${selectedBooking?.id}\u0000${draft.template}\u0000${templateHtml}\u0000${responseUrl}\u0000${JSON.stringify(design)}\u0000${draft.width}x${draft.height}`;
   const [htmlPreview, setHtmlPreview] = useState<{ key: string; document: string } | null>(null);
   const [examplePreviews, setExamplePreviews] = useState<Partial<Record<CreativeTemplateTopic, string>>>({});
   const [htmlError, setHtmlError] = useState<string | null>(null);
@@ -74,12 +83,14 @@ export default function CreativeView({
     fileSize: uploadFile ? Math.max(1, Math.ceil(uploadFile.size / 1048576)) : draft.fileSize,
   });
   const ready = validations.every((check) => check.ok);
-  const canSubmitCurrentMode = ready && (sourceMode === "template" ? htmlPreview?.key === previewKey : Boolean(uploadFile && uploadFileType));
+  const canSubmitCurrentMode = history.ready && !logoPending && ready && (sourceMode === "template" ? htmlPreview?.key === previewKey : Boolean(uploadFile && uploadFileType));
   const submittedCreative = selectedBooking ? creatives.find((creative) => creative.bookingId === selectedBooking.id) : undefined;
 
   useEffect(() => {
-    if (selectedInventory) setDraft((current) => creativeDraftForFormat(current, selectedInventory.format));
-  }, [selectedInventory?.format, setDraft]);
+    if (selectedInventory) setInputDraft((current) => creativeDraftForFormat(current, selectedInventory.format));
+  }, [selectedInventory?.format, setInputDraft]);
+
+  useEffect(() => { setUploadFile(null); setSourceMode("template"); setHtmlPreview(null); setHtmlError(null); }, [selectedBooking?.id]);
 
   async function submitCurrentCreative() {
     if (!selectedBooking || actionPendingRef.current) return false;
@@ -130,17 +141,18 @@ export default function CreativeView({
   }, [uploadFile]);
 
   useEffect(() => {
-    if (sourceMode !== "template") return;
+    if (sourceMode !== "template" || !history.ready) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch("/api/creative/template-preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ template: draft.template, html: templateHtml, ...(responseUrl ? { responseUrl } : {}) }),
+          body: JSON.stringify({ template: draft.template, html: templateHtml, ...(responseUrl ? { responseUrl } : {}), ...(design ? { design } : {}) }),
           signal: controller.signal,
         });
         const result = await response.json() as { document?: string; error?: string };
+        if (controller.signal.aborted) return;
         if (!response.ok || !result.document) throw new Error(result.error ?? "Preview could not be generated.");
         setHtmlPreview({ key: previewKey, document: result.document });
         setHtmlError(null);
@@ -151,7 +163,7 @@ export default function CreativeView({
       }
     }, 250);
     return () => { controller.abort(); window.clearTimeout(timer); };
-  }, [draft.template, previewKey, responseUrl, sourceMode, templateHtml]);
+  }, [draft.template, previewKey, responseUrl, sourceMode, templateHtml, history.ready]);
 
   useEffect(() => {
     if (sourceMode !== "template") return;
@@ -184,14 +196,25 @@ export default function CreativeView({
 
   return (
     <section className="grid creative-grid">
-      <div className="panel">
-        <PanelHeading eyebrow="Creative source" title={sourceMode === "template" ? "Fixed template" : "Upload media"} />
+      <div className="panel creative-edit-panel" onKeyDown={(event) => {
+        if (!(event.metaKey || event.ctrlKey) || event.altKey || actionPending || logoPending) return;
+        const key = event.key.toLowerCase();
+        if (key === "z") { event.preventDefault(); if (event.shiftKey) history.redo(); else history.undo(); }
+        if (key === "y" && event.ctrlKey) { event.preventDefault(); history.redo(); }
+      }}>
+        <PanelHeading eyebrow="Creative source" title={sourceMode === "template" ? "Design editor" : "Upload media"} />
+        <fieldset className="creative-edit-fields" disabled={actionPending || !history.ready}>
         {requiresUpload ? <p className="helper-text">{t("Static billboards require uploaded artwork. Choose a PNG, JPG, or PDF file.")}</p> : <div className="creative-source-tabs" role="tablist" aria-label={t("Creative source")}>
-          <button type="button" className={sourceMode === "template" ? "active" : ""} onClick={() => setSourceMode("template")}>{t("Fixed template")}</button>
+          <button type="button" className={sourceMode === "template" ? "active" : ""} onClick={() => setSourceMode("template")}>{t("Design editor")}</button>
           <button type="button" className={sourceMode === "upload" ? "active" : ""} onClick={() => setSourceMode("upload")}>{t("Upload media")}</button>
         </div>}
         {sourceMode === "template" ? (
           <>
+            <div className="creative-editor-toolbar">
+              <div className="button-row"><button type="button" className="secondary-button" disabled={!history.canUndo || logoPending} onClick={history.undo}>{t("Undo")}</button><button type="button" className="secondary-button" disabled={!history.canRedo || logoPending} onClick={history.redo}>{t("Redo")}</button></div>
+              {history.persistent ? <small role="status">{t(!history.ready ? "Loading draft…" : history.saveState === "unavailable" ? "Draft could not be saved in this browser." : history.saveState === "saving" ? "Saving draft…" : "Draft saved in this browser.")}</small> : null}
+            </div>
+            {history.restored ? <p className="helper-text">{t("Your last draft was restored. Uploaded artwork must be selected again.")}</p> : null}
             <div className="template-gallery-heading">
               <strong>{t("Choose a ready-made design")}</strong>
               <span>{t("Each design includes example copy. Select one and replace the details for your campaign.")}</span>
@@ -207,7 +230,7 @@ export default function CreativeView({
                   setDraft((current) => ({ ...current, template }));
                 }}>
                   <span className={`template-choice-art ${template}`}>
-                    {examplePreviews[template] ? <iframe title={t("{topic} design example", { topic: t(capitalize(template)) })} sandbox="" referrerPolicy="no-referrer" srcDoc={examplePreviews[template]} tabIndex={-1} /> : null}
+                    {examplePreviews[template] ? <CreativeCanvas title={t("{topic} design example", { topic: t(capitalize(template)) })} document={examplePreviews[template]} width={1920} height={1080} /> : null}
                   </span>
                   <span className="template-choice-copy">
                     <span className="template-choice-topic">{t(capitalize(template))}</span>
@@ -217,9 +240,7 @@ export default function CreativeView({
                 </a>
               ))}
             </div>
-            <div className="creative-html-preview" style={{ aspectRatio: spec.ratio }}>
-              {htmlPreview?.key === previewKey ? <iframe title={t("Template preview")} sandbox="" referrerPolicy="no-referrer" srcDoc={htmlPreview.document} /> : <span>{t("Preparing safe preview…")}</span>}
-            </div>
+            <CreativeDesignControls key={`${selectedBooking.id}:${draft.template}`} topic={draft.template} value={design} ownerId={draftOwnerId} onBusyChange={setLogoPending} onChange={(next) => setDraft(current => ({ ...current, designsByTopic: { ...current.designsByTopic, [draft.template]: next } }))} />
             <QuickAdEditor
               topic={draft.template}
               fields={draft.fieldsByTopic?.[draft.template]}
@@ -237,7 +258,7 @@ export default function CreativeView({
               </label>
               <div className="creative-html-editor-foot">
                 <small>{t("Edit the words and layout tags. Scripts, links, images, and inline styles are removed for safety.")}</small>
-                <button type="button" onClick={() => setDraft((current) => ({ ...current, htmlByTopic: withoutTopic(current.htmlByTopic, current.template), fieldsByTopic: withoutTopic(current.fieldsByTopic, current.template) }))}>{t("Reset this topic")}</button>
+                <button type="button" onClick={() => setDraft((current) => ({ ...current, htmlByTopic: withoutTopic(current.htmlByTopic, current.template), fieldsByTopic: withoutTopic(current.fieldsByTopic, current.template), designsByTopic: withoutTopic(current.designsByTopic, current.template) }))}>{t("Reset this topic")}</button>
               </div>
             </details>
             <label className="creative-qr-field">{t("QR code on the ad (optional)")}
@@ -277,7 +298,10 @@ export default function CreativeView({
             ) : null}
           </div>
         )}
+        </fieldset>
       </div>
+      <div className="creative-review-column">
+        {sourceMode === "template" ? <div className="panel"><CreativePreview document={htmlPreview?.key === previewKey ? htmlPreview.document : undefined} width={draft.width} height={draft.height} safeZone={spec.safeZone} /></div> : null}
       <div className="panel">
         <PanelHeading eyebrow="Automated validation" title="Output checks" action={<span className={`status ${canSubmitCurrentMode ? "good" : "bad"}`}>{t(canSubmitCurrentMode ? "Ready" : "Fix needed")}</span>} />
         <div className="creative-form">
@@ -321,6 +345,7 @@ export default function CreativeView({
             </AsyncButton>
           </div>
         </div>
+      </div>
       </div>
       <div className="panel span-2">
         <PanelHeading eyebrow="Creative queue" title="Submissions" />

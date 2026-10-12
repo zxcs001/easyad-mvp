@@ -18,6 +18,7 @@ import { isDigitalInventory, isStaticInventory } from "../lib/inventory-delivery
 import { inventoryAvailabilityLabel, isValidAvailabilityWindow } from "../lib/inventory-availability";
 import { screenUseOf } from "../lib/screen-use-policy";
 import { daypartSummary } from "./daypart-summary";
+import { ContentScheduleSummary } from "./content-schedule-editor";
 
 export function InventoryView({
   inventory,
@@ -631,6 +632,7 @@ export function ApprovalsView({
                   <span className="eyebrow">{t("Operator-submitted device content")}</span>
                   <strong>{resource.title}</strong>
                   <small>{device?.name ?? resource.inventoryId} - {resource.originalName}</small>
+                  <ContentScheduleSummary resource={resource} />
                   <small>{t("Institution-owned uploads bypass this queue; delegated operator uploads require review.")}</small>
                 </div>
                 <a className="approval-creative-preview" href={resource.publicUrl} target="_blank" rel="noreferrer" aria-label={t("Preview device content {title}", { title: resource.title })}>

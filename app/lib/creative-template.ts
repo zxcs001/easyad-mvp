@@ -1,5 +1,6 @@
 import { parseFragment, type DefaultTreeAdapterTypes } from "parse5";
 import { isCreativeTemplateTopic, type CreativeTemplateTopic } from "../creative-templates";
+import { creativeDesign } from "../creative-design";
 
 const allowedTags = new Set(["section", "article", "div", "p", "h1", "h2", "h3", "span", "strong", "em", "small", "br", "ul", "ol", "li"]);
 const discardWithContents = new Set(["script", "style", "svg", "math", "iframe", "object", "embed", "form", "template", "textarea", "noscript", "audio", "video", "picture", "select", "button"]);
@@ -42,12 +43,62 @@ function escapeHtml(value: string) {
  * generator (app/lib/responses.ts), never from the person's HTML: it is the
  * one piece of markup that does not pass through the sanitizer.
  */
-export function renderCreativeDocument(topic: CreativeTemplateTopic, sanitizedHtml: string, options: { qrSvg?: string } = {}) {
+export function renderCreativeDocument(topic: CreativeTemplateTopic, sanitizedHtml: string, options: { qrSvg?: string; design?: unknown } = {}) {
   if (!isCreativeTemplateTopic(topic)) throw new Error("Unknown template topic.");
+  const design = options.design === undefined ? null : creativeDesign(topic, options.design);
+  const classes = design ? ` ad-designed ad-layout-${design.layout} ad-font-${design.font}${design.palette === "custom" ? " ad-custom-colours" : ""}${design.decorations ? "" : " ad-no-art"}${design.logoDataUrl ? " ad-has-logo" : ""}` : "";
+  const style = design ? ` style="--ad-bg:${design.background};--ad-ink:${design.foreground};--ad-accent:${design.accent};--ad-scale:${design.headlineScale / 100}"` : "";
+  const logo = design?.logoDataUrl ? `<aside class="ad-logo"><img src="${design.logoDataUrl}" alt="Brand logo"></aside>` : "";
   const qr = options.qrSvg && /^<svg[\s\S]*<\/svg>\s*$/.test(options.qrSvg.trim()) && !/<script|on\w+=|href=/i.test(options.qrSvg)
     ? `<aside class="ad-qr" aria-label="QR code">${options.qrSvg.trim()}<span>SCAN ME</span></aside>` : "";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>${templateCss}</style></head><body class="${topic}"><main class="artwork">${sanitizedHtml}${qr}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>${templateCss}${designCss}</style></head><body class="${topic}${classes}"${style}><main class="artwork">${sanitizedHtml}${logo}${qr}</main></body></html>`;
 }
+
+const designCss = `
+  .ad-custom-colours{background:var(--ad-bg);color:var(--ad-ink)}
+  .ad-custom-colours .artwork{background:var(--ad-bg)}
+  .ad-custom-colours h1 em,.ad-custom-colours .finance-overline,.ad-custom-colours .finance-action,.ad-custom-colours .finance-foot,.ad-custom-colours .event-overline,.ad-custom-colours .event-action span,.ad-custom-colours .event-foot{color:var(--ad-accent)}
+  .ad-custom-colours .retail-sun,.ad-custom-colours .finance-mark,.ad-custom-colours .finance-dot,.ad-custom-colours .event-streak{background:var(--ad-accent)}
+  .ad-custom-colours .retail-bag{background:var(--ad-ink);box-shadow:1vw 1.2vw 0 var(--ad-accent)}
+  .ad-custom-colours .retail-bag:before{border-color:var(--ad-ink)}
+  .ad-custom-colours .retail-card{color:var(--ad-ink);background:var(--ad-bg)}
+  .ad-custom-colours .retail-action,.ad-custom-colours .retail-foot,.ad-custom-colours .finance-foot,.ad-custom-colours .event-foot,.ad-custom-colours .event-action span{border-color:var(--ad-accent)}
+  .ad-custom-colours .finance-ring{border-color:var(--ad-accent)}
+  .ad-custom-colours .event-orb{background:var(--ad-accent);box-shadow:none}
+  .ad-designed .retail-copy,.ad-designed .finance-copy,.ad-designed .event-copy{left:8%;top:8%;width:58%}
+  .ad-designed .retail-foot,.ad-designed .finance-foot,.ad-designed .event-foot{left:8%;right:8%;bottom:8%}
+  .ad-designed .ad-qr{right:8%;bottom:16%}
+  .retail.ad-designed h1{font-size:calc(clamp(26px,7.7vw,150px) * var(--ad-scale) * var(--ad-layout-scale,1))}
+  .finance.ad-designed h1{font-size:calc(clamp(25px,6.5vw,126px) * var(--ad-scale) * var(--ad-layout-scale,1))}
+  .event.ad-designed h1{font-size:calc(clamp(30px,9vw,175px) * var(--ad-scale) * var(--ad-layout-scale,1))}
+  .ad-font-sans h1{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.03em}
+  .ad-font-serif h1{font-family:Georgia,'Times New Roman',serif;letter-spacing:-.04em}
+  .ad-font-condensed h1{font-family:Impact,'Arial Narrow',Arial,sans-serif;letter-spacing:-.025em}
+  .ad-layout-centered .retail-copy,.ad-layout-centered .finance-copy,.ad-layout-centered .event-copy{width:84%;text-align:center}
+  .ad-layout-centered .retail-detail,.ad-layout-centered .finance-detail{max-width:85%;margin-left:auto;margin-right:auto}
+  .ad-layout-centered .finance-brand,.ad-layout-centered .event-action{justify-content:center}
+  .ad-layout-centered .retail-scene,.ad-layout-centered .finance-art,.ad-layout-centered .event-art{opacity:.18}
+  .ad-layout-centered.ad-has-logo{--ad-layout-scale:.8}
+  .ad-layout-centered.ad-has-logo .retail-copy,.ad-layout-centered.ad-has-logo .finance-copy,.ad-layout-centered.ad-has-logo .event-copy{top:20%}
+  .ad-layout-type .retail-copy,.ad-layout-type .finance-copy,.ad-layout-type .event-copy{width:84%}
+  .ad-layout-type.ad-has-logo .retail-copy,.ad-layout-type.ad-has-logo .finance-copy,.ad-layout-type.ad-has-logo .event-copy{width:68%}
+  .ad-no-art .retail-scene,.ad-no-art .finance-art,.ad-no-art .event-art,.ad-layout-type .retail-scene,.ad-layout-type .finance-art,.ad-layout-type .event-art{display:none}
+  .ad-logo{position:absolute;z-index:6;right:8%;top:8%;width:16%;height:10%;padding:.5vw;background:#fff;border-radius:.3vw;display:grid;place-items:center}
+  .ad-logo img{display:block;max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+  @media(min-aspect-ratio:5/2){
+    .ad-designed .retail-copy,.ad-designed .finance-copy,.ad-designed .event-copy{left:10%;top:10%;width:54%}
+    .ad-layout-centered .retail-copy,.ad-layout-centered .finance-copy,.ad-layout-centered .event-copy{width:80%}
+    .ad-layout-centered.ad-has-logo .retail-copy,.ad-layout-centered.ad-has-logo .finance-copy,.ad-layout-centered.ad-has-logo .event-copy{top:20%}
+    .ad-layout-type .retail-copy,.ad-layout-type .finance-copy,.ad-layout-type .event-copy{width:80%}
+    .ad-layout-type.ad-has-logo .retail-copy,.ad-layout-type.ad-has-logo .finance-copy,.ad-layout-type.ad-has-logo .event-copy{width:64%}
+    .ad-designed .retail-foot,.ad-designed .finance-foot,.ad-designed .event-foot{left:10%;right:10%;bottom:10%}
+    .ad-designed .ad-logo{right:10%;top:10%}
+    .ad-designed .ad-qr{right:10%;bottom:18%}
+    .ad-designed h1{margin-top:2vh;margin-bottom:1.3vh}
+    .ad-designed .finance-overline{margin-top:4vh}
+    .ad-designed .retail-action,.ad-designed .finance-action,.ad-designed .event-action{margin-top:2vh}
+  }
+`;
 
 const templateCss = `
   .ad-qr{position:absolute;z-index:9;right:3%;bottom:12%;width:13.5vw;min-width:64px;padding:.6vw .6vw .3vw;background:#fff;border-radius:.6vw;box-shadow:0 .3vw 1.2vw rgba(0,0,0,.25);text-align:center}
